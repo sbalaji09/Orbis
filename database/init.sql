@@ -12,13 +12,13 @@ CREATE TABLE traces (
 CREATE TABLE spans (
     span_id INT PRIMARY KEY,
     trace_id INTEGER REFERENCES traces(trace_id),
-    parent_span_id INTEGER REFERENCES spans(span_id),
+    parent_span_ids INTEGER[],
     start_time DATETIME,
     end_time DATETIME,
     duration INTERVAL NOT NULL,
-    -- the input and output preview are just the first 200 characters of the input and output for quick viewing when displaying on the frontend DAG--
+    -- the point of the preview and blob_url is so that we can see the first 200 characters of the input --
+    -- and output for displaying on the DAG instead of having to grab the entire prompt from the buckets -- 
     input_preview VARCHAR(200),
-    -- the input and output blob urls are used for storing the url at which the data is stored--
     input_blob_url VARCHAR(250),
     output_preview VARCHAR(200),
     output_blob_url VARCHAR(250),
