@@ -4,6 +4,8 @@ from datetime import datetime
 import pandas as pd
 from botocore.exceptions import ClientError
 import requests
+from db_connection import SpanDB
+from fastapi import Request
 
 
 class SpanIn(BaseModel):
@@ -30,7 +32,7 @@ app = FastAPI()
 
 # post endpoint from the SDK to the backend infra
 @app.post("/span")
-async def post_span(span: SpanIn):
+async def post_span(request: Request, span: SpanIn):
     if not validate_span(span):
         raise ValueError("Span is not valid and could not be processed")
     
@@ -50,6 +52,7 @@ async def post_span(span: SpanIn):
     if not res:
         raise ValueError(error)
 
+    span_obj: SpanDB = create_spandb_object(request, span, input_url, output_url)
 
 
 def validate_span(span: SpanIn) -> bool:
@@ -72,3 +75,27 @@ def add_content_presigned_url(content: str, presigned_url: str):
     else:
         print(f"Upload failed: {response.text}")
         return False, f"Upload failed: {response.text}"
+
+def create_spandb_object(request: Request, span: SpanIn, input_blob_url: str, output_blob_url: str):
+    trace_val = get_trace(request)
+    new_span = SpanDB (
+        trace_id=trace_val,
+        parent_spans_ids=span.parent_span_id,
+        start_time=span.start_time,
+        end_time=span.end_time,
+        duration=span.duration,
+        input_preview=span.input_data[:200],
+        input_blob_url=input_blob_url,
+        output_preview=span.output_data[:200],
+        output_blob_url=output_blob_url,
+        llm_model=span.model,
+        prompt_tokens=span.input_tokens,
+        completion_tokens=span.output_tokens,
+        cost=span.total_cost,
+        status=span.status,
+        error_message=span.error_message,
+    )
+    return new_span
+
+def get_trace(request: Request):
+    return request.session.get('trace_id')
