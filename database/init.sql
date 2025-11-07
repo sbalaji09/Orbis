@@ -27,3 +27,19 @@ CREATE TABLE spans (
     cost FLOAT,
     error_message VARCHAR(200),
 );
+
+CREATE TABLE prompt_versions (
+    prompt_version_id INT PRIMARY KEY,
+    name VARCHAR(50),
+    version_number INT,
+    s3_url VARCHAR(200),
+    created_at DATETIME,
+    is_active BOOLEAN,
+);
+
+CREATE TABLE evaluations (
+    evaluation_id INT PRIMARY KEY,
+    trace_id INTEGER REFERENCES traces(trace_id),
+    evaluator_llm VARCHAR(200),
+    score INT
+);
