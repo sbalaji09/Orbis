@@ -3,6 +3,9 @@ from pydantic import BaseModel
 from datetime import datetime
 import pandas as pd
 from firebase import firebase
+from fastapi import APIRouter
+
+router = APIRouter()
 
 
 app = FastAPI()
@@ -24,7 +27,24 @@ class SpanDB(BaseModel):
     status: str
     error_message: str
 
-# post endpoint to add the span to the database
-@app.post("/add-span")
+firebase_app = firebase.FirebaseApplication('https://<your-database-name>.firebaseio.com/', None)
+
+@app.post("/span")
 async def add_span(span: SpanDB):
-    pass
+    span_data = span.dict()
+    result = firebase_app.post('/spans', span_data)
+    return {"message": "Span added", "firebase_id": result["name"]}
+
+@app.post("/trace")
+def create_trace_object(start_time: datetime, user_id: int):
+    trace_data = {
+        "start_time": start_time,
+        "end_time": None,
+        "duration": None,
+        "total_cost": None,
+        "total_tokens": None,
+        "status": "running",
+        "user_id": user_id
+    }
+    result = firebase_app.post('/traces', trace_data)
+    return {"message": "Trace created", "firebase_id": result["name"], "status": "running"}
