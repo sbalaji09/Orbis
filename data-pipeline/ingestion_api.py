@@ -6,6 +6,7 @@ from botocore.exceptions import ClientError
 import requests
 from db_connection import SpanDB
 from fastapi import Request
+from uuid import UUID
 
 
 class SpanIn(BaseModel):
@@ -54,11 +55,27 @@ async def post_span(request: Request, span: SpanIn):
 
     span_obj: SpanDB = create_spandb_object(request, span, input_url, output_url)
 
-
+def is_valid_uuid(val: str) -> bool:
+    try:
+        UUID(val)
+        return True
+    except ValueError:
+        return False
+    
 def validate_span(span: SpanIn) -> bool:
     for attr_name in vars(span):
-        if getattr(span, attr_name) is None:
+        attr_value = getattr(span, attr_name)
+        if attr_value is None:
             return False
+
+        # this validates the uuid id using the function above
+        if attr_name in ('trace_id', 'span_id') and not is_valid_uuid(str(attr_value)):
+            return False
+        
+        # if any of the parent spans UUIDs are not valid, then return False
+        if attr_name == 'parent_spans_ids':
+            if not isinstance(attr_value, list) or not all(is_valid_uuid(str(v)) for v in attr_value):
+                return False
     return True
 
 def create_presigned_url(bucket_name):
