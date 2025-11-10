@@ -5,8 +5,9 @@ import pandas as pd
 from botocore.exceptions import ClientError
 import requests
 from db_connection import SpanDB
-from fastapi import Request
+from fastapi import Request, HTTPException
 from uuid import UUID
+from redis_queue import queue
 
 
 class SpanIn(BaseModel):
@@ -31,37 +32,50 @@ class SpanIn(BaseModel):
 
 app = FastAPI()
 
-# post endpoint from the SDK to the backend infra
-@app.post("/span")
-async def post_span(request: Request, span: SpanIn):
+# post endpoint from the SDK to the backend infra that now uses the message queu
+# instead of sending to the database automatically
+@app.post("/span", status_code=202)
+async def post_span(span: SpanIn):
+
+    # first checks if the span is not valid and if it is not, we return an Exception
     if not validate_span(span):
-        raise ValueError("Span is not valid and could not be processed")
-    
-    presigned_url = create_presigned_url("test_bucket_name")
-    prompt = span.prompt
-    res, error = add_content_presigned_url(prompt, presigned_url)
-    if not res:
-        raise ValueError(error)
+        raise HTTPException(
+            status_code=400,
+            detail="Span not valid and could not be processed"
+        )
 
-    input_url = create_presigned_url("input_bucket")
-    res, error = add_content_presigned_url(span.input_data, input_url)
-    if not res:
-        raise ValueError(error)
+    # convert the span data into a dict
+    task_data = {
+        "span": span.model_dump(), # model_dump() converts the Pydantic instance into a dictionary
+        "received_at": datetime.utcnow().isoformat()
+    }
 
-    output_url = create_presigned_url("output_bucket")
-    res, error = add_content_presigned_url(span.output_data, output_url)
-    if not res:
-        raise ValueError(error)
+    # enqueue the task into the Redis queue
+    success = queue.enqueue(task_data)
 
-    span_obj: SpanDB = create_spandb_object(request, span, input_url, output_url)
+    # if we could not enqueue the task, then raise an Exception
+    if not success:
+        raise HTTPException(
+            status_code=503,
+            detail="Failed to queue span for processing"
+        )
 
+    # return a success message if we could enqueue the task into the Redis queue
+    return {
+        "status": "accepted",
+        "message": "Span queued for processing"
+
+    }
+
+# validates the uuid (user id) that belongs to a specific span
 def is_valid_uuid(val: str) -> bool:
     try:
         UUID(val)
         return True
     except ValueError:
         return False
-    
+
+# function to validate the span
 def validate_span(span: SpanIn) -> bool:
     for attr_name in vars(span):
         attr_value = getattr(span, attr_name)
@@ -77,42 +91,3 @@ def validate_span(span: SpanIn) -> bool:
             if not isinstance(attr_value, list) or not all(is_valid_uuid(str(v)) for v in attr_value):
                 return False
     return True
-
-def create_presigned_url(bucket_name):
-    try:
-        return "test_url"
-    except ClientError as e:
-        return f"Error generating presigned URL: {e}"
-
-def add_content_presigned_url(content: str, presigned_url: str):
-    response = requests.put(presigned_url, data=content.encode('utf-8'))
-    if response.status_code == 200:
-        print("Upload successful.")
-        return True, "Upload successful"
-    else:
-        print(f"Upload failed: {response.text}")
-        return False, f"Upload failed: {response.text}"
-
-def create_spandb_object(request: Request, span: SpanIn, input_blob_url: str, output_blob_url: str):
-    trace_val = get_trace(request)
-    new_span = SpanDB (
-        trace_id=trace_val,
-        parent_spans_ids=span.parent_span_id,
-        start_time=span.start_time,
-        end_time=span.end_time,
-        duration=span.duration,
-        input_preview=span.input_data[:200],
-        input_blob_url=input_blob_url,
-        output_preview=span.output_data[:200],
-        output_blob_url=output_blob_url,
-        llm_model=span.model,
-        prompt_tokens=span.input_tokens,
-        completion_tokens=span.output_tokens,
-        cost=span.total_cost,
-        status=span.status,
-        error_message=span.error_message,
-    )
-    return new_span
-
-def get_trace(request: Request):
-    return request.session.get('trace_id')
