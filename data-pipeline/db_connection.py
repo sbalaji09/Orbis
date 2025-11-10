@@ -5,11 +5,9 @@ from datetime import datetime
 import pandas as pd
 from firebase import firebase
 from fastapi import APIRouter
+from ingestion_api import app
 
 router = APIRouter()
-
-
-app = FastAPI()
 
 class SpanDB(BaseModel):
     trace_id: str
