@@ -1,0 +1,17 @@
+# Web framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+
+# Redis for message queue
+redis==5.0.1
+
+# Database
+python-firebase==1.2
+
+# Cloud storage (if using AWS S3)
+boto3==1.29.7
+
+# Utilities
+requests==2.31.0
+python-dotenv==1.0.0
