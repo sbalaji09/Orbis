@@ -1,3 +1,4 @@
+from typing import *
 from fastapi import FastAPI
 from pydantic import BaseModel
 from datetime import datetime
@@ -11,11 +12,11 @@ router = APIRouter()
 app = FastAPI()
 
 class SpanDB(BaseModel):
-    trace_id: int
-    parent_spans_ids: list[int]
+    trace_id: str
+    parent_spans_ids: List[str]
     start_time: datetime
     end_time: datetime
-    duration: pd.Interval
+    duration: Optional[str]
     input_preview: str
     input_blob_url: str
     output_preview: str
@@ -25,7 +26,7 @@ class SpanDB(BaseModel):
     completion_tokens: int
     cost: float
     status: str
-    error_message: str
+    error_message: Optional[str] = None
 
 firebase_app = firebase.FirebaseApplication('https://<your-database-name>.firebaseio.com/', None)
 
