@@ -1,9 +1,14 @@
 import os
+import sys
 import time
 from datetime import datetime
 from redis_queue import RedisQueue
 from firebase import firebase
 from dotenv import load_dotenv
+
+# add the application logging layer to the path
+sys.path.append(os.path.join(os.path.dirname(__file__), 'application_logging'))
+from application_logging.logger_config import setup_logger
 
 # load environment variables
 load_dotenv()
@@ -13,10 +18,19 @@ load_dotenv()
 class SpanWorker:
     # initialize the worker with the Redis queue information and the Firebase connection
     def __init__(self):
+        # set up the logger for the worker
+        self.logger = setup_logger(__name__)
+
         self.queue = RedisQueue()
 
         firebase_url = os.getenv('FIREBASE_URL', 'https://<your-database-name>.firebaseio.com/')
         self.firebase_app = firebase.FirebaseApplication(firebase_url, None)
+
+        # test print statement to see if the logger is working correctly
+        self.logger.info("Worker initialized successfully", extra={'extra_data': {
+            'queue_name': self.queue.queue_name,
+            'firebase_url': firebase_url
+        }})
 
     # this function processes a single span task
     # instead of having the backend infra do it automatically, we have this worker do it because it saves time
@@ -26,6 +40,17 @@ class SpanWorker:
             # extract span data
             span = task_data.get('span')
             received_at = task_data.get('received_at')
+
+            # extract ids for logging context
+            trace_id = str(span.get('trace_id', 'unknown'))
+            model = span.get('model', 'unknown')
+
+            # add a log stating that we have started to process the span
+            self.logger.info("Starting to process span task", extra={'extra_data': {
+                'trace_id': trace_id,
+                'model': model,
+                'received_at': received_at
+            }})
 
             # this are placeholder upload links for the S3 bucketss
             input_blob_url = "s3://bucket/input/placeholder"
@@ -58,15 +83,34 @@ class SpanWorker:
             result = self.firebase_app.post('/spans', span_db_data)
             firebase_id = result.get('name')
 
+            # log successful completion with context for the span
+            self.logger.info("Span processed successfully", extra={'extra_data': {
+                'trace_id': trace_id,
+                'firebase_id': firebase_id,
+                'model': model,
+                'cost': span.get('total_cost')
+            }})
+
             return True
 
         except Exception as e:
-            print(f"✗ Error processing span task: {e}")
+            # log error with full context and stack trace
+            self.logger.error(
+                "Failed to process span task",
+                extra={'extra_data': {
+                    'trace_id': trace_id if 'trace_id' in locals() else 'unknown',
+                    'model': model if 'model' in locals() else 'unknown',
+                    'error': str(e)
+                }},
+                exc_info=True  # This includes the full stack trace
+            )
             return False
 
     # this function is the main worker loop that pops from the queue and processes each popped task
     # note: this function will run forever unless forcefully stopped
     def run(self):
+        self.logger.info("Worker started - waiting for tasks from queue")
+
         try:
             while True:
                 # dequeues a task and waits 5 seconds before checking the queue again
@@ -77,15 +121,20 @@ class SpanWorker:
                     success = self.process_span_task(task)
 
                     if not success:
-                        raise ValueError("Could not process task")
+                        self.logger.warning("Task processing returned failure, will not retry")
                 else:
+                    # No task available - this is normal, just waiting
                     pass
 
         except KeyboardInterrupt:
-            print("\n\n=== Worker Stopped ===")
-            print("Shutting down gracefully...")
+            self.logger.info("Worker received shutdown signal (Ctrl+C)")
+            self.logger.info("Shutting down gracefully...")
         except Exception as e:
-            print(f"\n✗ Worker crashed: {e}")
+            self.logger.critical(
+                "Worker crashed unexpectedly",
+                extra={'extra_data': {'error': str(e)}},
+                exc_info=True
+            )
             raise
 
 
