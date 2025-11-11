@@ -78,6 +78,42 @@ class SpanWorker:
                 "is_start_span": span.get('is_start_span'),
                 "is_end_span": span.get('is_end_span')
             }
+            
+            # we add the current token amount and cost to a redis in session variable for final registering
+            self.queue.redis_client.incr("trace:" + trace_id + ":total_tokens", span.get('input_tokens') + span.get('output_tokens'))
+            self.queue.redis_client.incr("trace:" + trace_id + ":total_cost", span.get('total_cost'))
+            self.queue.redis_client.set("trace:" + trace_id + ":end_time", span.get('end_time'))
+            self.queue.redis_client.incr("trace:" + trace_id + ":total_duration", span.get('duration'))
+
+            # if this span is the start of a trace, then add the init trace object
+            if span.get('is_start_span'):
+                trace = {
+                    "start_time": str(span.get('start_time')),
+                    "end_time": "",
+                    "duration": 0,
+                    "total_cost": 0,
+                    "total_tokens": 0,
+                    "status": "running",
+                    "user_id": int(span.get('user_id')),
+                }
+                self.firebase_app.post('/trace', trace)
+            
+            # if this span is the end of a trace, then update the trace object with the token count and duration
+            if span.get('is_end_span'):
+                # Data to patch - only update the fields you want
+                total_tokens = int(self.queue.redis_client.get(("trace:" + trace_id + ":total_tokens") or 0))
+                total_cost = int(self.queue.redis_client.get("trace:" + trace_id + ":total_cost") or 0)
+                end_time = int(self.queue.redis_client.get("trace:" + trace_id + ":end_time") or 0)
+                total_duration = int(self.queue.redis_client.get("trace:" + trace_id + ":total_duration") or 0)
+
+                update_data = {
+                    "end_time": end_time,
+                    "duration": total_duration,
+                    "total_cost": total_cost,
+                    "total_tokens": total_tokens,
+                    "status": "completed",
+                }
+                self.firebase_app.patch(f'/trace/{trace_id}', update_data)
 
             # once the data has been converted into the proper format, the worker saves it to Firebase
             result = self.firebase_app.post('/spans', span_db_data)

@@ -14,7 +14,7 @@ class SpanDB(BaseModel):
     parent_spans_ids: List[str]
     start_time: datetime
     end_time: datetime
-    duration: Optional[str]
+    duration: float
     input_preview: str
     input_blob_url: str
     output_preview: str

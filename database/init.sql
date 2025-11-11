@@ -2,7 +2,7 @@ CREATE TABLE traces (
     trace_id INT PRIMARY KEY,
     start_time DATETIME,
     end_time DATETIME,
-    duration INTERVAL NOT NULL,
+    duration FLOAT NOT NULL,
     total_cost FLOAT,
     total_tokens INT,
     status VARCHAR(50),
@@ -15,7 +15,7 @@ CREATE TABLE spans (
     parent_span_ids INTEGER[],
     start_time DATETIME,
     end_time DATETIME,
-    duration INTERVAL NOT NULL,
+    duration FLOAT,
     -- the point of the preview and blob_url is so that we can see the first 200 characters of the input --
     -- and output for displaying on the DAG instead of having to grab the entire prompt from the buckets -- 
     input_preview VARCHAR(200),
