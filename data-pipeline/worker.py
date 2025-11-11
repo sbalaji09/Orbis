@@ -1,7 +1,7 @@
 import os
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from redis_queue import RedisQueue
 from firebase import firebase
 from dotenv import load_dotenv
@@ -110,6 +110,7 @@ class SpanWorker:
     # note: this function will run forever unless forcefully stopped
     def run(self):
         self.logger.info("Worker started - waiting for tasks from queue")
+        max_retries = int(os.getenv('MAX_RETRIES', 3))
 
         try:
             while True:
@@ -117,13 +118,44 @@ class SpanWorker:
                 task = self.queue.dequeue(timeout=5)
 
                 if task:
+                    # Get retry count (default to 0 for new tasks)
+                    retry_count = task.get('retry_count', 0)
+
                     # process the task
                     success = self.process_span_task(task)
 
                     if not success:
-                        self.logger.warning("Task processing returned failure, will not retry")
+                        # if the task did not succeed, we have to decide whether or not to send the task to the DLQ
+                        if retry_count < max_retries:
+                            # we can retry the task since it is less than the max_retries and so, we increment the retry count and enqueue the task
+                            task['retry_count'] = retry_count + 1
+                            task['last_error_at'] = datetime.now(timezone.utc).isoformat()
+
+                            self.logger.warning(
+                                f"Task failed, retry {retry_count + 1}/{max_retries}",
+                                extra={'extra_data': {
+                                    'retry_count': retry_count + 1,
+                                    'max_retries': max_retries,
+                                    'trace_id': task.get('span', {}).get('trace_id', 'unknown')
+                                }}
+                            )
+
+                            self.queue.enqueue(task)
+                        else:
+                            # otherwise if we have already hit the max retries, move the task to the DLQ
+                            self.logger.error(
+                                f"Task failed after {max_retries} retries, moving to DLQ",
+                                extra={'extra_data': {
+                                    'retry_count': retry_count,
+                                    'trace_id': task.get('span', {}).get('trace_id', 'unknown')
+                                }}
+                            )
+
+                            self.queue.enqueue_to_dlq(
+                                task,
+                                f"Failed after {max_retries} retry attempts"
+                            )
                 else:
-                    # No task available - this is normal, just waiting
                     pass
 
         except KeyboardInterrupt:
