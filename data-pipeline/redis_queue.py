@@ -2,6 +2,7 @@ import redis
 import json
 import os
 from typing import Optional, Dict, Any
+from datetime import datetime
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -97,6 +98,30 @@ class RedisQueue:
             return True
         except Exception as e:
             print(f"✗ Failed to clear queue: {e}")
+            return False
+
+    # this function enqueues a failed task to the DLQ and only occurs after we have called the max retries
+    def enqueue_to_dlq(self, task_data: Dict[Any, Any], error_message: str) -> bool:
+        try:
+            # the dead letter queue name will be different than the queue name for the messenger queue
+            dlq_name = os.getenv('DEAD_LETTER_QUEUE_NAME', 'span_processing_dlq')
+
+            # add the failure metadata to the task
+            dlq_task = {
+                **task_data,
+                'failed_at': datetime.now().isoformat(),
+                'error_message': error_message,
+                'original_queue': self.queue_name
+            }
+
+            task_json = json.dumps(dlq_task) # converts a Python object to a JSON string
+            self.redis_client.lpush(dlq_name, task_json)
+
+            print(f"✓ Task moved to DLQ: {dlq_name}")
+            return True
+
+        except Exception as e:
+            print(f"✗ Failed to move task to DLQ: {e}")
             return False
 
 

@@ -18,7 +18,7 @@ class SpanIn(BaseModel):
     total_cost: int
     start_time: datetime
     end_time: datetime
-    duration: pd.Interval
+    duration: float
     input_data: str
     output_data: str
     context: str
