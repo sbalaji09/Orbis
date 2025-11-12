@@ -45,9 +45,16 @@ async def post_span(request: Request, span: SpanIn):
             detail="Span not valid and could not be processed"
         )
 
+    span_dict = span.model_dump()
+
+    if isinstance(span_dict.get('start_time'), datetime):
+        span_dict['start_time'] = span_dict['start_time'].isoformat()
+    if isinstance(span_dict.get('end_time'), datetime):
+        span_dict['end_time'] = span_dict['end_time'].isoformat()
+
     # convert the span data into a dict
     task_data = {
-        "span": span.model_dump(), # model_dump() converts the Pydantic instance into a dictionary
+        "span": span_dict, # model_dump() converts the Pydantic instance into a dictionary
         "user_id": request.state.user_id,
         "received_at": datetime.now(timezone.utc).isoformat()
     }
