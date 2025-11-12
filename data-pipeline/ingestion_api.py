@@ -1,11 +1,6 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, HTTPException
 from pydantic import BaseModel
-from datetime import datetime
-import pandas as pd
-from botocore.exceptions import ClientError
-import requests
-from db_connection import SpanDB
-from fastapi import Request, HTTPException
+from datetime import datetime, timezone
 from uuid import UUID
 from redis_queue import queue
 from auth_middleware import check_api_key
@@ -39,7 +34,7 @@ app = FastAPI()
 @app.post("/span", status_code=202)
 async def post_span(request: Request, span: SpanIn):
 
-    check_api_key(request, span.is_start_span)
+    check_api_key(request)
 
     check_rate_limit(request.state.user_id)
 
@@ -54,7 +49,7 @@ async def post_span(request: Request, span: SpanIn):
     task_data = {
         "span": span.model_dump(), # model_dump() converts the Pydantic instance into a dictionary
         "user_id": request.state.user_id,
-        "received_at": datetime.utcnow().isoformat()
+        "received_at": datetime.now(timezone.utc).isoformat()
     }
 
     # enqueue the task into the Redis queue
