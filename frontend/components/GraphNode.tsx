@@ -2,129 +2,10 @@
 
 import { Popover, PopoverButton, PopoverPanel } from "@headlessui/react";
 import { Span } from "@/lib/types";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { dummySpans } from "@/lib/dummy";
 
 // Dummy span data for demonstration - showing a complex DAG structure
-const dummySpans: Span[] = [
-  {
-    span_id: 1,
-    trace_id: 101,
-    parent_span_ids: null,
-    start_time: new Date("2025-11-11T10:00:00"),
-    end_time: new Date("2025-11-11T10:00:02"),
-    duration: 2.0,
-    input_preview:
-      "Analyze user query: What are the best practices for building scalable web applications?",
-    input_blob_url: "https://storage.example.com/inputs/span-1",
-    output_preview:
-      "Query identified as technical question. Breaking down into subtasks: architecture patterns, database design, caching strategies...",
-    output_blob_url: "https://storage.example.com/outputs/span-1",
-    llm_model: "gpt-4-turbo",
-    prompt_tokens: 150,
-    completion_tokens: 75,
-    cost: 0.0045,
-    status: "completed",
-    error_message: null,
-  },
-  {
-    span_id: 2,
-    trace_id: 101,
-    parent_span_ids: [1],
-    start_time: new Date("2025-11-11T10:00:03"),
-    end_time: new Date("2025-11-11T10:00:05"),
-    duration: 1.8,
-    input_preview:
-      "Research architecture patterns for scalable applications...",
-    input_blob_url: "https://storage.example.com/inputs/span-2",
-    output_preview:
-      "Found patterns: Microservices, Event-driven architecture, CQRS, Serverless...",
-    output_blob_url: "https://storage.example.com/outputs/span-2",
-    llm_model: "gpt-3.5-turbo",
-    prompt_tokens: 120,
-    completion_tokens: 90,
-    cost: 0.0021,
-    status: "completed",
-    error_message: null,
-  },
-  {
-    span_id: 3,
-    trace_id: 101,
-    parent_span_ids: [1],
-    start_time: new Date("2025-11-11T10:00:03"),
-    end_time: new Date("2025-11-11T10:00:04"),
-    duration: 1.2,
-    input_preview: "Research database design best practices for scalability...",
-    input_blob_url: "https://storage.example.com/inputs/span-3",
-    output_preview:
-      "Key strategies: Sharding, Read replicas, Connection pooling, Indexing optimization...",
-    output_blob_url: "https://storage.example.com/outputs/span-3",
-    llm_model: "gpt-4-turbo",
-    prompt_tokens: 110,
-    completion_tokens: 85,
-    cost: 0.0038,
-    status: "completed",
-    error_message: null,
-  },
-  {
-    span_id: 4,
-    trace_id: 101,
-    parent_span_ids: [2, 3],
-    start_time: new Date("2025-11-11T10:00:06"),
-    end_time: new Date("2025-11-11T10:00:08"),
-    duration: 2.1,
-    input_preview:
-      "Synthesize findings from architecture and database research into cohesive recommendations...",
-    input_blob_url: "https://storage.example.com/inputs/span-4",
-    output_preview:
-      "Recommended approach: Start with microservices architecture, use PostgreSQL with read replicas, implement Redis caching...",
-    output_blob_url: "https://storage.example.com/outputs/span-4",
-    llm_model: "gpt-4-turbo",
-    prompt_tokens: 280,
-    completion_tokens: 150,
-    cost: 0.0092,
-    status: "completed",
-    error_message: null,
-  },
-  {
-    span_id: 5,
-    trace_id: 101,
-    parent_span_ids: [1],
-    start_time: new Date("2025-11-11T10:00:03"),
-    end_time: new Date("2025-11-11T10:00:04"),
-    duration: 1.0,
-    input_preview: "Find relevant code examples and documentation...",
-    input_blob_url: "https://storage.example.com/inputs/span-5",
-    output_preview:
-      "Retrieved examples from GitHub and official documentation sources...",
-    output_blob_url: "https://storage.example.com/outputs/span-5",
-    llm_model: "gpt-3.5-turbo",
-    prompt_tokens: 90,
-    completion_tokens: 60,
-    cost: 0.0015,
-    status: "completed",
-    error_message: null,
-  },
-  {
-    span_id: 6,
-    trace_id: 101,
-    parent_span_ids: [4, 5],
-    start_time: new Date("2025-11-11T10:00:09"),
-    end_time: new Date("2025-11-11T10:00:11"),
-    duration: 2.5,
-    input_preview:
-      "Generate final response with recommendations and code examples...",
-    input_blob_url: "https://storage.example.com/inputs/span-6",
-    output_preview:
-      "Here are the best practices for building scalable web applications: 1. Architecture: Use microservices...",
-    output_blob_url: "https://storage.example.com/outputs/span-6",
-    llm_model: "gpt-4-turbo",
-    prompt_tokens: 420,
-    completion_tokens: 300,
-    cost: 0.0156,
-    status: "completed",
-    error_message: null,
-  },
-];
 
 interface GraphNodeProps {
   span: Span;
@@ -165,16 +46,28 @@ export function GraphNode({
   isDragging,
 }: DraggableGraphNodeProps) {
   const statusColors = {
-    completed: "bg-green-500 hover:bg-green-600",
-    failed: "bg-red-500 hover:bg-red-600",
-    running: "bg-blue-500 hover:bg-blue-600",
-    pending: "bg-yellow-500 hover:bg-yellow-600",
-    cancelled: "bg-gray-500 hover:bg-gray-600",
+    completed: "bg-green-500 data-hover:bg-green-600",
+    failed: "bg-red-500 data-hover:bg-red-600",
+    running: "bg-blue-500 data-hover:bg-blue-600",
+    pending: "bg-yellow-500 data-hover:bg-yellow-600",
+    cancelled: "bg-gray-500 data-hover:bg-gray-600",
+  };
+
+  const statusBadgeColors = {
+    completed: "bg-green-500/90",
+    failed: "bg-red-500/90",
+    running: "bg-blue-500/90",
+    pending: "bg-yellow-500/90",
+    cancelled: "bg-gray-500/90",
   };
 
   const statusColor =
     statusColors[span.status as keyof typeof statusColors] ||
-    "bg-babyblue hover:bg-mustard";
+    "bg-babyblue data-hover:bg-mustard";
+
+  const statusBadgeColor =
+    statusBadgeColors[span.status as keyof typeof statusBadgeColors] ||
+    "bg-babyblue";
 
   const handleMouseDown = (e: React.MouseEvent<HTMLButtonElement>) => {
     if (!onDrag) return;
@@ -207,68 +100,73 @@ export function GraphNode({
   return (
     <Popover className="relative inline-block">
       <PopoverButton
-        className={`w-16 h-16 rounded-full ${statusColor} border-4 border-foreground shadow-lg 
-          focus:outline-none focus:ring-4 focus:ring-mustard/50
+        className={`w-16 h-16 rounded-full ${statusColor} border-3 border-foreground/20 shadow-md 
+          focus:outline-none data-focus:outline-2 data-focus:outline-mustard
           ${
             isDragging
               ? "cursor-grabbing scale-105 shadow-xl"
-              : "cursor-grab hover:scale-105 hover:shadow-xl"
+              : "cursor-grab data-hover:scale-105 data-hover:shadow-xl"
           } 
-          transition-transform duration-150 ease-out`}
+          transition-all duration-200 ease-in-out`}
         style={{ transform: `translate(${x}px, ${y}px)` }}
         onMouseDown={handleMouseDown}
       >
-        <span className="text-xs font-bold text-white select-none">
+        <span className="text-sm font-bold text-white select-none">
           {span.span_id}
         </span>
       </PopoverButton>
 
       <PopoverPanel
+        transition
         anchor="bottom"
-        className="z-10 mt-2 w-96 rounded-xl bg-background border-2 border-foreground shadow-2xl"
+        className="z-50 w-[400px] divide-y divide-foreground/10 rounded-xl bg-white/95 backdrop-blur-sm text-sm shadow-2xl 
+          border border-foreground/20 transition duration-200 ease-in-out 
+          [--anchor-gap:--spacing(3)] data-closed:-translate-y-1 data-closed:opacity-0"
       >
-        <div className="p-6 space-y-4">
+        <div className="p-4">
           {/* Header */}
-          <div className="border-b-2 border-foreground pb-3">
-            <h3 className="text-xl font-bold text-foreground">
+          <div className="pb-3">
+            <h3 className="text-lg font-bold text-foreground">
               Span #{span.span_id}
             </h3>
-            <div className="flex items-center gap-2 mt-1">
+            <div className="flex items-center gap-2 mt-2">
               <span
-                className={`px-3 py-1 rounded-full text-xs font-semibold text-white ${
-                  statusColor.split(" ")[0]
-                }`}
+                className={`px-2.5 py-0.5 rounded-full text-xs font-semibold text-white ${statusBadgeColor}`}
               >
                 {span.status || "unknown"}
               </span>
               {span.llm_model && (
-                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-babyblue text-foreground">
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-mustard/20 text-foreground">
                   {span.llm_model}
                 </span>
               )}
             </div>
           </div>
+        </div>
 
+        <div className="p-4">
           {/* Timing Information */}
-          <div className="space-y-2">
-            <h4 className="font-semibold text-foreground text-sm uppercase tracking-wide">
+          <div className="rounded-lg transition data-hover:bg-foreground/5 p-3">
+            <h4 className="font-semibold text-foreground/80 text-xs uppercase tracking-wide mb-2">
               Timing
             </h4>
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
-                <p className="text-gray-600 font-medium">Duration</p>
+                <p className="text-foreground/60 font-medium text-xs">
+                  Duration
+                </p>
                 <p className="text-foreground font-semibold">
                   {formatDuration(span.duration)}
                 </p>
               </div>
               <div>
-                <p className="text-gray-600 font-medium">Cost</p>
+                <p className="text-foreground/60 font-medium text-xs">Cost</p>
                 <p className="text-foreground font-semibold">
                   {formatCost(span.cost)}
                 </p>
               </div>
             </div>
-            <div className="text-xs text-gray-600">
+            <div className="text-xs text-foreground/50 mt-2 space-y-0.5">
               <p>Start: {formatDate(span.start_time)}</p>
               <p>End: {formatDate(span.end_time)}</p>
             </div>
@@ -276,19 +174,23 @@ export function GraphNode({
 
           {/* Token Information */}
           {(span.prompt_tokens || span.completion_tokens) && (
-            <div className="space-y-2">
-              <h4 className="font-semibold text-foreground text-sm uppercase tracking-wide">
+            <div className="rounded-lg transition data-hover:bg-foreground/5 p-3">
+              <h4 className="font-semibold text-foreground/80 text-xs uppercase tracking-wide mb-2">
                 Tokens
               </h4>
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
-                  <p className="text-gray-600 font-medium">Prompt</p>
+                  <p className="text-foreground/60 font-medium text-xs">
+                    Prompt
+                  </p>
                   <p className="text-foreground font-semibold">
                     {span.prompt_tokens || 0}
                   </p>
                 </div>
                 <div>
-                  <p className="text-gray-600 font-medium">Completion</p>
+                  <p className="text-foreground/60 font-medium text-xs">
+                    Completion
+                  </p>
                   <p className="text-foreground font-semibold">
                     {span.completion_tokens || 0}
                   </p>
@@ -296,20 +198,22 @@ export function GraphNode({
               </div>
             </div>
           )}
+        </div>
 
+        <div className="p-4">
           {/* Input Preview */}
           {span.input_preview && (
-            <div className="space-y-2">
-              <h4 className="font-semibold text-foreground text-sm uppercase tracking-wide">
+            <div className="rounded-lg transition data-hover:bg-foreground/5 p-3 mb-3">
+              <h4 className="font-semibold text-foreground/80 text-xs uppercase tracking-wide mb-2">
                 Input
               </h4>
-              <p className="text-sm text-gray-700 bg-babyblue/30 p-3 rounded-lg italic line-clamp-3">
+              <p className="text-sm text-foreground/70 bg-babyblue/20 p-3 rounded-lg italic line-clamp-3">
                 &ldquo;{span.input_preview}&rdquo;
               </p>
               {span.input_blob_url && (
                 <a
                   href={span.input_blob_url}
-                  className="text-xs text-mustard hover:underline font-medium"
+                  className="block mt-2 text-xs text-mustard data-hover:underline font-medium transition"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -321,17 +225,17 @@ export function GraphNode({
 
           {/* Output Preview */}
           {span.output_preview && (
-            <div className="space-y-2">
-              <h4 className="font-semibold text-foreground text-sm uppercase tracking-wide">
+            <div className="rounded-lg transition data-hover:bg-foreground/5 p-3">
+              <h4 className="font-semibold text-foreground/80 text-xs uppercase tracking-wide mb-2">
                 Output
               </h4>
-              <p className="text-sm text-gray-700 bg-babyblue/30 p-3 rounded-lg italic line-clamp-3">
+              <p className="text-sm text-foreground/70 bg-babyblue/20 p-3 rounded-lg italic line-clamp-3">
                 &ldquo;{span.output_preview}&rdquo;
               </p>
               {span.output_blob_url && (
                 <a
                   href={span.output_blob_url}
-                  className="text-xs text-mustard hover:underline font-medium"
+                  className="block mt-2 text-xs text-mustard data-hover:underline font-medium transition"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -343,21 +247,31 @@ export function GraphNode({
 
           {/* Error Message */}
           {span.error_message && (
-            <div className="space-y-2">
-              <h4 className="font-semibold text-red-600 text-sm uppercase tracking-wide">
+            <div className="rounded-lg bg-red-50/50 p-3 border border-red-200/50">
+              <h4 className="font-semibold text-red-600 text-xs uppercase tracking-wide mb-2">
                 Error
               </h4>
-              <p className="text-sm text-red-700 bg-red-50 p-3 rounded-lg border border-red-200">
-                {span.error_message}
-              </p>
+              <p className="text-sm text-red-700">{span.error_message}</p>
             </div>
           )}
+        </div>
 
+        <div className="p-4">
           {/* Metadata */}
-          <div className="pt-3 border-t border-gray-300 text-xs text-gray-600">
-            <p>Trace ID: {span.trace_id}</p>
+          <div className="text-xs text-foreground/50 space-y-1">
+            <p>
+              Trace ID:{" "}
+              <span className="font-mono text-foreground/70">
+                {span.trace_id}
+              </span>
+            </p>
             {span.parent_span_ids && span.parent_span_ids.length > 0 && (
-              <p>Parent Spans: {span.parent_span_ids.join(", ")}</p>
+              <p>
+                Parent Spans:{" "}
+                <span className="font-mono text-foreground/70">
+                  {span.parent_span_ids.join(", ")}
+                </span>
+              </p>
             )}
           </div>
         </div>
@@ -618,73 +532,88 @@ export default function GraphNodeDemo() {
   // Calculate edges based on current positions
   const currentEdges = calculateEdges(currentPositions);
 
+  // Track viewport dimensions for client-side only
+  const [viewportSize, setViewportSize] = useState({
+    width: containerWidth,
+    height: containerHeight,
+  });
+
+  useEffect(() => {
+    // Update viewport size on mount and resize
+    const handleResize = () => {
+      setViewportSize({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    };
+
+    // Set initial size
+    handleResize();
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // Calculate canvas dimensions
+  const canvasWidth = Math.max(containerWidth, viewportSize.width);
+  const canvasHeight = Math.max(containerHeight, viewportSize.height);
+
   return (
-    <div className="p-8 min-h-screen">
-      <h1 className="text-3xl font-bold mb-8 text-foreground">
-        Span Graph Visualization (DAG)
-      </h1>
-      <div className="relative bg-linear-to-br from-white to-babyblue/10 rounded-xl shadow-lg p-8 border-2 border-foreground overflow-hidden">
-        <div
-          className="relative"
-          style={{
-            width: `${containerWidth}px`,
-            height: `${containerHeight}px`,
-            margin: "0 auto",
-          }}
+    <div
+      className="fixed inset-0 overflow-hidden"
+      style={{
+        backgroundImage: `
+          linear-gradient(to right, #0c0f0a08 1px, transparent 1px),
+          linear-gradient(to bottom, #0c0f0a08 1px, transparent 1px)
+        `,
+        backgroundSize: "20px 20px",
+        backgroundColor: "#f8f9fa",
+      }}
+    >
+      <div
+        className="relative w-full h-full"
+        style={{
+          width: canvasWidth > 0 ? `${canvasWidth}px` : "100%",
+          height: canvasHeight > 0 ? `${canvasHeight}px` : "100%",
+        }}
+      >
+        {/* SVG for edges - covers entire canvas */}
+        <svg
+          width="100%"
+          height="100%"
+          className="absolute top-0 left-0"
+          style={{ pointerEvents: "none" }}
         >
-          {/* SVG for edges - matches the exact container dimensions */}
-          <svg
-            width={containerWidth}
-            height={containerHeight}
-            className="absolute top-0 left-0"
-            style={{ pointerEvents: "none" }}
-          >
-            <ArrowMarker />
-            {currentEdges.map((edge, idx) => (
-              <Edge key={idx} {...edge} />
-            ))}
-          </svg>
-
-          {/* Nodes positioned absolutely within the container */}
-          {currentPositions.map((pos) => (
-            <div
-              key={pos.span.span_id}
-              className="absolute"
-              style={{
-                left: `${pos.x}px`,
-                top: `${pos.y}px`,
-                transform: "translate(-50%, -50%)",
-                transition:
-                  activeDrag?.spanId === pos.span.span_id
-                    ? "none"
-                    : "all 0.15s ease-out",
-              }}
-            >
-              <GraphNode
-                span={pos.span}
-                x={0}
-                y={0}
-                onDrag={handleDrag}
-                isDragging={activeDrag?.spanId === pos.span.span_id}
-              />
-            </div>
+          <ArrowMarker />
+          {currentEdges.map((edge, idx) => (
+            <Edge key={idx} {...edge} />
           ))}
-        </div>
-      </div>
+        </svg>
 
-      <div className="mt-8 p-4 bg-babyblue/30 rounded-lg border border-foreground">
-        <h2 className="font-bold text-foreground mb-2">Legend</h2>
-        <div className="text-sm text-foreground space-y-1">
-          <p>• Arrows show the flow from parent spans to child spans</p>
-          <p>
-            • Nodes are arranged in levels based on their depth in the call
-            graph
-          </p>
-          <p>• Click any node to see detailed span information</p>
-          <p className="text-mustard font-semibold">
-            • Drag nodes to rearrange the graph
-          </p>
-        </div>
+        {/* Nodes positioned absolutely within the container */}
+        {currentPositions.map((pos) => (
+          <div
+            key={pos.span.span_id}
+            className="absolute"
+            style={{
+              left: `${pos.x}px`,
+              top: `${pos.y}px`,
+              transform: "translate(-50%, -50%)",
+              transition:
+                activeDrag?.spanId === pos.span.span_id
+                  ? "none"
+                  : "all 0.15s ease-out",
+            }}
+          >
+            <GraphNode
+              span={pos.span}
+              x={0}
+              y={0}
+              onDrag={handleDrag}
+              isDragging={activeDrag?.spanId === pos.span.span_id}
+            />
+          </div>
+        ))}
       </div>
     </div>
   );
