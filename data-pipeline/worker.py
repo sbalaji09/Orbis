@@ -2,9 +2,11 @@ import os
 import sys
 import time
 from datetime import datetime, timezone
-from redis_queue import RedisQueue
+from queues.redis_queue import RedisQueue
 from firebase import firebase
 from dotenv import load_dotenv
+from data_processing.prompt_upload import upload_input, upload_output
+
 
 # add the application logging layer to the path
 sys.path.append(os.path.join(os.path.dirname(__file__), 'application_logging'))
@@ -52,10 +54,21 @@ class SpanWorker:
                 'received_at': received_at
             }})
 
-            # this are placeholder upload links for the S3 bucketss
-            input_blob_url = "s3://bucket/input/placeholder"
-            output_blob_url = "s3://bucket/output/placeholder"
+            # this are links for the S3 buckets
+            input_blob_url = upload_input(
+                user_id=task_data.get('user_id'),
+                trace_id=trace_id,
+                span_id=str(span.get('span_id', 'unknown')),
+                content=span.get('input_data', '')
+            )
 
+            output_blob_url = upload_output(
+                user_id=task_data.get('user_id'),
+                trace_id=trace_id,
+                span_id=str(span.get('span_id', 'unknown')),
+                content=span.get('output_data', '')
+            )
+            
             # convert out input span data into a dict that can be passed into the Firebase table
             # this dict follows the span schema as stated in init.sql
             span_db_data = {
