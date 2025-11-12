@@ -2,8 +2,8 @@ from fastapi import FastAPI, Request, HTTPException
 from pydantic import BaseModel
 from datetime import datetime, timezone
 from uuid import UUID
-from redis_queue import queue
-from auth_middleware import check_api_key
+from queues.redis_queue import queue
+from auth.auth_middleware import check_api_key
 from rate_limiter import check_rate_limit
 
 
