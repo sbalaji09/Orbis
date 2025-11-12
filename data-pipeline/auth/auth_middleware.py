@@ -1,6 +1,6 @@
 import os
 from fastapi import HTTPException, Request
-from redis_queue import queue
+from queues.redis_queue import queue
 
 
 def check_api_key(request: Request):
