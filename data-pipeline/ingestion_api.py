@@ -8,6 +8,8 @@ from db_connection import SpanDB
 from fastapi import Request, HTTPException
 from uuid import UUID
 from redis_queue import queue
+from auth_middleware import check_api_key
+from rate_limiter import check_rate_limit
 
 
 class SpanIn(BaseModel):
@@ -35,7 +37,11 @@ app = FastAPI()
 # post endpoint from the SDK to the backend infra that now uses the message queu
 # instead of sending to the database automatically
 @app.post("/span", status_code=202)
-async def post_span(span: SpanIn):
+async def post_span(request: Request, span: SpanIn):
+
+    check_api_key(request, span.is_start_span)
+
+    check_rate_limit(request.state.user_id)
 
     # first checks if the span is not valid and if it is not, we return an Exception
     if not validate_span(span):
@@ -47,6 +53,7 @@ async def post_span(span: SpanIn):
     # convert the span data into a dict
     task_data = {
         "span": span.model_dump(), # model_dump() converts the Pydantic instance into a dictionary
+        "user_id": request.state.user_id,
         "received_at": datetime.utcnow().isoformat()
     }
 

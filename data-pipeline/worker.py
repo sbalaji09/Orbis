@@ -108,7 +108,7 @@ class SpanWorker:
             # if this span is the end of a trace, then update the trace object with the token count and duration
             if span.get('is_end_span'):
                 # Data to patch - only update the fields you want
-                total_tokens = int(self.queue.redis_client.get("trace:" + trace_id + ":total_tokens" or 0))
+                total_tokens = int(self.queue.redis_client.get("trace:" + trace_id + ":total_tokens") or 0)
                 total_cost = float(self.queue.redis_client.get("trace:" + trace_id + ":total_cost") or 0)
                 end_time = self.queue.redis_client.get("trace:" + trace_id + ":end_time") or ""
                 total_duration = float(self.queue.redis_client.get("trace:" + trace_id + ":total_duration") or 0)
