@@ -80,10 +80,12 @@ class SpanWorker:
             }
             
             # we add the current token amount and cost to a redis in session variable for final registering
-            self.queue.redis_client.incr("trace:" + trace_id + ":total_tokens", span.get('input_tokens') + span.get('output_tokens'))
-            self.queue.redis_client.incr("trace:" + trace_id + ":total_cost", span.get('total_cost'))
-            self.queue.redis_client.set("trace:" + trace_id + ":end_time", span.get('end_time'))
-            self.queue.redis_client.incr("trace:" + trace_id + ":total_duration", span.get('duration'))
+            self.queue.redis_client.incrbyfloat("trace:" + trace_id + ":total_tokens", span.get('input_tokens') + span.get('output_tokens'))
+            self.queue.redis_client.incrbyfloat("trace:" + trace_id + ":total_cost", span.get('total_cost'))
+            if span.get('is_end_span'):
+                self.queue.redis_client.set("trace:" + trace_id + ":end_time", span.get('end_time'))
+                
+            self.queue.redis_client.incrbyfloat("trace:" + trace_id + ":total_duration", span.get('duration'))
 
             # if this span is the start of a trace, then add the init trace object
             if span.get('is_start_span'):
@@ -97,14 +99,19 @@ class SpanWorker:
                     "user_id": int(span.get('user_id')),
                 }
                 self.firebase_app.post('/trace', trace)
+
+                self.logger.info("Trace created", extra={'extra_data': {
+                    'trace_id': trace_id,
+                    'user_id': trace['user_id']
+                }})
             
             # if this span is the end of a trace, then update the trace object with the token count and duration
             if span.get('is_end_span'):
                 # Data to patch - only update the fields you want
-                total_tokens = int(self.queue.redis_client.get(("trace:" + trace_id + ":total_tokens") or 0))
-                total_cost = int(self.queue.redis_client.get("trace:" + trace_id + ":total_cost") or 0)
-                end_time = int(self.queue.redis_client.get("trace:" + trace_id + ":end_time") or 0)
-                total_duration = int(self.queue.redis_client.get("trace:" + trace_id + ":total_duration") or 0)
+                total_tokens = int(self.queue.redis_client.get("trace:" + trace_id + ":total_tokens" or 0))
+                total_cost = float(self.queue.redis_client.get("trace:" + trace_id + ":total_cost") or 0)
+                end_time = self.queue.redis_client.get("trace:" + trace_id + ":end_time") or ""
+                total_duration = float(self.queue.redis_client.get("trace:" + trace_id + ":total_duration") or 0)
 
                 update_data = {
                     "end_time": end_time,
@@ -113,7 +120,22 @@ class SpanWorker:
                     "total_tokens": total_tokens,
                     "status": "completed",
                 }
+
                 self.firebase_app.patch(f'/trace/{trace_id}', update_data)
+
+                self.queue.redis_client.delete(
+                    f"trace:{trace_id}:total_tokens",
+                    f"trace:{trace_id}:total_cost",
+                    f"trace:{trace_id}:end_time",
+                    f"trace:{trace_id}:total_duration"
+                )
+
+                self.logger.info("Trace completed", extra={'extra_data': {
+                    'trace_id': trace_id,
+                    'total_cost': total_cost,
+                    'total_tokens': total_tokens,
+                    'duration': total_duration
+                }})
 
             # once the data has been converted into the proper format, the worker saves it to Firebase
             result = self.firebase_app.post('/spans', span_db_data)
