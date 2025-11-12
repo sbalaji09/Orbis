@@ -8,6 +8,7 @@ redis==5.0.1
 
 # Database
 python-firebase==1.2
+psycopg2==2.9.9
 
 # Cloud storage (if using AWS S3)
 boto3==1.29.7

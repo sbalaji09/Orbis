@@ -2,7 +2,7 @@ import os
 import time
 from dotenv import load_dotenv
 from fastapi import HTTPException
-from redis_queue import queue
+from queues.redis_queue import queue
 
 load_dotenv()
 
