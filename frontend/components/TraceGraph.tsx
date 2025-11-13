@@ -89,16 +89,17 @@ function calculateEdges(positions: NodePosition[]): Edge[] {
 function ArrowMarker() {
   return (
     <defs>
+      {/* Sleek triangular arrowhead */}
       <marker
         id="arrowhead"
         markerWidth="10"
         markerHeight="10"
-        refX="9"
+        refX="8"
         refY="5"
         orient="auto"
         markerUnits="strokeWidth"
       >
-        <path d="M0,0 L0,10 L9,5 z" fill="#0c0f0a" opacity="0.7" />
+        <polygon points="0,0 0,10 10,5" fill="#1a1d1a" stroke="none" />
       </marker>
     </defs>
   );
@@ -127,33 +128,22 @@ function Edge({ from, to }: Edge) {
 
   const fromX = from.x + Math.cos(angle) * nodeRadius;
   const fromY = from.y + Math.sin(angle) * nodeRadius;
-  const toX = to.x - Math.cos(angle) * (nodeRadius + 8);
-  const toY = to.y - Math.sin(angle) * (nodeRadius + 8);
+  const toX = to.x - Math.cos(angle) * nodeRadius;
+  const toY = to.y - Math.sin(angle) * nodeRadius;
 
-  // Create a smooth curved path using cubic Bezier
-  const distance = Math.sqrt(dx * dx + dy * dy);
-  const controlPointOffset = Math.min(distance * 0.2, 50);
-
-  // Control points for smooth curve
-  const cp1x = fromX + dx * 0.25;
-  const cp1y = fromY + controlPointOffset;
-  const cp2x = toX - dx * 0.25;
-  const cp2y = toY - controlPointOffset;
-
-  const path = `M ${fromX} ${fromY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${toX} ${toY}`;
+  // Completely straight line - no curves
+  const path = `M ${fromX} ${fromY} L ${toX} ${toY}`;
 
   return (
     <g>
-      {/* Main edge with subtle styling */}
+      {/* Clean arrow line */}
       <path
         d={path}
-        stroke="#0c0f0a"
-        strokeWidth="2"
+        stroke="#2a2d2a"
+        strokeWidth="1.5"
         fill="none"
         markerEnd="url(#arrowhead)"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        opacity="0.7"
+        strokeLinecap="butt"
       />
     </g>
   );

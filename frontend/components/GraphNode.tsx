@@ -151,7 +151,7 @@ export default function GraphNode({
                 <p className="text-foreground/60 font-medium text-xs">
                   Duration
                 </p>
-                <p className="text-foreground font-semibold">
+                <p className="text-foreground font-semibold font-sans">
                   {formatDuration(span.duration)}
                 </p>
               </div>
