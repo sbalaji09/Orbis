@@ -1,5 +1,13 @@
+export interface Agent {
+  agent_id: string;
+  name: string;
+  user_id: number;
+  description?: string;
+}
+
 export interface Trace {
   trace_id: number;
+  agent_id: string;
   start_time: Date;
   end_time: Date;
   duration: number;
