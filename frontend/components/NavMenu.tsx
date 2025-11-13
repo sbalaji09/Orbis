@@ -26,15 +26,22 @@ const navItems: NavItem[] = [
 
 export default function NavMenu() {
   return (
-    <nav className="w-13 p-2 fixed inset-y-2 left-2 z-50 bg-mustard/50 backdrop-blur-xs rounded-lg shadow-lg overflow-auto">
-      <ul className="flex flex-col items-center gap-4">
+    <nav className="flex items-center gap-6">
+      <div className="flex items-center gap-2">
+        <div className="w-8 h-8 bg-mustard rounded-lg flex items-center justify-center">
+          <span className="text-white font-bold text-sm">O</span>
+        </div>
+        <span className="text-lg font-semibold text-foreground">Orbis</span>
+      </div>
+      <ul className="flex items-center gap-1">
         {navItems.map((item) => (
           <Link
             href={item.link}
             key={item.name}
-            className="p-2 hover:bg-yellow-600 inline-flex rounded-lg"
+            className="px-3 py-2 hover:bg-foreground/5 rounded-lg transition-colors flex items-center gap-2 text-sm font-medium text-foreground/70 hover:text-foreground"
           >
-            {item.icon}
+            <span className="w-4 h-4">{item.icon}</span>
+            {item.name}
           </Link>
         ))}
       </ul>
