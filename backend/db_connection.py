@@ -190,6 +190,163 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
 
+    def get_traces_by_user(self, user_id: int, limit: int = 50, offset: int = 0) -> List[Dict]:
+        """Get all traces for a user with pagination"""
+        conn = self.get_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                sql = """
+                    SELECT * FROM traces
+                    WHERE user_id = %s
+                    ORDER BY start_time DESC
+                    LIMIT %s OFFSET %s
+                """
+                cur.execute(sql, (user_id, limit, offset))
+                results = cur.fetchall()
+                return [dict(row) for row in results]
+        finally:
+            self.return_connection(conn)
+    
+    def get_user_metrics(self, user_id: int) -> Dict:
+        """Get aggregate metrics for a user"""
+        conn = self.get_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Get aggregated metrics
+                sql = """
+                    SELECT
+                        COUNT(*) as total_traces,
+                        COALESCE(SUM(total_cost), 0) as total_cost,
+                        COALESCE(SUM(total_tokens), 0) as total_tokens,
+                        COALESCE(SUM(duration), 0) as total_duration,
+                        COALESCE(AVG(total_cost), 0) as avg_cost_per_trace
+                    FROM traces
+                    WHERE user_id = %s
+                """
+                cur.execute(sql, (user_id,))
+                trace_metrics = dict(cur.fetchone())
+
+                # Get total spans count
+                cur.execute("SELECT COUNT(*) as total_spans FROM spans s JOIN traces t ON s.trace_id = t.trace_id WHERE t.user_id = %s", (user_id,))
+                span_count = cur.fetchone()['total_spans']
+
+                trace_metrics['total_spans'] = span_count
+                return trace_metrics
+        finally:
+            self.return_connection(conn)
+    
+    def get_span_by_id(self, span_id: str) -> Optional[Dict]:
+        """Get a specific span by ID"""
+        conn = self.get_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                sql = "SELECT * FROM spans WHERE span_id = %s"
+                cur.execute(sql, (span_id,))
+                result = cur.fetchone()
+                return dict(result) if result else None
+        finally:
+            self.return_connection(conn)
+    
+    def get_recent_traces(self, user_id: int, limit: int = 10) -> List[Dict]:
+        """Get the most recent traces for a user"""
+        conn = self.get_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                sql = """
+                    SELECT * FROM traces
+                    WHERE user_id = %s
+                    ORDER BY start_time DESC
+                    LIMIT %s
+                """
+                cur.execute(sql, (user_id, limit))
+                results = cur.fetchall()
+                return [dict(row) for row in results]
+        finally:
+            self.return_connection(conn)
+    
+    def get_trace_summary(self, trace_id: str) -> Optional[Dict]:
+        """Get a trace with aggregated span information"""
+        conn = self.get_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Get the trace
+                trace = self.get_trace_by_id(trace_id)
+                if not trace:
+                    return None
+
+                # Get span count
+                cur.execute("SELECT COUNT(*) as span_count FROM spans WHERE trace_id = %s", (trace_id,))
+                span_count = cur.fetchone()['span_count']
+
+                # Get unique models used
+                cur.execute("SELECT DISTINCT llm_model FROM spans WHERE trace_id = %s AND llm_model IS NOT NULL", (trace_id,))
+                models = [row['llm_model'] for row in cur.fetchall()]
+
+                # Get error count
+                cur.execute("SELECT COUNT(*) as error_count FROM spans WHERE trace_id = %s AND status != 'success'", (trace_id,))
+                error_count = cur.fetchone()['error_count']
+
+                # Add summary info to trace
+                trace['span_count'] = span_count
+                trace['models_used'] = models
+                trace['error_count'] = error_count
+
+                return trace
+        finally:
+            self.return_connection(conn)
+
+    def search_traces(self, user_id: int, filters: Dict) -> List[Dict]:
+        """Search traces with filters"""
+        conn = self.get_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Build WHERE clauses dynamically based on filters
+                where_clauses = ["user_id = %s"]
+                params = [user_id]
+
+                if filters.get('status'):
+                    where_clauses.append("status = %s")
+                    params.append(filters['status'])
+
+                if filters.get('min_cost') is not None:
+                    where_clauses.append("total_cost >= %s")
+                    params.append(filters['min_cost'])
+
+                if filters.get('max_cost') is not None:
+                    where_clauses.append("total_cost <= %s")
+                    params.append(filters['max_cost'])
+
+                if filters.get('start_date'):
+                    where_clauses.append("start_time >= %s")
+                    params.append(filters['start_date'])
+
+                if filters.get('end_date'):
+                    where_clauses.append("start_time <= %s")
+                    params.append(filters['end_date'])
+
+                # Join with spans if filtering by model
+                if filters.get('model'):
+                    sql = f"""
+                        SELECT DISTINCT t.* FROM traces t
+                        JOIN spans s ON t.trace_id = s.trace_id
+                        WHERE {' AND '.join(where_clauses)}
+                        AND s.llm_model = %s
+                        ORDER BY t.start_time DESC
+                    """
+                    params.append(filters['model'])
+                else:
+                    sql = f"""
+                        SELECT * FROM traces
+                        WHERE {' AND '.join(where_clauses)}
+                        ORDER BY start_time DESC
+                    """
+
+                cur.execute(sql, params)
+                results = cur.fetchall()
+                return [dict(row) for row in results]
+        finally:
+            self.return_connection(conn)
+
     # closes all the connections in the pool
     def close(self):
         self.pool.closeall()
