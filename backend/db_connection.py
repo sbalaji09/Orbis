@@ -1,0 +1,375 @@
+import os
+import psycopg2
+from psycopg2.extras import RealDictCursor, execute_values
+from psycopg2.pool import SimpleConnectionPool
+from dotenv import load_dotenv
+from typing import Dict, List, Optional
+from uuid import UUID
+
+load_dotenv()
+
+# this class is the connection to SupabaseDB
+class SupabaseDB:
+
+    # init the connection pool to Supabase
+    def __init__(self):
+        connection_string = os.getenv('DIRECT_CONNECTION')
+
+        if not connection_string:
+            raise ValueError("DIRECT_CONNECTION not found in environment variables")
+
+        # create connection pool
+        self.pool = SimpleConnectionPool(
+            minconn=1,
+            maxconn=10,
+            dsn=connection_string
+        )
+
+        print(f"✓ Connected to Supabase PostgreSQL")
+
+    # get a connection from the pool
+    def get_connection(self):
+        
+        return self.pool.getconn()
+
+    # return a specific connection to the pool
+    def return_connection(self, conn):
+        self.pool.putconn(conn)
+
+    # insert a specific trace into the database
+    """
+    trace_data: dictionary with trace information
+        - trace_id (UUID): Trace identifier
+        - user_id (UUID): User who created the trace
+        - start_time (str): ISO timestamp
+        - status (str): 'running' or 'completed'
+    """
+    def insert_trace(self, trace_data: Dict) -> str:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                sql = """
+                    INSERT INTO traces (
+                        trace_id, user_id, start_time, status,
+                        total_cost, total_tokens
+                    ) VALUES (
+                        %s, %s, %s, %s, %s, %s
+                    )
+                    RETURNING trace_id
+                """
+                cur.execute(sql, (
+                    trace_data.get('trace_id'),
+                    trace_data.get('user_id'),
+                    trace_data.get('start_time'),
+                    trace_data.get('status', 'running'),
+                    trace_data.get('total_cost', 0),
+                    trace_data.get('total_tokens', 0)
+                ))
+                result = cur.fetchone()
+                conn.commit()
+                return str(result[0])
+        except Exception as e:
+            conn.rollback()
+            raise Exception(f"Failed to insert trace: {e}")
+        finally:
+            self.return_connection(conn)
+
+    # updates the trace with the values after finishing the trace span
+    """
+    trace_id: UUID of the trace
+        update_data: Dictionary with fields to update
+            - end_time (str): ISO timestamp
+            - duration (float): Total duration in seconds
+            - total_cost (float): Total cost
+            - total_tokens (int): Total tokens
+            - status (str): 'completed' or 'error'
+    """
+    def update_trace(self, trace_id: str, update_data: Dict) -> bool:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                set_clauses = []
+                values = []
+
+                for key, value in update_data.items():
+                    set_clauses.append(f"{key} = %s")
+                    values.append(value)
+
+                values.append(trace_id)  # For WHERE clause
+
+                sql = f"""
+                    UPDATE traces
+                    SET {', '.join(set_clauses)}
+                    WHERE trace_id = %s
+                """
+                cur.execute(sql, values)
+                conn.commit()
+                return True
+        except Exception as e:
+            conn.rollback()
+            raise Exception(f"Failed to update trace: {e}")
+        finally:
+            self.return_connection(conn)
+
+    # insert a new span into the database using a dict that contains span information
+    def insert_span(self, span_data: Dict) -> str:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                sql = """
+                    INSERT INTO spans (
+                        span_id, trace_id, parent_span_ids, name,
+                        start_time, end_time, duration,
+                        input_preview, input_blob_url,
+                        output_preview, output_blob_url,
+                        llm_model, prompt_tokens, completion_tokens,
+                        cost, status, error_message
+                    ) VALUES (
+                        %s, %s, %s, %s,
+                        %s, %s, %s,
+                        %s, %s,
+                        %s, %s,
+                        %s, %s, %s,
+                        %s, %s, %s
+                    )
+                    RETURNING span_id
+                """
+                cur.execute(sql, (
+                    span_data.get('span_id'),
+                    span_data.get('trace_id'),
+                    span_data.get('parent_span_ids', []),
+                    span_data.get('name'),
+                    span_data.get('start_time'),
+                    span_data.get('end_time'),
+                    span_data.get('duration'),
+                    span_data.get('input_preview'),
+                    span_data.get('input_blob_url'),
+                    span_data.get('output_preview'),
+                    span_data.get('output_blob_url'),
+                    span_data.get('llm_model'),
+                    span_data.get('prompt_tokens'),
+                    span_data.get('completion_tokens'),
+                    span_data.get('cost'),
+                    span_data.get('status'),
+                    span_data.get('error_message')
+                ))
+                result = cur.fetchone()
+                conn.commit()
+                return str(result[0])
+        except Exception as e:
+            conn.rollback()
+            raise Exception(f"Failed to insert span: {e}")
+        finally:
+            self.return_connection(conn)
+
+    # returns the id for a specific trace
+    def get_trace_by_id(self, trace_id: str) -> Optional[Dict]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                sql = "SELECT * FROM traces WHERE trace_id = %s"
+                cur.execute(sql, (trace_id,))
+                result = cur.fetchone()
+                return dict(result) if result else None
+        finally:
+            self.return_connection(conn)
+
+    # gets all the spans that correspond to a certain trace
+    def get_spans_by_trace(self, trace_id: str) -> List[Dict]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                sql = """
+                    SELECT * FROM spans
+                    WHERE trace_id = %s
+                    ORDER BY start_time ASC
+                """
+                cur.execute(sql, (trace_id,))
+                results = cur.fetchall()
+                return [dict(row) for row in results]
+        finally:
+            self.return_connection(conn)
+
+    def get_traces_by_user(self, user_id: int, limit: int = 50, offset: int = 0) -> List[Dict]:
+        """Get all traces for a user with pagination"""
+        conn = self.get_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                sql = """
+                    SELECT * FROM traces
+                    WHERE user_id = %s
+                    ORDER BY start_time DESC
+                    LIMIT %s OFFSET %s
+                """
+                cur.execute(sql, (user_id, limit, offset))
+                results = cur.fetchall()
+                return [dict(row) for row in results]
+        finally:
+            self.return_connection(conn)
+    
+    def get_user_metrics(self, user_id: int) -> Dict:
+        """Get aggregate metrics for a user"""
+        conn = self.get_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Get aggregated metrics
+                sql = """
+                    SELECT
+                        COUNT(*) as total_traces,
+                        COALESCE(SUM(total_cost), 0) as total_cost,
+                        COALESCE(SUM(total_tokens), 0) as total_tokens,
+                        COALESCE(SUM(duration), 0) as total_duration,
+                        COALESCE(AVG(total_cost), 0) as avg_cost_per_trace
+                    FROM traces
+                    WHERE user_id = %s
+                """
+                cur.execute(sql, (user_id,))
+                trace_metrics = dict(cur.fetchone())
+
+                # Get total spans count
+                cur.execute("SELECT COUNT(*) as total_spans FROM spans s JOIN traces t ON s.trace_id = t.trace_id WHERE t.user_id = %s", (user_id,))
+                span_count = cur.fetchone()['total_spans']
+
+                trace_metrics['total_spans'] = span_count
+                return trace_metrics
+        finally:
+            self.return_connection(conn)
+    
+    def get_span_by_id(self, span_id: str) -> Optional[Dict]:
+        """Get a specific span by ID"""
+        conn = self.get_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                sql = "SELECT * FROM spans WHERE span_id = %s"
+                cur.execute(sql, (span_id,))
+                result = cur.fetchone()
+                return dict(result) if result else None
+        finally:
+            self.return_connection(conn)
+    
+    def get_recent_traces(self, user_id: int, limit: int = 10) -> List[Dict]:
+        """Get the most recent traces for a user"""
+        conn = self.get_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                sql = """
+                    SELECT * FROM traces
+                    WHERE user_id = %s
+                    ORDER BY start_time DESC
+                    LIMIT %s
+                """
+                cur.execute(sql, (user_id, limit))
+                results = cur.fetchall()
+                return [dict(row) for row in results]
+        finally:
+            self.return_connection(conn)
+    
+    def get_trace_summary(self, trace_id: str) -> Optional[Dict]:
+        """Get a trace with aggregated span information"""
+        conn = self.get_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Get the trace
+                trace = self.get_trace_by_id(trace_id)
+                if not trace:
+                    return None
+
+                # Get span count
+                cur.execute("SELECT COUNT(*) as span_count FROM spans WHERE trace_id = %s", (trace_id,))
+                span_count = cur.fetchone()['span_count']
+
+                # Get unique models used
+                cur.execute("SELECT DISTINCT llm_model FROM spans WHERE trace_id = %s AND llm_model IS NOT NULL", (trace_id,))
+                models = [row['llm_model'] for row in cur.fetchall()]
+
+                # Get error count
+                cur.execute("SELECT COUNT(*) as error_count FROM spans WHERE trace_id = %s AND status != 'success'", (trace_id,))
+                error_count = cur.fetchone()['error_count']
+
+                # Add summary info to trace
+                trace['span_count'] = span_count
+                trace['models_used'] = models
+                trace['error_count'] = error_count
+
+                return trace
+        finally:
+            self.return_connection(conn)
+
+    def search_traces(self, user_id: int, filters: Dict) -> List[Dict]:
+        """Search traces with filters"""
+        conn = self.get_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Build WHERE clauses dynamically based on filters
+                where_clauses = ["user_id = %s"]
+                params = [user_id]
+
+                if filters.get('status'):
+                    where_clauses.append("status = %s")
+                    params.append(filters['status'])
+
+                if filters.get('min_cost') is not None:
+                    where_clauses.append("total_cost >= %s")
+                    params.append(filters['min_cost'])
+
+                if filters.get('max_cost') is not None:
+                    where_clauses.append("total_cost <= %s")
+                    params.append(filters['max_cost'])
+
+                if filters.get('start_date'):
+                    where_clauses.append("start_time >= %s")
+                    params.append(filters['start_date'])
+
+                if filters.get('end_date'):
+                    where_clauses.append("start_time <= %s")
+                    params.append(filters['end_date'])
+
+                # Join with spans if filtering by model
+                if filters.get('model'):
+                    sql = f"""
+                        SELECT DISTINCT t.* FROM traces t
+                        JOIN spans s ON t.trace_id = s.trace_id
+                        WHERE {' AND '.join(where_clauses)}
+                        AND s.llm_model = %s
+                        ORDER BY t.start_time DESC
+                    """
+                    params.append(filters['model'])
+                else:
+                    sql = f"""
+                        SELECT * FROM traces
+                        WHERE {' AND '.join(where_clauses)}
+                        ORDER BY start_time DESC
+                    """
+
+                cur.execute(sql, params)
+                results = cur.fetchall()
+                return [dict(row) for row in results]
+        finally:
+            self.return_connection(conn)
+
+    # closes all the connections in the pool
+    def close(self):
+        self.pool.closeall()
+        print("✓ Database connections closed")
+
+db = SupabaseDB()
+
+
+# Test the connection
+if __name__ == "__main__":
+    print("\n=== Testing Supabase Connection ===\n")
+
+    try:
+        # Test connection
+        print("✓ Database connection successful!")
+
+        # You can add more tests here once your schema is set up
+
+    except Exception as e:
+        print(f"✗ Database connection failed: {e}")
+        print("\nMake sure:")
+        print("1. Supabase project is running")
+        print("2. DIRECT_CONNECTION is set in .env")
+        print("3. Database schema is created (run init.sql)")
+
+    print("\n=== Test Complete ===\n")

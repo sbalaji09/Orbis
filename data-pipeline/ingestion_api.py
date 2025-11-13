@@ -2,28 +2,29 @@ from fastapi import FastAPI, Request, HTTPException
 from pydantic import BaseModel
 from datetime import datetime, timezone
 from uuid import UUID
+from typing import Optional
 from queues.redis_queue import queue
 from auth.auth_middleware import check_api_key
 from rate_limiter import check_rate_limit
 
 
 class SpanIn(BaseModel):
-    prompt: str
-    model: str
-    input_tokens: int
-    output_tokens: int
-    total_cost: int
-    start_time: datetime
-    end_time: datetime
+    trace_id: str
+    span_id: str
+    parent_span_id: list[str]
+    name: str
+    start_time: str
+    end_time: str
     duration: float
     input_data: str
     output_data: str
-    context: str
-    output: str
+    model: str
+    input_tokens: int
+    output_tokens: int
+    total_cost: float
     status: str
-    error_message: str
-    parent_span_id: list[int]
-    name: str
+    error_message: Optional[str] = None
+    user_id: str
     is_start_span: bool
     is_end_span: bool
 
@@ -88,15 +89,23 @@ def is_valid_uuid(val: str) -> bool:
 def validate_span(span: SpanIn) -> bool:
     for attr_name in vars(span):
         attr_value = getattr(span, attr_name)
+
+        # error_message can be None
+        if attr_name == 'error_message':
+            continue
+
         if attr_value is None:
             return False
 
         # this validates the uuid id using the function above
         if attr_name in ('trace_id', 'span_id') and not is_valid_uuid(str(attr_value)):
             return False
-        
-        # if any of the parent spans UUIDs are not valid, then return False
-        if attr_name == 'parent_spans_ids':
-            if not isinstance(attr_value, list) or not all(is_valid_uuid(str(v)) for v in attr_value):
+
+        # if any of the parent span UUIDs are not valid, then return False
+        if attr_name == 'parent_span_id':
+            if not isinstance(attr_value, list):
+                return False
+            # Allow empty list for root spans
+            if len(attr_value) > 0 and not all(is_valid_uuid(str(v)) for v in attr_value):
                 return False
     return True
