@@ -273,7 +273,7 @@ export default function TraceGraph(props: { traceId: number }) {
 
   return (
     <div
-      className="fixed inset-0 overflow-hidden"
+      className="w-full h-full relative overflow-auto"
       style={{
         backgroundImage: `
           linear-gradient(to right, #0c0f0a08 1px, transparent 1px),
@@ -284,10 +284,12 @@ export default function TraceGraph(props: { traceId: number }) {
       }}
     >
       <div
-        className="relative w-full h-full"
+        className="relative"
         style={{
           width: canvasWidth > 0 ? `${canvasWidth}px` : "100%",
           height: canvasHeight > 0 ? `${canvasHeight}px` : "100%",
+          minWidth: "100%",
+          minHeight: "100%",
         }}
       >
         {/* SVG for edges - covers entire canvas */}

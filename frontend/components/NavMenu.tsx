@@ -20,22 +20,24 @@ const navItems: NavItem[] = [
       </svg>
     ),
     name: "Home",
-    link: "/",
+    link: "/dashboard",
   },
 ];
 
 export default function NavMenu() {
   return (
-    <nav className="w-16 flex items-center flex-col p-2 fixed h-full left-0 top-0 bg-yellow-500">
-      {navItems.map((item) => (
-        <Link
-          href={item.link}
-          key={item.name}
-          className="p-2 hover:bg-yellow-600 inline-flex rounded-lg"
-        >
-          {item.icon}
-        </Link>
-      ))}
+    <nav className="w-13 p-2 fixed inset-y-2 left-2 z-50 bg-mustard/50 backdrop-blur-xs rounded-lg shadow-lg overflow-auto">
+      <ul className="flex flex-col items-center gap-4">
+        {navItems.map((item) => (
+          <Link
+            href={item.link}
+            key={item.name}
+            className="p-2 hover:bg-yellow-600 inline-flex rounded-lg"
+          >
+            {item.icon}
+          </Link>
+        ))}
+      </ul>
     </nav>
   );
 }
