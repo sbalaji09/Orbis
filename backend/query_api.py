@@ -41,13 +41,6 @@ async def list_traces(
     offset: int = Query(0, ge=0, description="Number to skip for pagination"),
     status: Optional[str] = Query(None, description="Filter by status")
 ):
-    """
-    List all traces for a user with pagination
-
-    Example:
-        GET /traces?limit=10&offset=0&status=completed
-        Header: X-User-ID: 1
-    """
     try:
         # get all the traces
         traces = db.get_traces_by_user(user_id, limit=limit, offset=offset)
@@ -221,6 +214,41 @@ async def search_traces(
             "filters": filters,
             "traces": traces
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# get traces based on the specific agent
+@app.get("/traces/{agent_id}")
+async def get_traces_by_agent(agent_id: int, user_id: int, limit: int = 5, offset: int = 0):
+    try:
+        span = db.get_traces_by_agentid(agent_id, user_id)
+
+        if not span:
+            raise HTTPException(status_code=404, detail="Span not found")
+
+        # check if the user has access via a trace
+        trace = db.get_trace_by_id(span['trace_id'])
+        if not trace or trace.get('user_id') != user_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        return span
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# get all the agents belonging to a specific user
+@app.get("/agents")
+async def get_agents(user_id: int):
+    try:
+        agents = db.get_agents(user_id)
+
+        if not agents:
+            raise HTTPException(status_code=404, detail="Agents not found")
+
+        return agents
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

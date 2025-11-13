@@ -189,6 +189,39 @@ class SupabaseDB:
                 return [dict(row) for row in results]
         finally:
             self.return_connection(conn)
+    
+    # gets all the traces that correspond to a certain agent
+    def get_traces_by_agentid(self, agent_id: str, user_id: str) -> List[Dict]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                sql = """
+                    SELECT * FROM traces
+                    WHERE agent_id = %s
+                    AND user_id = %s
+                    ORDER BY start_time ASC
+                """
+                cur.execute(sql, (agent_id, user_id))
+                results = cur.fetchall()
+                return [dict(row) for row in results]
+        finally:
+            self.return_connection(conn)
+
+    # gets all the agents that belong to a certain user
+    def get_agents(self, user_id: str) -> List[Dict]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                sql = """
+                    SELECT * FROM agents
+                    WHERE user_id = %s
+                    ORDER BY start_time ASC
+                """
+                cur.execute(sql, (user_id))
+                results = cur.fetchall()
+                return [dict(row) for row in results]
+        finally:
+            self.return_connection(conn)
 
     def get_traces_by_user(self, user_id: int, limit: int = 50, offset: int = 0) -> List[Dict]:
         """Get all traces for a user with pagination"""
