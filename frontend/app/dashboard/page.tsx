@@ -12,7 +12,7 @@ export default function Dashboard() {
   }));
 
   return (
-    <div className="min-h-screen p-8">
+    <div className="h-full overflow-y-auto p-8">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">

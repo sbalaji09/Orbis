@@ -26,13 +26,13 @@ export default function TraceList() {
     <Disclosure defaultOpen={true}>
       {({ open }) => (
         <div
-          className={`bg-white border-l border-foreground/10 h-screen flex flex-col transition-all duration-300 ${
+          className={`bg-white border-l border-foreground/10 h-full flex flex-col transition-all duration-300 ${
             open ? "w-80" : "w-16"
           }`}
         >
           {/* Header bar */}
           <div
-            className={`px-4 py-3 border-b border-foreground/10 flex items-center ${
+            className={`px-4 py-3 border-b border-foreground/10 flex items-center shrink-0 ${
               open ? "justify-between" : "justify-center"
             }`}
           >
@@ -65,7 +65,7 @@ export default function TraceList() {
             </DisclosureButton>
           </div>
 
-          <DisclosurePanel className="flex-1 overflow-y-auto">
+          <DisclosurePanel className="flex-1 overflow-y-auto min-h-0">
             <div className="divide-y divide-foreground/5">
               {tracesByAgent.map(({ agent, traces }) => (
                 <Disclosure key={agent.agent_id} defaultOpen={true}>

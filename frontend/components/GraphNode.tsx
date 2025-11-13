@@ -115,105 +115,170 @@ export default function GraphNode({
       <PopoverPanel
         transition
         anchor="bottom"
-        className="z-50 w-[400px] divide-y divide-foreground/10 rounded-xl bg-white/95 backdrop-blur-sm text-sm shadow-2xl 
-          border border-foreground/20 transition duration-200 ease-in-out 
-          [--anchor-gap:--spacing(3)] data-closed:-translate-y-1 data-closed:opacity-0"
+        className="z-50 w-[min(480px,90vw)] max-h-[80vh] overflow-y-auto rounded-lg bg-white text-sm shadow-2xl 
+          border border-foreground/10 transition duration-200 ease-in-out
+          [--anchor-gap:--spacing(2)] data-closed:-translate-y-1 data-closed:opacity-0"
       >
-        <div className="p-4">
-          {/* Header */}
-          <div className="pb-3">
-            <h3 className="text-lg font-bold text-foreground">
-              Span #{span.span_id}
-            </h3>
-            <div className="flex items-center gap-2 mt-2">
-              <span
-                className={`px-2.5 py-0.5 rounded-full text-xs font-semibold text-white ${statusBadgeColor}`}
-              >
-                {span.status || "unknown"}
-              </span>
+        {/* Header with gradient background like dashboard */}
+        <div className="px-5 py-3 bg-linear-to-br from-babyblue/10 to-babyblue/5 border-b border-foreground/10 sticky top-0 bg-white/95 backdrop-blur-sm z-10">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <h3 className="text-base font-semibold text-foreground">
+                Span #{span.span_id}
+              </h3>
               {span.llm_model && (
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-mustard/20 text-foreground">
+                <p className="text-xs text-foreground/60 mt-0.5 truncate">
                   {span.llm_model}
-                </span>
+                </p>
               )}
             </div>
+            <span
+              className={`px-2 py-1 rounded text-xs font-semibold text-white shrink-0 ${statusBadgeColor}`}
+            >
+              {span.status || "unknown"}
+            </span>
           </div>
         </div>
 
-        <div className="p-4">
+        <div className="p-4 space-y-4">
           {/* Timing Information */}
-          <div className="rounded-lg transition data-hover:bg-foreground/5 p-3">
-            <h4 className="font-semibold text-foreground/80 text-xs uppercase tracking-wide mb-2">
-              Timing
+          <div>
+            <h4 className="font-semibold text-foreground text-sm mb-2">
+              Timing & Cost
             </h4>
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <p className="text-foreground/60 font-medium text-xs">
-                  Duration
-                </p>
-                <p className="text-foreground font-semibold font-sans">
-                  {formatDuration(span.duration)}
-                </p>
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="flex items-start gap-2">
+                <svg
+                  className="w-4 h-4 text-foreground/60 shrink-0 mt-0.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <div className="min-w-0">
+                  <p className="text-foreground/60">Duration</p>
+                  <p className="text-foreground font-semibold">
+                    {formatDuration(span.duration)}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-foreground/60 font-medium text-xs">Cost</p>
-                <p className="text-foreground font-semibold">
-                  {formatCost(span.cost)}
-                </p>
+              <div className="flex items-start gap-2">
+                <svg
+                  className="w-4 h-4 text-foreground/60 shrink-0 mt-0.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <div className="min-w-0">
+                  <p className="text-foreground/60">Cost</p>
+                  <p className="text-foreground font-semibold">
+                    {formatCost(span.cost)}
+                  </p>
+                </div>
               </div>
             </div>
-            <div className="text-xs text-foreground/50 mt-2 space-y-0.5">
-              <p>Start: {formatDate(span.start_time)}</p>
-              <p>End: {formatDate(span.end_time)}</p>
+            <div className="text-xs text-foreground/50 mt-2 pt-2 border-t border-foreground/10 space-y-0.5">
+              <p className="truncate">Start: {formatDate(span.start_time)}</p>
+              <p className="truncate">End: {formatDate(span.end_time)}</p>
             </div>
           </div>
 
           {/* Token Information */}
           {(span.prompt_tokens || span.completion_tokens) && (
-            <div className="rounded-lg transition data-hover:bg-foreground/5 p-3">
-              <h4 className="font-semibold text-foreground/80 text-xs uppercase tracking-wide mb-2">
+            <div>
+              <h4 className="font-semibold text-foreground text-sm mb-2">
                 Tokens
               </h4>
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div>
-                  <p className="text-foreground/60 font-medium text-xs">
-                    Prompt
-                  </p>
-                  <p className="text-foreground font-semibold">
-                    {span.prompt_tokens || 0}
-                  </p>
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="flex items-start gap-2">
+                  <svg
+                    className="w-4 h-4 text-foreground/60 shrink-0 mt-0.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13 10V3L4 14h7v7l9-11h-7z"
+                    />
+                  </svg>
+                  <div className="min-w-0">
+                    <p className="text-foreground/60">Prompt</p>
+                    <p className="text-foreground font-semibold font-mono">
+                      {span.prompt_tokens || 0}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-foreground/60 font-medium text-xs">
-                    Completion
-                  </p>
-                  <p className="text-foreground font-semibold">
-                    {span.completion_tokens || 0}
-                  </p>
+                <div className="flex items-start gap-2">
+                  <svg
+                    className="w-4 h-4 text-foreground/60 shrink-0 mt-0.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13 10V3L4 14h7v7l9-11h-7z"
+                    />
+                  </svg>
+                  <div className="min-w-0">
+                    <p className="text-foreground/60">Completion</p>
+                    <p className="text-foreground font-semibold font-mono">
+                      {span.completion_tokens || 0}
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
           )}
-        </div>
 
-        <div className="p-4">
           {/* Input Preview */}
           {span.input_preview && (
-            <div className="rounded-lg transition data-hover:bg-foreground/5 p-3 mb-3">
-              <h4 className="font-semibold text-foreground/80 text-xs uppercase tracking-wide mb-2">
+            <div>
+              <h4 className="font-semibold text-foreground text-sm mb-2">
                 Input
               </h4>
-              <p className="text-sm text-foreground/70 bg-babyblue/20 p-3 rounded-lg italic line-clamp-3">
-                &ldquo;{span.input_preview}&rdquo;
+              <p className="text-xs text-foreground/70 bg-babyblue/10 p-2.5 rounded border border-foreground/10 line-clamp-4 wrap-break-word">
+                {span.input_preview}
               </p>
               {span.input_blob_url && (
                 <a
                   href={span.input_blob_url}
-                  className="block mt-2 text-xs text-mustard data-hover:underline font-medium transition"
+                  className="inline-flex items-center gap-1 mt-1.5 text-xs text-mustard hover:underline font-medium transition"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  View full input →
+                  View full input
+                  <svg
+                    className="w-3 h-3"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 5l7 7-7 7"
+                    />
+                  </svg>
                 </a>
               )}
             </div>
@@ -221,21 +286,34 @@ export default function GraphNode({
 
           {/* Output Preview */}
           {span.output_preview && (
-            <div className="rounded-lg transition data-hover:bg-foreground/5 p-3">
-              <h4 className="font-semibold text-foreground/80 text-xs uppercase tracking-wide mb-2">
+            <div>
+              <h4 className="font-semibold text-foreground text-sm mb-2">
                 Output
               </h4>
-              <p className="text-sm text-foreground/70 bg-babyblue/20 p-3 rounded-lg italic line-clamp-3">
-                &ldquo;{span.output_preview}&rdquo;
+              <p className="text-xs text-foreground/70 bg-babyblue/10 p-2.5 rounded border border-foreground/10 line-clamp-4 wrap-break-word">
+                {span.output_preview}
               </p>
               {span.output_blob_url && (
                 <a
                   href={span.output_blob_url}
-                  className="block mt-2 text-xs text-mustard data-hover:underline font-medium transition"
+                  className="inline-flex items-center gap-1 mt-1.5 text-xs text-mustard hover:underline font-medium transition"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  View full output →
+                  View full output
+                  <svg
+                    className="w-3 h-3"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 5l7 7-7 7"
+                    />
+                  </svg>
                 </a>
               )}
             </div>
@@ -243,32 +321,34 @@ export default function GraphNode({
 
           {/* Error Message */}
           {span.error_message && (
-            <div className="rounded-lg bg-red-50/50 p-3 border border-red-200/50">
-              <h4 className="font-semibold text-red-600 text-xs uppercase tracking-wide mb-2">
+            <div className="rounded bg-red-50 p-2.5 border border-red-200">
+              <h4 className="font-semibold text-red-700 text-sm mb-1.5">
                 Error
               </h4>
-              <p className="text-sm text-red-700">{span.error_message}</p>
+              <p className="text-xs text-red-600 wrap-break-word">
+                {span.error_message}
+              </p>
             </div>
           )}
-        </div>
 
-        <div className="p-4">
           {/* Metadata */}
-          <div className="text-xs text-foreground/50 space-y-1">
-            <p>
-              Trace ID:{" "}
-              <span className="font-mono text-foreground/70">
-                {span.trace_id}
-              </span>
-            </p>
-            {span.parent_span_ids && span.parent_span_ids.length > 0 && (
-              <p>
-                Parent Spans:{" "}
-                <span className="font-mono text-foreground/70">
-                  {span.parent_span_ids.join(", ")}
+          <div className="pt-3 border-t border-foreground/10">
+            <div className="text-xs text-foreground/50 space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="shrink-0">Trace ID:</span>
+                <span className="font-mono text-foreground/70 bg-foreground/5 px-1.5 py-0.5 rounded">
+                  {span.trace_id}
                 </span>
-              </p>
-            )}
+              </div>
+              {span.parent_span_ids && span.parent_span_ids.length > 0 && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="shrink-0">Parent Spans:</span>
+                  <span className="font-mono text-foreground/70 bg-foreground/5 px-1.5 py-0.5 rounded">
+                    {span.parent_span_ids.join(", ")}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </PopoverPanel>
