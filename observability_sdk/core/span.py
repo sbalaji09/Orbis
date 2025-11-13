@@ -56,26 +56,29 @@ class Span:
     # convert to dict for JSON serialization
     def to_dict(self) -> dict:
         return {
+            "trace_id": self.trace_id, 
             "span_id": self.span_id,
-            "trace_id": self.trace_id,
-            "parent_span_id": self.parent_span_id,
             "name": self.name,
+            "prompt": self.prompt or "",  # Backend expects string, not None
+            "model": self.model or "",
+            "input_tokens": self.input_tokens or 0,
+            "output_tokens": self.output_tokens or 0,
+            "total_cost": self.total_cost or 0.0,
             "start_time": self.start_time.isoformat(),
-            "end_time": self.end_time.isoformat() if self.end_time else None,
-            "duration": self.duration_ms,
+            "end_time": self.end_time.isoformat() if self.end_time else self.start_time.isoformat(),
+            "duration": self.duration_ms or 0.0,
+            "input_data": self.input_data or "",
+            "output_data": self.output_data or "",
+            "context": self.context or "",
+            "output": self.output or "",
             "status": self.status,
-            "error_message": self.error_message,
-            "model": self.model,
-            "prompt": self.prompt,
-            "output": self.output,
-            "input_data": self.input_data,
-            "output_data": self.output_data,
-            "context": self.context,
-            "input_tokens": self.input_tokens,
-            "output_tokens": self.output_tokens,
-            "total_cost": self.total_cost,
+            "error_message": self.error_message or "",  # Can't be None!
+            "parent_span_id": self.parent_span_id,  # Already a list
             "is_start_span": self.is_start_span,
             "is_end_span": self.is_end_span,
+            # Don't send these - backend doesn't expect them:
+            # "span_id": self.span_id,
+            # "trace_id": self.trace_id,
         }
 
     def __str__(self):
