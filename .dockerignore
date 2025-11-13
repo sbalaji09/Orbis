@@ -1,0 +1,13 @@
+.git
+.gitignore
+*.md
+.env
+.DS_Store
+*.log
+dump.rdb
+__pycache__
+*.pyc
+node_modules
+.next
+frontend/node_modules
+frontend/.next
