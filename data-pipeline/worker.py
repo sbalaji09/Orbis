@@ -3,9 +3,9 @@ import sys
 import time
 from datetime import datetime, timezone
 from queues.redis_queue import RedisQueue
-from firebase import firebase
 from dotenv import load_dotenv
 from data_processing.prompt_upload import upload_input, upload_output
+from backend.db_connection import db
 
 
 # add the application logging layer to the path
@@ -18,25 +18,16 @@ load_dotenv()
 # this class represents a worker that processes span tasks from the Redis queue
 # it continuously pulls task from the queue and processes them and is separate from the API
 class SpanWorker:
-    # initialize the worker with the Redis queue information and the Firebase connection
+    # initialize the worker with the Redis queue information
     def __init__(self):
         # set up the logger for the worker
         self.logger = setup_logger(__name__)
 
         self.queue = RedisQueue()
 
-        firebase_url = os.getenv('FIREBASE_URL', 'https://<your-database-name>.firebaseio.com/')
-        self.firebase_app = firebase.FirebaseApplication(firebase_url, None)
-
-        # test print statement to see if the logger is working correctly
-        self.logger.info("Worker initialized successfully", extra={'extra_data': {
-            'queue_name': self.queue.queue_name,
-            'firebase_url': firebase_url
-        }})
-
     # this function processes a single span task
     # instead of having the backend infra do it automatically, we have this worker do it because it saves time
-    # this function will upload data to our blob storage (S3) and also save the span to the Firebase db
+    # this function will upload data to our blob storage (S3) and also save the span to the Supabase db
     def process_span_task(self, task_data: dict) -> bool:
         try:
             # extract span data
@@ -68,8 +59,8 @@ class SpanWorker:
                 span_id=str(span.get('span_id', 'unknown')),
                 content=span.get('output_data', '')
             )
-            
-            # convert out input span data into a dict that can be passed into the Firebase table
+
+            # convert out input span data into a dict that can be passed into the Supabase table
             # this dict follows the span schema as stated in init.sql
             span_db_data = {
                 "trace_id": str(span.get('trace_id', 'unknown')),
@@ -111,7 +102,7 @@ class SpanWorker:
                     "status": "running",
                     "user_id": int(span.get('user_id')),
                 }
-                self.firebase_app.post('/trace', trace)
+                db.insert_trace(trace)
 
                 self.logger.info("Trace created", extra={'extra_data': {
                     'trace_id': trace_id,
@@ -133,8 +124,8 @@ class SpanWorker:
                     "total_tokens": total_tokens,
                     "status": "completed",
                 }
-
-                self.firebase_app.patch(f'/trace/{trace_id}', update_data)
+                
+                db.update_trace(update_data)
 
                 self.queue.redis_client.delete(
                     f"trace:{trace_id}:total_tokens",
@@ -150,15 +141,14 @@ class SpanWorker:
                     'duration': total_duration
                 }})
 
-            # once the data has been converted into the proper format, the worker saves it to Firebase
-            result = self.firebase_app.post('/spans', span_db_data)
-            firebase_id = result.get('name')
+            # once the data has been converted into the proper format, the worker saves it to Supabase
+            span_id = db.insert_span(span_db_data)
 
             # log successful completion with context for the span
             self.logger.info("Span processed successfully", extra={'extra_data': {
                 'trace_id': trace_id,
-                'firebase_id': firebase_id,
                 'model': model,
+                'span_id': span_id,
                 'cost': span.get('total_cost')
             }})
 
