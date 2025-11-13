@@ -46,6 +46,14 @@ CREATE TABLE evaluations (
     score INT
 );
 
+CREATE TABLE agents (
+  agent_id SERIAL PRIMARY KEY,
+  user_id INT REFERENCES users(user_id),
+  agent_name VARCHAR(50),
+  created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+  api_key VARCHAR(280),
+);
+
 
 CREATE INDEX idx_traces_user_id ON traces(user_id);
 CREATE INDEX idx_spans_trace_id ON spans(trace_id);
@@ -53,3 +61,4 @@ CREATE INDEX idx_spans_parent_span_id ON spans(parent_span_id);
 CREATE INDEX idx_spans_status ON spans(status);
 CREATE INDEX idx_prompt_versions_version_number ON prompt_versions(version_number);
 CREATE INDEX idx_evaluations_trace_id ON evaluations(trace_id);
+CREATE UNIQUE INDEX idx_agents_api_key ON agents(api_key);
