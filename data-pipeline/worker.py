@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from queues.redis_queue import RedisQueue
 from dotenv import load_dotenv
 from data_processing.prompt_upload import upload_input, upload_output
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from backend.db_connection import db
 
 
@@ -46,19 +47,28 @@ class SpanWorker:
             }})
 
             # this are links for the S3 buckets
-            input_blob_url = upload_input(
-                user_id=task_data.get('user_id'),
-                trace_id=trace_id,
-                span_id=str(span.get('span_id', 'unknown')),
-                content=span.get('input_data', '')
-            )
+            # If S3 credentials are not configured, use placeholder URLs
+            try:
+                input_blob_url = upload_input(
+                    user_id=task_data.get('user_id'),
+                    trace_id=trace_id,
+                    span_id=str(span.get('span_id', 'unknown')),
+                    content=span.get('input_data', '')
+                )
+            except Exception as e:
+                self.logger.warning(f"S3 upload failed for input, using placeholder: {e}")
+                input_blob_url = f"placeholder://input/{trace_id}/{span.get('span_id', 'unknown')}"
 
-            output_blob_url = upload_output(
-                user_id=task_data.get('user_id'),
-                trace_id=trace_id,
-                span_id=str(span.get('span_id', 'unknown')),
-                content=span.get('output_data', '')
-            )
+            try:
+                output_blob_url = upload_output(
+                    user_id=task_data.get('user_id'),
+                    trace_id=trace_id,
+                    span_id=str(span.get('span_id', 'unknown')),
+                    content=span.get('output_data', '')
+                )
+            except Exception as e:
+                self.logger.warning(f"S3 upload failed for output, using placeholder: {e}")
+                output_blob_url = f"placeholder://output/{trace_id}/{span.get('span_id', 'unknown')}"
 
             # convert out input span data into a dict that can be passed into the Supabase table
             # this dict follows the span schema as stated in init.sql

@@ -11,7 +11,7 @@ class S3Uploader:
     # define the key values for the S3 bucket including the bucket_name, the aws_region, and the s3_client
     def __init__(self):
         self.bucket_name = os.getenv('S3_BUCKET_NAME', 'orbis-prompts-bucket')
-        aws_region = os.getenv('AWS_REGION', 'us-east-1')
+        aws_region = os.getenv('AWS_REGION', 'us-west-1')
 
         self.s3_client = boto3.client(
             's3',
