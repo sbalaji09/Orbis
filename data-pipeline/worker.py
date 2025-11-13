@@ -63,11 +63,13 @@ class SpanWorker:
             # convert out input span data into a dict that can be passed into the Supabase table
             # this dict follows the span schema as stated in init.sql
             span_db_data = {
-                "trace_id": str(span.get('trace_id', 'unknown')),
+                "span_id": str(span.get('span_id', 'unknown')),
+                "trace_id": trace_id,
                 "parent_span_ids": [str(id) for id in span.get('parent_span_id', [])],
+                "name": span.get('name'),
                 "start_time": span.get('start_time'),
                 "end_time": span.get('end_time'),
-                "duration": str(span.get('duration')),
+                "duration": float(span.get('duration', 0)),
                 "input_preview": span.get('input_data', '')[:200],
                 "input_blob_url": input_blob_url,
                 "output_preview": span.get('output_data', '')[:200],
@@ -77,10 +79,7 @@ class SpanWorker:
                 "completion_tokens": span.get('output_tokens'),
                 "cost": span.get('total_cost'),
                 "status": span.get('status'),
-                "error_message": span.get('error_message'),
-                "name": span.get('name'),
-                "is_start_span": span.get('is_start_span'),
-                "is_end_span": span.get('is_end_span')
+                "error_message": span.get('error_message')
             }
             
             # we add the current token amount and cost to a redis in session variable for final registering
@@ -102,6 +101,7 @@ class SpanWorker:
                     "status": "running",
                     "user_id": int(span.get('user_id')),
                 }
+                trace["trace_id"] = trace_id
                 db.insert_trace(trace)
 
                 self.logger.info("Trace created", extra={'extra_data': {
@@ -125,7 +125,7 @@ class SpanWorker:
                     "status": "completed",
                 }
                 
-                db.update_trace(update_data)
+                db.update_trace(trace_id, update_data)
 
                 self.queue.redis_client.delete(
                     f"trace:{trace_id}:total_tokens",
