@@ -25,6 +25,7 @@ class SpanIn(BaseModel):
     status: str
     error_message: Optional[str] = None
     user_id: str
+    agent_id: Optional[int] = None
     is_start_span: bool
     is_end_span: bool
 
