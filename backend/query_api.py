@@ -40,34 +40,34 @@ async def health_check():
 
 @app.get("/traces")
 async def list_traces(
-    user_id: int = Header(..., alias="X-User-ID"),
+    user_id: str = Header(..., alias="X-User-ID"),
     limit: int = Query(50, ge=1, le=100, description="Max traces to return"),
     offset: int = Query(0, ge=0, description="Number to skip for pagination"),
     status: Optional[str] = Query(None, description="Filter by status")
 ):
-    try:
-        # get all the traces
-        traces = db.get_traces_by_user(user_id, limit=limit, offset=offset)
+    # try:
+    # get all the traces
+    traces = db.get_traces_by_user(user_id, limit=limit, offset=offset)
 
-        # filter by the status
-        if status:
-            traces = [t for t in traces if t.get('status') == status]
+    # filter by the status
+    if status:
+        traces = [t for t in traces if t.get('status') == status]
 
-        return {
-            "traces": traces,
-            "count": len(traces),
-            "limit": limit,
-            "offset": offset
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return {
+        "traces": traces,
+        "count": len(traces),
+        "limit": limit,
+        "offset": offset
+    }
+    # except Exception as e:
+    #     raise HTTPException(status_code=500, detail=str(e))
 
 # get the most recent traces for a user
 
 
 @app.get("/traces/recent")
 async def get_recent_traces(
-    user_id: int = Header(..., alias="X-User-ID"),
+    user_id: str = Header(..., alias="X-User-ID"),
     limit: int = Query(10, ge=1, le=50, description="Number of recent traces")
 ):
     try:
@@ -85,7 +85,7 @@ async def get_recent_traces(
 @app.get("/traces/{trace_id}")
 async def get_trace(
     trace_id: str,
-    user_id: int = Header(..., alias="X-User-ID")
+    user_id: str = Header(..., alias="X-User-ID")
 ):
     try:
         trace = db.get_trace_by_id(trace_id)
@@ -109,7 +109,7 @@ async def get_trace(
 @app.get("/traces/{trace_id}/spans")
 async def get_trace_spans(
     trace_id: str,
-    user_id: int = Header(..., alias="X-User-ID")
+    user_id: str = Header(..., alias="X-User-ID")
 ):
     try:
         # check if the trace exists and the user has access
@@ -138,7 +138,7 @@ async def get_trace_spans(
 @app.get("/traces/{trace_id}/summary")
 async def get_trace_summary(
     trace_id: str,
-    user_id: int = Header(..., alias="X-User-ID")
+    user_id: str = Header(..., alias="X-User-ID")
 ):
     try:
         summary = db.get_trace_summary(trace_id)
@@ -162,7 +162,7 @@ async def get_trace_summary(
 @app.get("/spans/{span_id}")
 async def get_span(
     span_id: str,
-    user_id: int = Header(..., alias="X-User-ID")
+    user_id: str = Header(..., alias="X-User-ID")
 ):
     try:
         span = db.get_span_by_id(span_id)
@@ -187,7 +187,7 @@ async def get_span(
 
 @app.get("/metrics/user")
 async def get_user_metrics(
-    user_id: int = Header(..., alias="X-User-ID")
+    user_id: str = Header(..., alias="X-User-ID")
 ):
     try:
         metrics = db.get_user_metrics(user_id)
@@ -200,7 +200,7 @@ async def get_user_metrics(
 
 @app.get("/search/traces")
 async def search_traces(
-    user_id: int = Header(..., alias="X-User-ID"),
+    user_id: str = Header(..., alias="X-User-ID"),
     status: Optional[str] = Query(None, description="Filter by status"),
     model: Optional[str] = Query(None, description="Filter by LLM model"),
     min_cost: Optional[float] = Query(None, description="Minimum cost"),
@@ -241,7 +241,7 @@ async def search_traces(
 
 
 @app.get("/traces/{agent_id}")
-async def get_traces_by_agent(agent_id: int, user_id: int, limit: int = 5, offset: int = 0):
+async def get_traces_by_agent(agent_id: str, user_id: str, limit: int = 5, offset: int = 0):
     try:
         span = db.get_traces_by_agentid(agent_id, user_id)
 
@@ -263,18 +263,18 @@ async def get_traces_by_agent(agent_id: int, user_id: int, limit: int = 5, offse
 
 
 @app.get("/agents")
-async def get_agents(user_id: int):
-    try:
-        agents = db.get_agents(user_id)
+async def get_agents(user_id: str):
+    # try:
+    agents = db.get_agents(user_id)
 
-        if not agents:
-            raise HTTPException(status_code=404, detail="Agents not found")
+    # if not agents:
+    #     raise HTTPException(status_code=404, detail="Agents not found")
 
-        return agents
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return agents
+    # except HTTPException:
+    #     raise
+    # except Exception as e:
+    #     raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn

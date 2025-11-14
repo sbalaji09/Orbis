@@ -9,6 +9,8 @@ from uuid import UUID
 load_dotenv()
 
 # this class is the connection to SupabaseDB
+
+
 class SupabaseDB:
 
     # init the connection pool to Supabase
@@ -16,7 +18,8 @@ class SupabaseDB:
         connection_string = os.getenv('DIRECT_CONNECTION')
 
         if not connection_string:
-            raise ValueError("DIRECT_CONNECTION not found in environment variables")
+            raise ValueError(
+                "DIRECT_CONNECTION not found in environment variables")
 
         # create connection pool
         self.pool = SimpleConnectionPool(
@@ -29,7 +32,7 @@ class SupabaseDB:
 
     # get a connection from the pool
     def get_connection(self):
-        
+
         return self.pool.getconn()
 
     # return a specific connection to the pool
@@ -45,6 +48,7 @@ class SupabaseDB:
         - start_time (str): ISO timestamp
         - status (str): 'running' or 'completed'
     """
+
     def insert_trace(self, trace_data: Dict) -> str:
         conn = self.get_connection()
         try:
@@ -106,6 +110,7 @@ class SupabaseDB:
             - total_tokens (int): Total tokens
             - status (str): 'completed' or 'error'
     """
+
     def update_trace(self, trace_id: str, update_data: Dict) -> bool:
         conn = self.get_connection()
         try:
@@ -211,7 +216,7 @@ class SupabaseDB:
                 return [dict(row) for row in results]
         finally:
             self.return_connection(conn)
-    
+
     # gets all the traces that correspond to a certain agent
     def get_traces_by_agentid(self, agent_id: str, user_id: str) -> List[Dict]:
         conn = self.get_connection()
@@ -245,7 +250,7 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
 
-    def get_traces_by_user(self, user_id: int, limit: int = 50, offset: int = 0) -> List[Dict]:
+    def get_traces_by_user(self, user_id: str, limit: int = 50, offset: int = 0) -> List[Dict]:
         """Get all traces for a user with pagination"""
         conn = self.get_connection()
         try:
@@ -261,8 +266,8 @@ class SupabaseDB:
                 return [dict(row) for row in results]
         finally:
             self.return_connection(conn)
-    
-    def get_user_metrics(self, user_id: int) -> Dict:
+
+    def get_user_metrics(self, user_id: str) -> Dict:
         """Get aggregate metrics for a user"""
         conn = self.get_connection()
         try:
@@ -282,14 +287,15 @@ class SupabaseDB:
                 trace_metrics = dict(cur.fetchone())
 
                 # Get total spans count
-                cur.execute("SELECT COUNT(*) as total_spans FROM spans s JOIN traces t ON s.trace_id = t.trace_id WHERE t.user_id = %s", (user_id,))
+                cur.execute(
+                    "SELECT COUNT(*) as total_spans FROM spans s JOIN traces t ON s.trace_id = t.trace_id WHERE t.user_id = %s", (user_id,))
                 span_count = cur.fetchone()['total_spans']
 
                 trace_metrics['total_spans'] = span_count
                 return trace_metrics
         finally:
             self.return_connection(conn)
-    
+
     def get_span_by_id(self, span_id: str) -> Optional[Dict]:
         """Get a specific span by ID"""
         conn = self.get_connection()
@@ -301,8 +307,8 @@ class SupabaseDB:
                 return dict(result) if result else None
         finally:
             self.return_connection(conn)
-    
-    def get_recent_traces(self, user_id: int, limit: int = 10) -> List[Dict]:
+
+    def get_recent_traces(self, user_id: str, limit: int = 10) -> List[Dict]:
         """Get the most recent traces for a user"""
         conn = self.get_connection()
         try:
@@ -318,7 +324,7 @@ class SupabaseDB:
                 return [dict(row) for row in results]
         finally:
             self.return_connection(conn)
-    
+
     def get_trace_summary(self, trace_id: str) -> Optional[Dict]:
         """Get a trace with aggregated span information"""
         conn = self.get_connection()
@@ -330,15 +336,18 @@ class SupabaseDB:
                     return None
 
                 # Get span count
-                cur.execute("SELECT COUNT(*) as span_count FROM spans WHERE trace_id = %s", (trace_id,))
+                cur.execute(
+                    "SELECT COUNT(*) as span_count FROM spans WHERE trace_id = %s", (trace_id,))
                 span_count = cur.fetchone()['span_count']
 
                 # Get unique models used
-                cur.execute("SELECT DISTINCT llm_model FROM spans WHERE trace_id = %s AND llm_model IS NOT NULL", (trace_id,))
+                cur.execute(
+                    "SELECT DISTINCT llm_model FROM spans WHERE trace_id = %s AND llm_model IS NOT NULL", (trace_id,))
                 models = [row['llm_model'] for row in cur.fetchall()]
 
                 # Get error count
-                cur.execute("SELECT COUNT(*) as error_count FROM spans WHERE trace_id = %s AND status != 'success'", (trace_id,))
+                cur.execute(
+                    "SELECT COUNT(*) as error_count FROM spans WHERE trace_id = %s AND status != 'success'", (trace_id,))
                 error_count = cur.fetchone()['error_count']
 
                 # Add summary info to trace
@@ -350,7 +359,7 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
 
-    def search_traces(self, user_id: int, filters: Dict) -> List[Dict]:
+    def search_traces(self, user_id: str, filters: Dict) -> List[Dict]:
         """Search traces with filters"""
         conn = self.get_connection()
         try:
@@ -406,6 +415,7 @@ class SupabaseDB:
     def close(self):
         self.pool.closeall()
         print("✓ Database connections closed")
+
 
 db = SupabaseDB()
 
