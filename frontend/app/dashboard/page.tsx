@@ -1,6 +1,9 @@
 import { getAgents, getTraces } from "@/lib/api-server";
 import { TraceRow } from "@/components/TraceRow";
 
+// Revalidate every 10 seconds
+export const revalidate = 10;
+
 export default async function Dashboard() {
   // Fetch data on server
   const [agents, traces] = await Promise.all([getAgents(), getTraces()]);

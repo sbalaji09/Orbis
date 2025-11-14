@@ -2,8 +2,8 @@ import { notFound } from "next/navigation";
 import TraceGraphServer from "@/components/TraceGraphServer";
 import { getTrace } from "@/lib/api-server";
 
-// Force dynamic rendering - no static generation
-export const dynamic = "force-dynamic";
+// Revalidate every 10 seconds
+export const revalidate = 10;
 
 export default async function TraceOverview({
   params,
