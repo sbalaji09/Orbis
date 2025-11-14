@@ -1,7 +1,7 @@
 import { Agent, Trace, Span } from "./types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-const DEFAULT_USER_ID = 1; // In production, get from auth/session
+const DEFAULT_USER_ID = "b4cbdac0-016b-4ea4-9207-b89beae02099"; // In production, get from auth/session
 
 /**
  * Server-side API functions for fetching data
@@ -9,7 +9,7 @@ const DEFAULT_USER_ID = 1; // In production, get from auth/session
  */
 
 export async function getAgents(
-  userId: number = DEFAULT_USER_ID
+  userId: string = DEFAULT_USER_ID
 ): Promise<Agent[]> {
   try {
     const response = await fetch(`${API_BASE_URL}/agents?user_id=${userId}`, {
@@ -29,7 +29,7 @@ export async function getAgents(
 }
 
 export async function getTraces(
-  userId: number = DEFAULT_USER_ID,
+  userId: string = DEFAULT_USER_ID,
   options: {
     limit?: number;
     offset?: number;
@@ -67,7 +67,7 @@ export async function getTraces(
 
 export async function getTraceSpans(
   traceId: string,
-  userId: number = DEFAULT_USER_ID
+  userId: string = DEFAULT_USER_ID
 ): Promise<Span[]> {
   try {
     const response = await fetch(`${API_BASE_URL}/traces/${traceId}/spans`, {
@@ -92,7 +92,7 @@ export async function getTraceSpans(
 
 export async function getTrace(
   traceId: string,
-  userId: number = DEFAULT_USER_ID
+  userId: string = DEFAULT_USER_ID
 ): Promise<Trace | null> {
   try {
     const response = await fetch(`${API_BASE_URL}/traces/${traceId}`, {
