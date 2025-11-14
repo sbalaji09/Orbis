@@ -38,4 +38,5 @@ export interface Span {
   cost: number | null;
   status: string | null;
   error_message: string | null;
+  name: string | null;
 }

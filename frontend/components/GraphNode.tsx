@@ -52,7 +52,7 @@ export default function GraphNode({
   const [showTooltip, setShowTooltip] = useState(false);
 
   const statusColors = {
-    completed: "bg-green-500 hover:bg-green-600",
+    success: "bg-green-500 hover:bg-green-600",
     failed: "bg-red-500 hover:bg-red-600",
     running: "bg-blue-500 hover:bg-blue-600",
     pending: "bg-yellow-500 hover:bg-yellow-600",
@@ -60,7 +60,7 @@ export default function GraphNode({
   };
 
   const statusBadgeColors = {
-    completed: "bg-green-500/90",
+    success: "bg-green-500/90",
     failed: "bg-red-500/90",
     running: "bg-blue-500/90",
     pending: "bg-yellow-500/90",
@@ -116,7 +116,7 @@ export default function GraphNode({
     <>
       <div className="relative inline-block">
         <button
-          className={`w-16 h-16 rounded-full ${statusColor} border-3 border-foreground/20 shadow-md 
+          className={`px-4 py-2 min-w-32 max-w-44 h-10 rounded-full ${statusColor} border-2 border-foreground/20 shadow-md 
             focus:outline-none
             ${
               isDragging
@@ -129,8 +129,8 @@ export default function GraphNode({
           onMouseEnter={() => setShowTooltip(true)}
           onMouseLeave={() => setShowTooltip(false)}
         >
-          <span className="text-sm font-bold text-white select-none">
-            {span.span_id}
+          <span className="text-xs font-semibold text-white select-none truncate block">
+            {span.name}
           </span>
         </button>
 
