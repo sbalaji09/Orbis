@@ -41,6 +41,7 @@ class SupabaseDB:
     trace_data: dictionary with trace information
         - trace_id (UUID): Trace identifier
         - user_id (UUID): User who created the trace
+        - agent_id (int, optional): Agent identifier
         - start_time (str): ISO timestamp
         - status (str): 'running' or 'completed'
     """
@@ -48,23 +49,44 @@ class SupabaseDB:
         conn = self.get_connection()
         try:
             with conn.cursor() as cur:
-                sql = """
-                    INSERT INTO traces (
-                        trace_id, user_id, start_time, status,
-                        total_cost, total_tokens
-                    ) VALUES (
-                        %s, %s, %s, %s, %s, %s
-                    )
-                    RETURNING trace_id
-                """
-                cur.execute(sql, (
-                    trace_data.get('trace_id'),
-                    trace_data.get('user_id'),
-                    trace_data.get('start_time'),
-                    trace_data.get('status', 'running'),
-                    trace_data.get('total_cost', 0),
-                    trace_data.get('total_tokens', 0)
-                ))
+                # Build dynamic SQL based on whether agent_id is provided
+                if trace_data.get('agent_id') is not None:
+                    sql = """
+                        INSERT INTO traces (
+                            trace_id, user_id, agent_id, start_time, status,
+                            total_cost, total_tokens
+                        ) VALUES (
+                            %s, %s, %s, %s, %s, %s, %s
+                        )
+                        RETURNING trace_id
+                    """
+                    cur.execute(sql, (
+                        trace_data.get('trace_id'),
+                        trace_data.get('user_id'),
+                        trace_data.get('agent_id'),
+                        trace_data.get('start_time'),
+                        trace_data.get('status', 'running'),
+                        trace_data.get('total_cost', 0),
+                        trace_data.get('total_tokens', 0)
+                    ))
+                else:
+                    sql = """
+                        INSERT INTO traces (
+                            trace_id, user_id, start_time, status,
+                            total_cost, total_tokens
+                        ) VALUES (
+                            %s, %s, %s, %s, %s, %s
+                        )
+                        RETURNING trace_id
+                    """
+                    cur.execute(sql, (
+                        trace_data.get('trace_id'),
+                        trace_data.get('user_id'),
+                        trace_data.get('start_time'),
+                        trace_data.get('status', 'running'),
+                        trace_data.get('total_cost', 0),
+                        trace_data.get('total_tokens', 0)
+                    ))
                 result = cur.fetchone()
                 conn.commit()
                 return str(result[0])
@@ -215,9 +237,9 @@ class SupabaseDB:
                 sql = """
                     SELECT * FROM agents
                     WHERE user_id = %s
-                    ORDER BY start_time ASC
+                    ORDER BY created_at DESC
                 """
-                cur.execute(sql, (user_id))
+                cur.execute(sql, (user_id,))
                 results = cur.fetchall()
                 return [dict(row) for row in results]
         finally:

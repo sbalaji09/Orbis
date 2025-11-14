@@ -112,11 +112,17 @@ class SpanWorker:
                     "user_id": int(span.get('user_id')),
                 }
                 trace["trace_id"] = trace_id
+
+                # Add agent_id if provided
+                if span.get('agent_id') is not None:
+                    trace["agent_id"] = int(span.get('agent_id'))
+
                 db.insert_trace(trace)
 
                 self.logger.info("Trace created", extra={'extra_data': {
                     'trace_id': trace_id,
-                    'user_id': trace['user_id']
+                    'user_id': trace['user_id'],
+                    'agent_id': trace.get('agent_id', 'none')
                 }})
             
             # if this span is the end of a trace, then update the trace object with the token count and duration
