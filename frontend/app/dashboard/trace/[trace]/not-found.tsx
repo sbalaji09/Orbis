@@ -1,12 +1,6 @@
 import Link from "next/link";
-import { dummySpans } from "@/lib/dummy";
 
 export default function NotFound() {
-  // Get all valid trace IDs
-  const validTraceIds = Array.from(
-    new Set(dummySpans.map((span) => span.trace_id))
-  ).sort((a, b) => a - b);
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-8">
       <div className="max-w-md w-full bg-white rounded-xl shadow-lg border-2 border-foreground p-8 text-center">
@@ -21,23 +15,7 @@ export default function NotFound() {
           </p>
         </div>
 
-        <div className="mb-6">
-          <h3 className="font-semibold text-foreground mb-3">
-            Available Trace IDs:
-          </h3>
-          <div className="flex flex-wrap gap-2 justify-center">
-            {validTraceIds.map((traceId) => (
-              <Link
-                key={traceId}
-                href={`/dashboard/${traceId}`}
-                className="px-4 py-2 bg-babyblue hover:bg-mustard text-foreground rounded-lg 
-                  font-semibold transition-colors duration-200 border border-foreground/20"
-              >
-                Trace {traceId}
-              </Link>
-            ))}
-          </div>
-        </div>
+        <div className="mb-6"></div>
 
         <Link
           href="/dashboard"

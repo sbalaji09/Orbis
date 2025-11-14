@@ -1,6 +1,5 @@
 "use client";
 import { useState, useEffect } from "react";
-import { dummySpans } from "@/lib/dummy";
 import { Span } from "@/lib/types";
 import GraphNode from "@/components/GraphNode";
 
@@ -149,10 +148,8 @@ function Edge({ from, to }: Edge) {
   );
 }
 
-export default function TraceGraph(props: { traceId: number }) {
-  const initialPositions = calculateDAGLayout(
-    dummySpans.filter((span) => span.trace_id === props.traceId)
-  );
+export default function TraceGraphClient({ spans }: { spans: Span[] }) {
+  const initialPositions = calculateDAGLayout(spans);
 
   // Calculate container dimensions based on node positions
   const allX = initialPositions.map((p) => p.x);

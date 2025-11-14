@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
-import TraceGraph from "@/components/TraceGraph";
-import { isValidTraceId } from "@/lib/traceUtils";
+import TraceGraphServer from "@/components/TraceGraphServer";
+import { getTrace } from "@/lib/api-server";
 
 // Force dynamic rendering - no static generation
 export const dynamic = "force-dynamic";
@@ -18,10 +18,11 @@ export default async function TraceOverview({
     notFound();
   }
 
-  // Check if trace ID exists in our data (will query DB in production)
-  if (!isValidTraceId(traceId)) {
+  // Check if trace exists in database
+  const trace = await getTrace(traceId.toString());
+  if (!trace) {
     notFound();
   }
 
-  return <TraceGraph traceId={traceId} />;
+  return <TraceGraphServer traceId={traceId} />;
 }
