@@ -11,12 +11,7 @@ export default async function TraceOverview({
   params: Promise<{ trace: string }>;
 }) {
   const resolvedParams = await params;
-  const traceId = parseInt(resolvedParams.trace, 10);
-
-  // Check if trace ID is a valid number
-  if (isNaN(traceId)) {
-    notFound();
-  }
+  const traceId = resolvedParams.trace;
 
   // Check if trace exists in database
   const trace = await getTrace(traceId.toString());

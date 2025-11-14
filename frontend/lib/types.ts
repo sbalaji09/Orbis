@@ -1,12 +1,12 @@
 export interface Agent {
   agent_id: string;
-  name: string;
-  user_id: number;
+  agent_name: string;
+  user_id: string;
   description?: string;
 }
 
 export interface Trace {
-  trace_id: number;
+  trace_id: string;
   agent_id: string;
   start_time: Date;
   end_time: Date;
@@ -14,13 +14,13 @@ export interface Trace {
   total_cost: number | null;
   total_tokens: number | null;
   status: string;
-  user_id: number | null;
+  user_id: string | null;
 }
 
 export interface Span {
-  span_id: number;
-  trace_id: number;
-  parent_span_ids: number[] | null;
+  span_id: string;
+  trace_id: string;
+  parent_span_ids: string[] | null;
   start_time: Date;
   end_time: Date;
   duration: number | null;

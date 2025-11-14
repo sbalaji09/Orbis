@@ -6,10 +6,10 @@ import GraphNode from "@/components/GraphNode";
 function calculateDAGLayout(spans: Span[]): NodePosition[] {
   const spanMap = new Map(spans.map((span) => [span.span_id, span]));
   const positions: NodePosition[] = [];
-  const levels = new Map<number, number>();
+  const levels = new Map<string, number>();
 
   // Calculate depth level for each node
-  function getLevel(spanId: number): number {
+  function getLevel(spanId: string): number {
     if (levels.has(spanId)) return levels.get(spanId)!;
 
     const span = spanMap.get(spanId);
@@ -17,7 +17,6 @@ function calculateDAGLayout(spans: Span[]): NodePosition[] {
       levels.set(spanId, 0);
       return 0;
     }
-
     const maxParentLevel = Math.max(
       ...span.parent_span_ids.map((parentId) => getLevel(parentId))
     );
@@ -170,7 +169,7 @@ export default function TraceGraphClient({ spans }: { spans: Span[] }) {
 
   // State to track absolute positions (committed after drag ends)
   const [nodePositions, setNodePositions] = useState<
-    Map<number, { x: number; y: number }>
+    Map<string, { x: number; y: number }>
   >(
     () =>
       new Map(
@@ -183,7 +182,7 @@ export default function TraceGraphClient({ spans }: { spans: Span[] }) {
 
   // Temporary drag state (during active drag)
   const [activeDrag, setActiveDrag] = useState<{
-    spanId: number;
+    spanId: string;
     deltaX: number;
     deltaY: number;
   } | null>(null);
@@ -212,7 +211,7 @@ export default function TraceGraphClient({ spans }: { spans: Span[] }) {
 
   // Handle drag events
   const handleDrag = (
-    spanId: number,
+    spanId: string,
     deltaX: number,
     deltaY: number,
     commit: boolean

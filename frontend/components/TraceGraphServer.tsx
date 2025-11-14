@@ -4,8 +4,8 @@ import TraceGraphClient from "./TraceGraphClient";
 // Revalidate every 10 seconds
 export const revalidate = 10;
 
-export default async function TraceGraph({ traceId }: { traceId: number }) {
-  const spans = await getTraceSpans(traceId.toString());
+export default async function TraceGraph({ traceId }: { traceId: string }) {
+  const spans = await getTraceSpans(traceId);
 
   if (spans.length === 0) {
     return (

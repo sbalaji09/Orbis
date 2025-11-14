@@ -39,7 +39,7 @@ export default async function Dashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-lg font-semibold text-foreground">
-                      {agent.name}
+                      {agent.agent_name}
                     </h2>
                     {agent.description && (
                       <p className="text-sm text-foreground/60 mt-1">

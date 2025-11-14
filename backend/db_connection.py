@@ -213,7 +213,24 @@ class SupabaseDB:
                 """
                 cur.execute(sql, (trace_id,))
                 results = cur.fetchall()
-                return [dict(row) for row in results]
+
+                # Convert PostgreSQL array format to Python lists
+                spans = []
+                for row in results:
+                    span = dict(row)
+                    # Parse parent_span_ids from PostgreSQL array format "{id1,id2}" to Python list
+                    if 'parent_span_ids' in span and isinstance(span['parent_span_ids'], str):
+                        # Remove curly braces and split by comma
+                        array_str = span['parent_span_ids'].strip('{}')
+                        if array_str:
+                            span['parent_span_ids'] = array_str.split(',')
+                        else:
+                            span['parent_span_ids'] = []
+                    elif 'parent_span_ids' not in span or span['parent_span_ids'] is None:
+                        span['parent_span_ids'] = []
+                    spans.append(span)
+
+                return spans
         finally:
             self.return_connection(conn)
 
@@ -304,7 +321,22 @@ class SupabaseDB:
                 sql = "SELECT * FROM spans WHERE span_id = %s"
                 cur.execute(sql, (span_id,))
                 result = cur.fetchone()
-                return dict(result) if result else None
+
+                if not result:
+                    return None
+
+                span = dict(result)
+                # Parse parent_span_ids from PostgreSQL array format to Python list
+                if 'parent_span_ids' in span and isinstance(span['parent_span_ids'], str):
+                    array_str = span['parent_span_ids'].strip('{}')
+                    if array_str:
+                        span['parent_span_ids'] = array_str.split(',')
+                    else:
+                        span['parent_span_ids'] = []
+                elif 'parent_span_ids' not in span or span['parent_span_ids'] is None:
+                    span['parent_span_ids'] = []
+
+                return span
         finally:
             self.return_connection(conn)
 

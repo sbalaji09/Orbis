@@ -33,7 +33,7 @@ function formatDate(date: Date): string {
 
 interface DraggableGraphNodeProps extends GraphNodeProps {
   onDrag?: (
-    spanId: number,
+    spanId: string,
     deltaX: number,
     deltaY: number,
     commit: boolean
