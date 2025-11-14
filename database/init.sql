@@ -1,9 +1,18 @@
--- Drop existing tables if they exist
+-- Drop existing tables if they exist (in reverse dependency order)
 DROP TABLE IF EXISTS evaluations CASCADE;
 DROP TABLE IF EXISTS spans CASCADE;
 DROP TABLE IF EXISTS traces CASCADE;
 DROP TABLE IF EXISTS prompt_versions CASCADE;
 DROP TABLE IF EXISTS agents CASCADE;
+
+-- Create agents table first (referenced by traces)
+CREATE TABLE agents (
+    agent_id SERIAL PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id),
+    agent_name VARCHAR(50),
+    created_at TIMESTAMP DEFAULT NOW(),
+    api_key VARCHAR(280)
+);
 
 -- Create tables with UUID for trace_id and span_id
 CREATE TABLE traces (
@@ -14,7 +23,8 @@ CREATE TABLE traces (
     total_cost FLOAT DEFAULT 0,
     total_tokens INT DEFAULT 0,
     status VARCHAR(50),
-    user_id INT
+    user_id INT,
+    agent_id INT REFERENCES agents(agent_id)
 );
 
 CREATE TABLE spans (
@@ -53,16 +63,9 @@ CREATE TABLE evaluations (
     score INT
 );
 
-CREATE TABLE agents (
-    agent_id SERIAL PRIMARY KEY,
-    user_id UUID REFERENCES auth.users(id),
-    agent_name VARCHAR(50),
-    created_at TIMESTAMP DEFAULT NOW(),
-    api_key VARCHAR(280)
-);
-
 -- Create indexes
 CREATE INDEX idx_traces_user_id ON traces(user_id);
+CREATE INDEX idx_traces_agent_id ON traces(agent_id);
 CREATE INDEX idx_spans_trace_id ON spans(trace_id);
 CREATE INDEX idx_spans_status ON spans(status);
 CREATE INDEX idx_prompt_versions_version_number ON prompt_versions(version_number);
