@@ -1,0 +1,123 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: orbis-postgres
+    environment:
+      POSTGRES_DB: orbis
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - orbis-network
+
+  # Redis for message queue
+  redis:
+    image: redis:7-alpine
+    container_name: orbis-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - orbis-network
+
+  # Data Pipeline - Ingestion API
+  ingestion-api:
+    build:
+      context: ./data-pipeline
+      dockerfile: Dockerfile
+    container_name: orbis-ingestion-api
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/orbis
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - orbis-network
+
+  # Data Pipeline - Worker
+  worker:
+    build:
+      context: ./data-pipeline
+      dockerfile: Dockerfile.worker
+    container_name: orbis-worker
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/orbis
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - S3_BUCKET=${S3_BUCKET:-orbis-traces}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - orbis-network
+
+  # Backend Query API
+  query-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: orbis-query-api
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/orbis
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - orbis-network
+
+  # Frontend Next.js
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: orbis-frontend
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - query-api
+    restart: unless-stopped
+    networks:
+      - orbis-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  orbis-network:
+    driver: bridge
