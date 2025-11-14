@@ -1,3 +1,6 @@
+import sys
+sys.path.insert(0, '.')
+
 from observability_sdk.core.span import Span
 from observability_sdk.collector.collector import get_collector
 from observability_sdk.collector.config import configure
