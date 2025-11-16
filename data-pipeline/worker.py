@@ -101,8 +101,12 @@ class SpanWorker:
                 
             self.queue.redis_client.incrbyfloat("trace:" + trace_id + ":total_duration", span.get('duration'))
 
-            # if this span is the start of a trace, then add the init trace object
-            if span.get('is_start_span'):
+            # Check if trace exists, if not create it
+            # This handles SDK sending spans out of order or without explicit start span
+            existing_trace = db.get_trace_by_id(trace_id)
+
+            if not existing_trace:
+                # Auto-create trace if it doesn't exist
                 trace = {
                     "start_time": str(span.get('start_time')),
                     "end_time": "",
@@ -120,10 +124,11 @@ class SpanWorker:
 
                 db.insert_trace(trace)
 
-                self.logger.info("Trace created", extra={'extra_data': {
+                self.logger.info("Trace auto-created", extra={'extra_data': {
                     'trace_id': trace_id,
                     'user_id': trace['user_id'],
-                    'agent_id': trace.get('agent_id', 'none')
+                    'agent_id': trace.get('agent_id', 'none'),
+                    'reason': 'trace_did_not_exist'
                 }})
             
             # if this span is the end of a trace, then update the trace object with the token count and duration
