@@ -2,6 +2,7 @@ import os
 import sys
 import time
 from datetime import datetime, timezone
+import uuid
 from queues.redis_queue import RedisQueue
 from dotenv import load_dotenv
 from data_processing.prompt_upload import upload_input, upload_output
@@ -75,7 +76,7 @@ class SpanWorker:
             span_db_data = {
                 "span_id": str(span.get('span_id', 'unknown')),
                 "trace_id": trace_id,
-                "parent_span_ids": [str(id) for id in span.get('parent_span_id', [])],
+                "parent_span_ids": [uuid.UUID(id) for id in span.get('parent_span_id', [])],
                 "name": span.get('name'),
                 "start_time": span.get('start_time'),
                 "end_time": span.get('end_time'),
