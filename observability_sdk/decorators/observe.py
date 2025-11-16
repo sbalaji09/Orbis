@@ -2,9 +2,10 @@ from functools import wraps
 from typing import Optional, Callable
 from ..core.span import Span
 from ..collector.collector import get_collector
+from ..core.context import get_current_span, set_current_span
 
 
-def observe(name: Optional[str] = None, trace_id: Optional[str] = None):
+def observe(name: Optional[str] = None, trace_id: Optional[str] = None, user_id: Optional[str]= None):
     """
     Decorator to automatically track function execution as a span.
     
@@ -27,12 +28,24 @@ def observe(name: Optional[str] = None, trace_id: Optional[str] = None):
         def wrapper(*args, **kwargs):
             # create span with custom name or use function name
             span_name = name or func.__name__
+
+            # get parent context
+            parent_span = get_current_span()
             
             # create the span
             span = Span(
                 name=span_name,
-                trace_id=trace_id or Span.__dataclass_fields__['trace_id'].default_factory()
+                user_id=user_id or "sdk_auto",
+                trace_id=trace_id or (parent_span.trace_id if parent_span else Span.__dataclass_fields__['trace_id'].default_factory())  # ✅ Inherit from parent
             )
+
+            # if there's a parent, set parent relationship
+            if parent_span:
+                span.parent_span_id = [parent_span.span_id]
+            
+            # set this span as the active span
+            previous_span = get_current_span()
+            set_current_span(span)
             
             try:
                 # execute the actual function
@@ -52,6 +65,8 @@ def observe(name: Optional[str] = None, trace_id: Optional[str] = None):
                 raise
                 
             finally:
+                # restore previous span context
+                set_current_span(previous_span)
                 # send span to collector (replaces print)
                 collector = get_collector()
                 collector.collect(span)

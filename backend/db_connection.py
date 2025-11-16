@@ -152,7 +152,7 @@ class SupabaseDB:
                         llm_model, prompt_tokens, completion_tokens,
                         cost, status, error_message
                     ) VALUES (
-                        %s, %s, %s, %s,
+                        %s, %s, %s::uuid[], %s,
                         %s, %s, %s,
                         %s, %s,
                         %s, %s,

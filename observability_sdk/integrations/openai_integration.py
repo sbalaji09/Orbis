@@ -7,6 +7,7 @@ from typing import Optional, Any
 import functools
 from ..core.span import Span
 from ..collector.collector import get_collector
+from ..core.context import get_current_span, set_current_span
 
 # openai pricing per 1M tokens (updated 11.12.25)
 OPENAI_PRICING = {
@@ -120,12 +121,25 @@ class OpenAIInstrumentor:
         model = kwargs.get("model", "unknown")
         messages = kwargs.get("messages", [])
 
+        # get parent context
+        parent_span = get_current_span()
+
         # create span
         span = Span(
             name=f"openai.{model}",
+            user_id="sdk_auto",
             model=model,
             prompt=extract_prompt_from_messages(messages),
         )
+
+        # if there is a parent, inherit its trace_id and set parent relationship
+        if parent_span:
+            span.trace_id = parent_span.trace_id
+            span.parent_span_id = [parent_span.span_id]
+
+        # set this span as the active span
+        previous_span = get_current_span()
+        set_current_span(span)
 
         try:
             # call the actual openai api
@@ -158,6 +172,9 @@ class OpenAIInstrumentor:
             raise
 
         finally:
+            # restore previous span context
+            set_current_span(previous_span)
+
             # send span to collector
             collector = get_collector()
             collector.collect(span)

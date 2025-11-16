@@ -112,6 +112,9 @@ class SpanCollector:
         
         # send each span individually (sid's endpoint expects one span per req)
         for span_data in spans:
+            if self.config.debug:
+                print(f"sending span data: {span_data}")
+            
             for attempt in range(self.config.max_retries):
                 try:
                     headers = {"Content-Type": "application/json"}

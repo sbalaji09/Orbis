@@ -76,7 +76,7 @@ class SpanWorker:
             span_db_data = {
                 "span_id": str(span.get('span_id', 'unknown')),
                 "trace_id": trace_id,
-                "parent_span_ids": [uuid.UUID(id) for id in span.get('parent_span_id', [])],
+                "parent_span_ids": span.get('parent_span_id', []),
                 "name": span.get('name'),
                 "start_time": span.get('start_time'),
                 "end_time": span.get('end_time'),
