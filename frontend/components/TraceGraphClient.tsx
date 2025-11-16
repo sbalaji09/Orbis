@@ -1,16 +1,15 @@
 "use client";
 import { useState, useEffect } from "react";
-import { dummySpans } from "@/lib/dummy";
 import { Span } from "@/lib/types";
 import GraphNode from "@/components/GraphNode";
 
 function calculateDAGLayout(spans: Span[]): NodePosition[] {
   const spanMap = new Map(spans.map((span) => [span.span_id, span]));
   const positions: NodePosition[] = [];
-  const levels = new Map<number, number>();
+  const levels = new Map<string, number>();
 
   // Calculate depth level for each node
-  function getLevel(spanId: number): number {
+  function getLevel(spanId: string): number {
     if (levels.has(spanId)) return levels.get(spanId)!;
 
     const span = spanMap.get(spanId);
@@ -18,7 +17,6 @@ function calculateDAGLayout(spans: Span[]): NodePosition[] {
       levels.set(spanId, 0);
       return 0;
     }
-
     const maxParentLevel = Math.max(
       ...span.parent_span_ids.map((parentId) => getLevel(parentId))
     );
@@ -118,20 +116,41 @@ interface Edge {
 
 // Edge component to draw connections between spans
 function Edge({ from, to }: Edge) {
-  // Offset to account for node radius
-  const nodeRadius = 40;
+  // Node dimensions: min-w-32 to max-w-44 (128-176px) x h-10 (40px)
+  const nodeWidth = 152; // Average width for ellipse calculation
+  const nodeHeight = 40;
+  const gap = 12; // Gap from node edge (increased to prevent arrowhead overlap)
 
-  // Calculate angle and adjust start/end points
+  // Calculate angle between node centers
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   const angle = Math.atan2(dy, dx);
 
-  const fromX = from.x + Math.cos(angle) * nodeRadius;
-  const fromY = from.y + Math.sin(angle) * nodeRadius;
-  const toX = to.x - Math.cos(angle) * nodeRadius;
-  const toY = to.y - Math.sin(angle) * nodeRadius;
+  // Calculate intersection with ellipse for FROM node
+  // Using ellipse equation: (x/a)^2 + (y/b)^2 = 1
+  const a = nodeWidth / 2; // semi-major axis (width)
+  const b = nodeHeight / 2; // semi-minor axis (height)
 
-  // Completely straight line - no curves
+  // Parametric form: x = a*cos(θ), y = b*sin(θ)
+  // But we need to scale to get the radius at this angle
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+
+  // Distance from center to ellipse edge at this angle
+  const fromRadius =
+    (a * b) / Math.sqrt(Math.pow(b * cos, 2) + Math.pow(a * sin, 2));
+  const toRadius =
+    (a * b) / Math.sqrt(Math.pow(b * cos, 2) + Math.pow(a * sin, 2));
+
+  // Apply gap and calculate edge points
+  // For the TO node, add extra gap to account for arrowhead size
+  const arrowheadSize = 8;
+  const fromX = from.x + cos * (fromRadius + gap);
+  const fromY = from.y + sin * (fromRadius + gap);
+  const toX = to.x - cos * (toRadius + gap + arrowheadSize);
+  const toY = to.y - sin * (toRadius + gap + arrowheadSize);
+
+  // Straight line path
   const path = `M ${fromX} ${fromY} L ${toX} ${toY}`;
 
   return (
@@ -149,10 +168,8 @@ function Edge({ from, to }: Edge) {
   );
 }
 
-export default function TraceGraph(props: { traceId: number }) {
-  const initialPositions = calculateDAGLayout(
-    dummySpans.filter((span) => span.trace_id === props.traceId)
-  );
+export default function TraceGraphClient({ spans }: { spans: Span[] }) {
+  const initialPositions = calculateDAGLayout(spans);
 
   // Calculate container dimensions based on node positions
   const allX = initialPositions.map((p) => p.x);
@@ -173,7 +190,7 @@ export default function TraceGraph(props: { traceId: number }) {
 
   // State to track absolute positions (committed after drag ends)
   const [nodePositions, setNodePositions] = useState<
-    Map<number, { x: number; y: number }>
+    Map<string, { x: number; y: number }>
   >(
     () =>
       new Map(
@@ -186,7 +203,7 @@ export default function TraceGraph(props: { traceId: number }) {
 
   // Temporary drag state (during active drag)
   const [activeDrag, setActiveDrag] = useState<{
-    spanId: number;
+    spanId: string;
     deltaX: number;
     deltaY: number;
   } | null>(null);
@@ -215,7 +232,7 @@ export default function TraceGraph(props: { traceId: number }) {
 
   // Handle drag events
   const handleDrag = (
-    spanId: number,
+    spanId: string,
     deltaX: number,
     deltaY: number,
     commit: boolean

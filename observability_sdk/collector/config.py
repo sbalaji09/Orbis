@@ -7,7 +7,7 @@ from typing import Optional
 class SDKConfig:
 
     # backend API settings
-    api_url: str = "http://localhost:8000" # sid's backend
+    api_url: str = "http://localhost:8080" # ingestion API
     api_key: Optional[str] = None
 
     # batching settings
@@ -26,7 +26,7 @@ class SDKConfig:
     @classmethod
     def from_env(cls) -> "SDKConfig":
         return cls(
-            api_url=os.getenv("OBSERVABILITY_API_URL", "http://localhost:8000"),
+            api_url=os.getenv("OBSERVABILITY_API_URL", "http://localhost:8080"),
             api_key=os.getenv("OBSERVABILITY_API_KEY"),
             batch_size=int(os.getenv("OBSERVABILITY_BATCH_SIZE", "10")),
             flush_interval=float(os.getenv("OBSERVABILITY_FLUSH_INTERVAL", "5.0")),

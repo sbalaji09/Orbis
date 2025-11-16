@@ -9,6 +9,8 @@ class Span:
     # tracks a single function execution
 
     name: str
+    user_id: str
+    agent_id: Optional[int] = None
     trace_id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
     span_id: str = field(default_factory=lambda: str(uuid.uuid4()))
@@ -56,29 +58,25 @@ class Span:
     # convert to dict for JSON serialization
     def to_dict(self) -> dict:
         return {
-            "trace_id": self.trace_id, 
+            "trace_id": self.trace_id,
             "span_id": self.span_id,
+            "parent_span_id": self.parent_span_id,
             "name": self.name,
-            "prompt": self.prompt or "",  # Backend expects string, not None
-            "model": self.model or "",
-            "input_tokens": self.input_tokens or 0,
-            "output_tokens": self.output_tokens or 0,
-            "total_cost": self.total_cost or 0.0,
             "start_time": self.start_time.isoformat(),
             "end_time": self.end_time.isoformat() if self.end_time else self.start_time.isoformat(),
             "duration": self.duration_ms or 0.0,
             "input_data": self.input_data or "",
             "output_data": self.output_data or "",
-            "context": self.context or "",
-            "output": self.output or "",
+            "model": self.model or "",
+            "input_tokens": self.input_tokens or 0,
+            "output_tokens": self.output_tokens or 0,
+            "total_cost": self.total_cost or 0.0,
             "status": self.status,
-            "error_message": self.error_message or "",  # Can't be None!
-            "parent_span_id": self.parent_span_id,  # Already a list
+            "error_message": self.error_message,  # Can be None
+            "user_id": self.user_id,
+            "agent_id": self.agent_id,
             "is_start_span": self.is_start_span,
             "is_end_span": self.is_end_span,
-            # Don't send these - backend doesn't expect them:
-            # "span_id": self.span_id,
-            # "trace_id": self.trace_id,
         }
 
     def __str__(self):
