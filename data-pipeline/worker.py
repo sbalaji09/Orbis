@@ -109,13 +109,13 @@ class SpanWorker:
                     "total_cost": 0,
                     "total_tokens": 0,
                     "status": "running",
-                    "user_id": int(span.get('user_id')),
+                    "user_id": str(span.get('user_id')),  # Keep as UUID string
                 }
                 trace["trace_id"] = trace_id
 
-                # Add agent_id if provided
+                # Add agent_id if provided (as UUID string)
                 if span.get('agent_id') is not None:
-                    trace["agent_id"] = int(span.get('agent_id'))
+                    trace["agent_id"] = str(span.get('agent_id'))
 
                 db.insert_trace(trace)
 

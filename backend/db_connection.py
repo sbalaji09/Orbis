@@ -41,7 +41,7 @@ class SupabaseDB:
     trace_data: dictionary with trace information
         - trace_id (UUID): Trace identifier
         - user_id (UUID): User who created the trace
-        - agent_id (int, optional): Agent identifier
+        - agent_id (UUID, optional): Agent identifier
         - start_time (str): ISO timestamp
         - status (str): 'running' or 'completed'
     """

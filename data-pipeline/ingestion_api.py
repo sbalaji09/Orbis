@@ -25,7 +25,7 @@ class SpanIn(BaseModel):
     status: str
     error_message: Optional[str] = None
     user_id: str
-    agent_id: Optional[int] = None
+    agent_id: Optional[str] = None  # Changed to str (UUID)
     is_start_span: bool
     is_end_span: bool
 
@@ -91,8 +91,8 @@ def validate_span(span: SpanIn) -> bool:
     for attr_name in vars(span):
         attr_value = getattr(span, attr_name)
 
-        # error_message can be None
-        if attr_name == 'error_message':
+        # error_message and agent_id can be None (optional fields)
+        if attr_name in ('error_message', 'agent_id'):
             continue
 
         if attr_value is None:

@@ -7,7 +7,7 @@ DROP TABLE IF EXISTS agents CASCADE;
 
 -- Create agents table first (referenced by traces)
 CREATE TABLE agents (
-    agent_id SERIAL PRIMARY KEY,
+    agent_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES auth.users(id),
     agent_name VARCHAR(50),
     created_at TIMESTAMP DEFAULT NOW(),
@@ -23,8 +23,8 @@ CREATE TABLE traces (
     total_cost FLOAT DEFAULT 0,
     total_tokens INT DEFAULT 0,
     status VARCHAR(50),
-    user_id INT,
-    agent_id INT REFERENCES agents(agent_id)
+    user_id UUID,
+    agent_id UUID REFERENCES agents(agent_id)
 );
 
 CREATE TABLE spans (
