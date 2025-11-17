@@ -10,7 +10,7 @@ class Span:
 
     name: str
     user_id: Optional[str] = None
-    agent_id: Optional[int] = None
+    agent_id: Optional[str] = None
     trace_id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
     span_id: str = field(default_factory=lambda: str(uuid.uuid4()))
@@ -74,7 +74,7 @@ class Span:
             "status": self.status,
             "error_message": self.error_message,  # Can be None
             "user_id": self.user_id,
-            "agent_id": str(self.agent_id) if self.agent_id is not None else None,
+            "agent_id": self.agent_id,
             "is_start_span": self.is_start_span,
             "is_end_span": self.is_end_span,
         }

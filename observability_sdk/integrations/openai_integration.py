@@ -128,6 +128,7 @@ class OpenAIInstrumentor:
         span = Span(
             name=f"openai.{model}",
             user_id="00000000-0000-0000-0000-000000000000",
+            agent_id="af913dc2-732e-42a6-a113-a80c694d71bf",
             model=model,
             prompt=extract_prompt_from_messages(messages),
         )

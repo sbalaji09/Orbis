@@ -35,6 +35,7 @@ def observe(name: Optional[str] = None, trace_id: Optional[str] = None, user_id:
             # create the span
             span = Span(
                 name=span_name,
+                agent_id="af913dc2-732e-42a6-a113-a80c694d71bf",
                 user_id=user_id or "00000000-0000-0000-0000-000000000000",
                 trace_id=trace_id or (parent_span.trace_id if parent_span else Span.__dataclass_fields__['trace_id'].default_factory())  # ✅ Inherit from parent
             )
