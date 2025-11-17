@@ -170,3 +170,6 @@ data/
 # Profiling
 *.prof
 *.lprof
+
+# dump
+*.rdb
