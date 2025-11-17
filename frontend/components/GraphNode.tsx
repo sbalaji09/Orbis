@@ -43,21 +43,11 @@ interface DraggableGraphNodeProps extends GraphNodeProps {
 
 export default function GraphNode({
   span,
-  x = 0,
-  y = 0,
   onDrag,
   isDragging,
 }: DraggableGraphNodeProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
-
-  const statusColors = {
-    success: "bg-green-500 hover:bg-green-600",
-    failed: "bg-red-500 hover:bg-red-600",
-    running: "bg-blue-500 hover:bg-blue-600",
-    pending: "bg-yellow-500 hover:bg-yellow-600",
-    cancelled: "bg-gray-500 hover:bg-gray-600",
-  };
 
   const statusBadgeColors = {
     success: "bg-green-500/90",
@@ -66,10 +56,6 @@ export default function GraphNode({
     pending: "bg-yellow-500/90",
     cancelled: "bg-gray-500/90",
   };
-
-  const statusColor =
-    statusColors[span.status as keyof typeof statusColors] ||
-    "bg-babyblue hover:bg-mustard";
 
   const statusBadgeColor =
     statusBadgeColors[span.status as keyof typeof statusBadgeColors] ||
@@ -116,27 +102,60 @@ export default function GraphNode({
     <>
       <div className="relative inline-block">
         <button
-          className={`px-4 py-2 min-w-32 max-w-44 h-10 rounded-full ${statusColor} border-2 border-foreground/20 shadow-md 
+          className={`flex items-center gap-3 w-56 min-h-16 rounded-lg border border-foreground/10 bg-white shadow-sm px-3 py-2 text-left
             focus:outline-none
             ${
               isDragging
-                ? "cursor-grabbing scale-105 shadow-xl"
-                : "cursor-grab hover:scale-105 hover:shadow-xl"
-            } 
-            transition-all duration-200 ease-in-out`}
-          style={{ transform: `translate(${x}px, ${y}px)` }}
+                ? "cursor-grabbing scale-105 shadow-lg"
+                : "cursor-grab hover:scale-[1.02] hover:shadow-lg"
+            }
+            transition-all duration-150 ease-in-out`}
           onMouseDown={handleMouseDown}
           onMouseEnter={() => setShowTooltip(true)}
           onMouseLeave={() => setShowTooltip(false)}
         >
-          <span className="text-xs font-semibold text-white select-none truncate block">
-            {span.name}
-          </span>
+          {/* Left icon / avatar */}
+          {/* <div
+            className={`flex items-center justify-center shrink-0 w-10 h-10 rounded-full text-white font-semibold ${statusBadgeColor}`}
+          >
+            {span.llm_model
+              ? span.llm_model.split("-")[0].charAt(0).toUpperCase()
+              : span.name
+              ? span.name.charAt(0).toUpperCase()
+              : "?"}
+          </div> */}
+
+          {/* Title + subtitle */}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-foreground">
+                {span.name}
+              </span>
+              {/* <span className="text-xs text-foreground/50 truncate">
+                #{span.span_id}
+              </span> */}
+            </div>
+            <div className="mt-1 text-xs text-foreground/60 flex items-center gap-2">
+              {span.llm_model && (
+                <span className="truncate">{span.llm_model}</span>
+              )}
+              <span className="truncate">{formatDuration(span.duration)}</span>
+            </div>
+          </div>
+
+          {/* Status badge */}
+          <div className="shrink-0">
+            <span
+              className={`px-2 py-1 rounded-md text-xs font-semibold text-white ${statusBadgeColor}`}
+            >
+              {span.status}
+            </span>
+          </div>
         </button>
 
-        {/* Tooltip */}
+        {/* Tooltip (slimmer) */}
         {showTooltip && !isDragging && (
-          <div className="absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-lg bg-gray-900 px-3 py-2 text-xs text-white shadow-lg pointer-events-none z-50">
+          <div className="absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md bg-gray-900 px-3 py-2 text-xs text-white shadow-lg pointer-events-none z-50">
             <div className="flex items-center gap-2">
               <span className="font-medium">#{span.span_id}</span>
               <span
@@ -147,10 +166,7 @@ export default function GraphNode({
             </div>
             <div className="mt-1 flex gap-3 text-gray-300">
               <span>{formatDuration(span.duration)}</span>
-              {span.cost && <span>${formatCost(span.cost)}</span>}
-            </div>
-            <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px">
-              <div className="border-4 border-transparent border-t-gray-900"></div>
+              {span.cost && <span>{formatCost(span.cost)}</span>}
             </div>
           </div>
         )}

@@ -97,7 +97,7 @@ function ArrowMarker() {
         orient="auto"
         markerUnits="strokeWidth"
       >
-        <polygon points="0,0 0,10 10,5" fill="#1a1d1a" stroke="none" />
+        <polygon points="0,0 0,10 10,5" fill="#374151" stroke="none" />
       </marker>
     </defs>
   );
@@ -116,53 +116,48 @@ interface Edge {
 
 // Edge component to draw connections between spans
 function Edge({ from, to }: Edge) {
-  // Node dimensions: min-w-32 to max-w-44 (128-176px) x h-10 (40px)
-  const nodeWidth = 152; // Average width for ellipse calculation
-  const nodeHeight = 40;
-  const gap = 12; // Gap from node edge (increased to prevent arrowhead overlap)
+  // Node dimensions now correspond to card-style nodes (width x height)
+  const nodeWidth = 220; // px
+  const nodeHeight = 64; // px
+  const halfW = nodeWidth / 2;
+  const halfH = nodeHeight / 2;
+  const gap = 8; // gap between node edge and line start/end
 
-  // Calculate angle between node centers
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   const angle = Math.atan2(dy, dx);
-
-  // Calculate intersection with ellipse for FROM node
-  // Using ellipse equation: (x/a)^2 + (y/b)^2 = 1
-  const a = nodeWidth / 2; // semi-major axis (width)
-  const b = nodeHeight / 2; // semi-minor axis (height)
-
-  // Parametric form: x = a*cos(θ), y = b*sin(θ)
-  // But we need to scale to get the radius at this angle
   const cos = Math.cos(angle);
   const sin = Math.sin(angle);
 
-  // Distance from center to ellipse edge at this angle
-  const fromRadius =
-    (a * b) / Math.sqrt(Math.pow(b * cos, 2) + Math.pow(a * sin, 2));
-  const toRadius =
-    (a * b) / Math.sqrt(Math.pow(b * cos, 2) + Math.pow(a * sin, 2));
+  // For axis-aligned rectangle centered at (cx,cy), the ray intersection distance t is:
+  // tx = halfW / |cos|, ty = halfH / |sin|, t = min(tx, ty)
+  const tx = Math.abs(cos) < 1e-6 ? Infinity : halfW / Math.abs(cos);
+  const ty = Math.abs(sin) < 1e-6 ? Infinity : halfH / Math.abs(sin);
+  const fromT = Math.min(tx, ty);
 
-  // Apply gap and calculate edge points
-  // For the TO node, add extra gap to account for arrowhead size
+  // Reverse direction for 'to' node (we trace from center of 'to' backwards)
+  const toTx = tx;
+  const toTy = ty;
+  const toT = Math.min(toTx, toTy);
+
   const arrowheadSize = 8;
-  const fromX = from.x + cos * (fromRadius + gap);
-  const fromY = from.y + sin * (fromRadius + gap);
-  const toX = to.x - cos * (toRadius + gap + arrowheadSize);
-  const toY = to.y - sin * (toRadius + gap + arrowheadSize);
 
-  // Straight line path
+  const fromX = from.x + cos * (fromT + gap);
+  const fromY = from.y + sin * (fromT + gap);
+  const toX = to.x - cos * (toT + gap + arrowheadSize);
+  const toY = to.y - sin * (toT + gap + arrowheadSize);
+
   const path = `M ${fromX} ${fromY} L ${toX} ${toY}`;
 
   return (
     <g>
-      {/* Clean arrow line */}
       <path
         d={path}
-        stroke="#2a2d2a"
-        strokeWidth="1.5"
+        stroke="#374151"
+        strokeWidth="1.6"
         fill="none"
         markerEnd="url(#arrowhead)"
-        strokeLinecap="butt"
+        strokeLinecap="round"
       />
     </g>
   );
