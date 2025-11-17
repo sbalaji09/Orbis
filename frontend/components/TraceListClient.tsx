@@ -94,7 +94,7 @@ export function TraceListClient({
                               />
                             </svg>
                             <span className="text-sm font-semibold text-foreground">
-                              {agent.name}
+                              {agent.agent_name}
                             </span>
                           </div>
                           <span className="px-2 py-0.5 text-[10px] font-mono font-semibold bg-mustard/20 text-mustard rounded">
