@@ -3,9 +3,15 @@ from pydantic import BaseModel
 from datetime import datetime, timezone
 from uuid import UUID
 from typing import Optional
+import os
+import sys
 from queues.redis_queue import queue
 from auth.auth_middleware import check_api_key
 from rate_limiter import check_rate_limit
+
+# Add backend to path for database access
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from backend.db_connection import db
 
 
 class SpanIn(BaseModel):
@@ -75,8 +81,25 @@ async def post_span(request: Request, span: SpanIn):
     return {
         "status": "accepted",
         "message": "Span queued for processing"
-
     }
+
+# health check endpoint for kubernetes / docker liveness probes
+@app.get("/health")
+async def health_check():
+    health = get_health()
+
+    if health["status"] == "unhealthy":
+        raise HTTPException(
+            status_code=503,
+            detail=health
+        )
+
+    return health
+
+# metrics endpoint for monitoring and observability
+@app.get("/metrics")
+async def metrics():
+    return get_metrics()
 
 # validates the uuid (user id) that belongs to a specific span
 def is_valid_uuid(val: str) -> bool:
@@ -110,3 +133,173 @@ def validate_span(span: SpanIn) -> bool:
             if len(attr_value) > 0 and not all(is_valid_uuid(str(v)) for v in attr_value):
                 return False
     return True
+
+# health check endpoint that verifies all critical services are operational
+def get_health() -> dict:
+    health_status = {
+        "status": "healthy",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "services": {}
+    }
+
+    # checks the Redis connection through a try catch
+    try:
+        queue.redis_client.ping()
+        health_status["services"]["redis"] = {
+            "status": "healthy",
+            "connected": True
+        }
+    except Exception as e:
+        health_status["status"] = "unhealthy"
+        health_status["services"]["redis"] = {
+            "status": "unhealthy",
+            "connected": False,
+            "error": str(e)
+        }
+
+    # checks the postgres connection through a try catch
+    try:
+        conn = db.get_connection()
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1")
+            cur.fetchone()
+        db.return_connection(conn)
+        health_status["services"]["postgres"] = {
+            "status": "healthy",
+            "connected": True
+        }
+    except Exception as e:
+        health_status["status"] = "unhealthy"
+        health_status["services"]["postgres"] = {
+            "status": "unhealthy",
+            "connected": False,
+            "error": str(e)
+        }
+
+    # get queue metrics about the Redis queue only if the Redis queue is healthy
+    if health_status["services"]["redis"]["connected"]:
+        try:
+            queue_length = queue.get_queue_length()
+            dlq_name = os.getenv('DEAD_LETTER_QUEUE_NAME', 'span_processing_dlq')
+            dlq_length = queue.redis_client.llen(dlq_name)
+
+            health_status["queue"] = {
+                "main_queue_length": queue_length,
+                "dlq_length": dlq_length,
+                "queue_name": queue.queue_name
+            }
+
+            # warn if the queue is backing up
+            if queue_length > 1000:
+                health_status["warnings"] = health_status.get("warnings", [])
+                health_status["warnings"].append(f"Queue depth high: {queue_length} tasks")
+
+            # alert the user if the DLQ has items
+            if dlq_length > 0:
+                health_status["warnings"] = health_status.get("warnings", [])
+                health_status["warnings"].append(f"DLQ has {dlq_length} failed tasks")
+
+        except Exception as e:
+            health_status["queue"] = {
+                "error": str(e)
+            }
+
+    return health_status
+
+# this is the metrics endpoint that provides operational metrics for monitoring
+def get_metrics() -> dict:
+    metrics = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "queue": {},
+        "processing": {},
+        "database": {}
+    }
+
+    try:
+        # queue metrics
+        queue_length = queue.get_queue_length()
+        dlq_name = os.getenv('DEAD_LETTER_QUEUE_NAME', 'span_processing_dlq')
+        dlq_length = queue.redis_client.llen(dlq_name)
+
+        metrics["queue"] = {
+            "main_queue_depth": queue_length,
+            "dlq_depth": dlq_length,
+            "total_pending": queue_length + dlq_length
+        }
+
+        # processing metrics (tracked via Redis counters) that would be incremented by the worker in a production system
+        current_hour = datetime.now(timezone.utc).strftime("%Y-%m-%d-%H")
+
+        # get hourly metrics from the Redis queue
+        spans_processed = queue.redis_client.get(f"metrics:spans_processed:{current_hour}")
+        spans_failed = queue.redis_client.get(f"metrics:spans_failed:{current_hour}")
+
+        metrics["processing"] = {
+            "spans_processed_current_hour": int(spans_processed) if spans_processed else 0,
+            "spans_failed_current_hour": int(spans_failed) if spans_failed else 0,
+        }
+
+        # calculate the error rate 
+        total = metrics["processing"]["spans_processed_current_hour"] + metrics["processing"]["spans_failed_current_hour"]
+        if total > 0:
+            error_rate = (metrics["processing"]["spans_failed_current_hour"] / total) * 100
+            metrics["processing"]["error_rate_percent"] = round(error_rate, 2)
+        else:
+            metrics["processing"]["error_rate_percent"] = 0.0
+
+    except Exception as e:
+        metrics["queue"] = {"error": str(e)}
+        metrics["processing"] = {"error": str(e)}
+
+    # calculate the database metrics
+    try:
+        conn = db.get_connection()
+        with conn.cursor() as cur:
+            # get total counts
+            cur.execute("SELECT COUNT(*) FROM traces")
+            total_traces = cur.fetchone()[0]
+
+            cur.execute("SELECT COUNT(*) FROM spans")
+            total_spans = cur.fetchone()[0]
+
+            # get counts from the last hour
+            cur.execute("""
+                SELECT COUNT(*) FROM traces
+                WHERE start_time >= NOW() - INTERVAL '1 hour'
+            """)
+            traces_last_hour = cur.fetchone()[0]
+
+            cur.execute("""
+                SELECT COUNT(*) FROM spans
+                WHERE start_time >= NOW() - INTERVAL '1 hour'
+            """)
+            spans_last_hour = cur.fetchone()[0]
+
+            # get the average processing metrics
+            cur.execute("""
+                SELECT
+                    AVG(duration) as avg_duration,
+                    AVG(total_cost) as avg_cost
+                FROM traces
+                WHERE start_time >= NOW() - INTERVAL '1 hour'
+                AND status = 'completed'
+            """)
+            result = cur.fetchone()
+            avg_duration = float(result[0]) if result[0] else 0.0
+            avg_cost = float(result[1]) if result[1] else 0.0
+
+        db.return_connection(conn)
+
+        metrics["database"] = {
+            "total_traces": total_traces,
+            "total_spans": total_spans,
+            "traces_last_hour": traces_last_hour,
+            "spans_last_hour": spans_last_hour,
+            "avg_trace_duration_seconds": round(avg_duration, 3),
+            "avg_trace_cost_dollars": round(avg_cost, 6)
+        }
+
+    except Exception as e:
+        metrics["database"] = {"error": str(e)}
+
+    return metrics
