@@ -49,17 +49,19 @@ export default function GraphNode({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
 
-  const statusBadgeColors = {
-    success: "bg-green-500/90",
-    failed: "bg-red-500/90",
-    running: "bg-blue-500/90",
-    pending: "bg-yellow-500/90",
-    cancelled: "bg-gray-500/90",
+  const statusConfig = {
+    success: { bg: "bg-emerald-50", text: "text-success", dot: "bg-success" },
+    failed: { bg: "bg-red-50", text: "text-error", dot: "bg-error" },
+    running: { bg: "bg-sky-50", text: "text-babyblue", dot: "bg-babyblue" },
+    pending: { bg: "bg-amber-50", text: "text-warning", dot: "bg-warning" },
+    cancelled: { bg: "bg-gray-50", text: "text-muted", dot: "bg-muted" },
   };
 
-  const statusBadgeColor =
-    statusBadgeColors[span.status as keyof typeof statusBadgeColors] ||
-    "bg-babyblue";
+  const status = statusConfig[span.status as keyof typeof statusConfig] || {
+    bg: "bg-gray-50",
+    text: "text-muted",
+    dot: "bg-muted",
+  };
 
   const handleMouseDown = (e: React.MouseEvent<HTMLButtonElement>) => {
     if (!onDrag) return;
@@ -102,71 +104,98 @@ export default function GraphNode({
     <>
       <div className="relative inline-block">
         <button
-          className={`flex items-center gap-3 w-56 min-h-16 rounded-lg border border-foreground/10 bg-white shadow-sm px-3 py-2 text-left
-            focus:outline-none
+          className={`group relative w-[200px] rounded-lg border bg-card text-left overflow-hidden
+            focus:outline-none focus:ring-2 focus:ring-babyblue/30 focus:ring-offset-2
             ${
               isDragging
-                ? "cursor-grabbing scale-105 shadow-lg"
-                : "cursor-grab hover:scale-[1.02] hover:shadow-lg"
+                ? "cursor-grabbing shadow-xl border-slate/40 scale-[1.02]"
+                : "cursor-grab hover:border-slate/30 hover:shadow-lg hover:-translate-y-px border-border shadow-sm"
             }
-            transition-all duration-150 ease-in-out`}
+            transition-all duration-300 ease-in-out`}
           onMouseDown={handleMouseDown}
           onMouseEnter={() => setShowTooltip(true)}
           onMouseLeave={() => setShowTooltip(false)}
         >
-          {/* Left icon / avatar */}
-          {/* <div
-            className={`flex items-center justify-center shrink-0 w-10 h-10 rounded-full text-white font-semibold ${statusBadgeColor}`}
-          >
-            {span.llm_model
-              ? span.llm_model.split("-")[0].charAt(0).toUpperCase()
-              : span.name
-              ? span.name.charAt(0).toUpperCase()
-              : "?"}
-          </div> */}
+          {/* Status accent stripe */}
+          <div className={`h-0.5 ${status.dot} transition-all duration-300`} />
 
-          {/* Title + subtitle */}
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-foreground">
+          {/* Content */}
+          <div className="p-3">
+            {/* Header: Name + Status */}
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <h3 className="text-xs font-semibold text-foreground leading-tight truncate flex-1 transition-colors duration-200">
                 {span.name}
-              </span>
-              {/* <span className="text-xs text-foreground/50 truncate">
-                #{span.span_id}
-              </span> */}
+              </h3>
+              <div
+                className={`flex items-center gap-1 px-1.5 py-0.5 rounded ${status.bg} shrink-0 transition-transform duration-200`}
+              >
+                <div className={`w-1 h-1 rounded-full ${status.dot}`} />
+                <span
+                  className={`text-[8px] font-bold uppercase tracking-wide ${status.text}`}
+                >
+                  {span.status}
+                </span>
+              </div>
             </div>
-            <div className="mt-1 text-xs text-foreground/60 flex items-center gap-2">
-              {span.llm_model && (
-                <span className="truncate">{span.llm_model}</span>
-              )}
-              <span className="truncate">{formatDuration(span.duration)}</span>
-            </div>
-          </div>
 
-          {/* Status badge */}
-          <div className="shrink-0">
-            <span
-              className={`px-2 py-1 rounded-md text-xs font-semibold text-white ${statusBadgeColor}`}
-            >
-              {span.status}
-            </span>
+            {/* Model - only show if exists */}
+            {span.llm_model && (
+              <div className="text-[9px] text-slate/80 font-medium mb-2 truncate">
+                {span.llm_model}
+              </div>
+            )}
+
+            {/* Metrics - clean inline layout */}
+            <div className="flex items-center gap-3 text-[9px] pt-2 border-t border-border/60">
+              <div className="flex items-center gap-1 text-slate">
+                <svg
+                  className="w-3 h-3 opacity-50 transition-opacity duration-200 group-hover:opacity-70"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <span className="font-mono font-medium">
+                  {formatDuration(span.duration)}
+                </span>
+              </div>
+
+              {span.cost !== null && (
+                <div className="flex items-center gap-1 text-mustard ml-auto">
+                  <svg
+                    className="w-3 h-3 opacity-70 transition-opacity duration-200 group-hover:opacity-90"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  <span className="font-mono font-semibold">
+                    {formatCost(span.cost)}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
         </button>
 
-        {/* Tooltip (slimmer) */}
+        {/* Tooltip */}
         {showTooltip && !isDragging && (
-          <div className="absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md bg-gray-900 px-3 py-2 text-xs text-white shadow-lg pointer-events-none z-50">
-            <div className="flex items-center gap-2">
-              <span className="font-medium">#{span.span_id}</span>
-              <span
-                className={`${statusBadgeColor} rounded-full px-2 py-0.5 text-[10px] font-medium text-white`}
-              >
-                {span.status}
-              </span>
-            </div>
-            <div className="mt-1 flex gap-3 text-gray-300">
-              <span>{formatDuration(span.duration)}</span>
-              {span.cost && <span>{formatCost(span.cost)}</span>}
+          <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md bg-foreground/95 px-2.5 py-1.5 shadow-lg pointer-events-none z-50">
+            <div className="flex items-center gap-1.5 text-[9px] text-white/90 font-mono">
+              <span className="opacity-60">ID</span>
+              <span className="font-semibold">{span.span_id}</span>
             </div>
           </div>
         )}
@@ -198,155 +227,135 @@ export default function GraphNode({
                 leaveFrom="opacity-100 scale-100"
                 leaveTo="opacity-0 scale-95"
               >
-                <DialogPanel className="w-full max-w-xl max-h-[85vh] overflow-y-auto rounded-xl border border-gray-200 bg-white text-sm text-foreground shadow-xl">
-                  {/* Header with gradient background like dashboard */}
-                  <div className="sticky top-0 z-10 px-5 py-3 bg-linear-to-br from-babyblue/10 to-babyblue/5 border-b border-foreground/10 backdrop-blur-sm bg-white/95">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <DialogTitle className="text-base font-semibold text-foreground">
-                          Span #{span.span_id}
-                        </DialogTitle>
-                        {span.llm_model && (
-                          <p className="text-xs text-foreground/60 mt-0.5 truncate">
-                            {span.llm_model}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
+                <DialogPanel className="w-full max-w-2xl max-h-[90vh] overflow-hidden rounded-2xl border border-border bg-card text-sm text-foreground shadow-2xl flex flex-col">
+                  {/* Header */}
+                  <div className="flex items-start justify-between gap-4 px-6 py-4 border-b border-border bg-linear-to-r from-babyblue/5 to-transparent">
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <DialogTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
+                        <span>Span Details</span>
+                        <span className="text-sm font-mono text-muted">
+                          #{span.span_id}
+                        </span>
+                      </DialogTitle>
+                      {span.llm_model !== null && (
+                        <p className="text-xs text-muted font-medium">
+                          {span.llm_model}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <div
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${status.bg}`}
+                      >
+                        <div className={`w-2 h-2 rounded-full ${status.dot}`} />
                         <span
-                          className={`px-2 py-1 rounded text-xs font-semibold text-white shrink-0 ${statusBadgeColor}`}
+                          className={`text-xs font-semibold ${status.text}`}
                         >
                           {span.status || "unknown"}
                         </span>
-                        <button
-                          onClick={() => setIsModalOpen(false)}
-                          className="p-1 rounded-lg hover:bg-foreground/10 transition-colors"
-                        >
-                          <svg
-                            className="w-5 h-5 text-foreground/60"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M6 18L18 6M6 6l12 12"
-                            />
-                          </svg>
-                        </button>
                       </div>
+                      <button
+                        onClick={() => setIsModalOpen(false)}
+                        className="p-1.5 rounded-lg hover:bg-foreground/5 transition-colors"
+                      >
+                        <svg
+                          className="w-5 h-5 text-muted"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
+                      </button>
                     </div>
                   </div>
 
-                  <div className="p-4 space-y-4">
+                  <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
                     {/* Timing Information */}
-                    <div>
-                      <h4 className="font-semibold text-foreground text-sm mb-2">
-                        Timing & Cost
+                    <div className="space-y-3">
+                      <h4 className="text-xs font-semibold text-muted uppercase tracking-wide">
+                        Performance
                       </h4>
-                      <div className="grid grid-cols-2 gap-3 text-xs">
-                        <div className="flex items-start gap-2">
-                          <svg
-                            className="w-4 h-4 text-foreground/60 shrink-0 mt-0.5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                            />
-                          </svg>
-                          <div className="min-w-0">
-                            <p className="text-foreground/60">Duration</p>
-                            <p className="text-foreground font-semibold">
-                              {formatDuration(span.duration)}
-                            </p>
-                          </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1 p-3 rounded-lg bg-babyblue/5 border border-babyblue/20">
+                          <span className="text-[10px] font-medium text-muted uppercase tracking-wide">
+                            Duration
+                          </span>
+                          <span className="text-lg font-semibold text-foreground font-mono">
+                            {formatDuration(span.duration)}
+                          </span>
                         </div>
-                        <div className="flex items-start gap-2">
-                          <svg
-                            className="w-4 h-4 text-foreground/60 shrink-0 mt-0.5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                            />
-                          </svg>
-                          <div className="min-w-0">
-                            <p className="text-foreground/60">Cost</p>
-                            <p className="text-foreground font-semibold">
-                              {formatCost(span.cost)}
-                            </p>
-                          </div>
+                        <div className="flex flex-col gap-1 p-3 rounded-lg bg-mustard/5 border border-mustard/20">
+                          <span className="text-[10px] font-medium text-muted uppercase tracking-wide">
+                            Cost
+                          </span>
+                          <span className="text-lg font-semibold text-mustard font-mono">
+                            {formatCost(span.cost)}
+                          </span>
                         </div>
                       </div>
-                      <div className="text-xs text-foreground/50 mt-2 pt-2 border-t border-foreground/10 space-y-0.5">
-                        <p className="truncate">
-                          Start: {formatDate(span.start_time)}
-                        </p>
-                        <p className="truncate">
-                          End: {formatDate(span.end_time)}
-                        </p>
+                      <div className="text-[11px] text-muted space-y-1 pt-2 border-t border-border">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium w-12">Start</span>
+                          <span className="font-mono">
+                            {formatDate(span.start_time)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium w-12">End</span>
+                          <span className="font-mono">
+                            {formatDate(span.end_time)}
+                          </span>
+                        </div>
                       </div>
                     </div>
 
                     {/* Token Information */}
-                    {(span.prompt_tokens || span.completion_tokens) && (
-                      <div>
-                        <h4 className="font-semibold text-foreground text-sm mb-2">
-                          Tokens
+                    {(span.prompt_tokens !== null ||
+                      span.completion_tokens !== null) && (
+                      <div className="space-y-3">
+                        <h4 className="text-xs font-semibold text-muted uppercase tracking-wide">
+                          Token Usage
                         </h4>
-                        <div className="grid grid-cols-2 gap-3 text-xs">
-                          <div className="flex items-start gap-2">
-                            <svg
-                              className="w-4 h-4 text-foreground/60 shrink-0 mt-0.5"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M13 10V3L4 14h7v7l9-11h-7z"
-                              />
-                            </svg>
-                            <div className="min-w-0">
-                              <p className="text-foreground/60">Prompt</p>
-                              <p className="text-foreground font-semibold font-mono">
-                                {span.prompt_tokens || 0}
-                              </p>
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1 flex items-center gap-2 p-3 rounded-lg bg-background">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-[10px] font-medium text-muted uppercase tracking-wide">
+                                Prompt
+                              </span>
+                              <span className="text-base font-semibold text-foreground font-mono">
+                                {span.prompt_tokens?.toLocaleString() || 0}
+                              </span>
                             </div>
                           </div>
-                          <div className="flex items-start gap-2">
-                            <svg
-                              className="w-4 h-4 text-foreground/60 shrink-0 mt-0.5"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M13 10V3L4 14h7v7l9-11h-7z"
-                              />
-                            </svg>
-                            <div className="min-w-0">
-                              <p className="text-foreground/60">Completion</p>
-                              <p className="text-foreground font-semibold font-mono">
-                                {span.completion_tokens || 0}
-                              </p>
+                          <div className="text-muted text-sm">+</div>
+                          <div className="flex-1 flex items-center gap-2 p-3 rounded-lg bg-background">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-[10px] font-medium text-muted uppercase tracking-wide">
+                                Completion
+                              </span>
+                              <span className="text-base font-semibold text-foreground font-mono">
+                                {span.completion_tokens?.toLocaleString() || 0}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="text-muted text-sm">=</div>
+                          <div className="flex-1 flex items-center gap-2 p-3 rounded-lg bg-babyblue/10 border border-babyblue/20">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-[10px] font-medium text-muted uppercase tracking-wide">
+                                Total
+                              </span>
+                              <span className="text-base font-semibold text-foreground font-mono">
+                                {(
+                                  (span.prompt_tokens || 0) +
+                                  (span.completion_tokens || 0)
+                                ).toLocaleString()}
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -354,24 +363,26 @@ export default function GraphNode({
                     )}
 
                     {/* Input Preview */}
-                    {span.input_preview && (
-                      <div>
-                        <h4 className="font-semibold text-foreground text-sm mb-2">
+                    {span.input_preview !== null && (
+                      <div className="space-y-2">
+                        <h4 className="text-xs font-semibold text-muted uppercase tracking-wide">
                           Input
                         </h4>
-                        <p className="text-xs text-foreground/70 bg-babyblue/10 p-2.5 rounded border border-foreground/10 line-clamp-4 wrap-break-word">
-                          {span.input_preview}
-                        </p>
-                        {span.input_blob_url && (
+                        <div className="p-4 rounded-lg bg-background border border-border">
+                          <p className="text-xs text-foreground/80 leading-relaxed line-clamp-6 whitespace-pre-wrap wrap-break-word font-mono">
+                            {span.input_preview}
+                          </p>
+                        </div>
+                        {span.input_blob_url !== null && (
                           <a
                             href={span.input_blob_url}
-                            className="inline-flex items-center gap-1 mt-1.5 text-xs text-mustard hover:underline font-medium transition"
+                            className="inline-flex items-center gap-1.5 text-xs text-babyblue hover:text-foreground font-medium transition group"
                             target="_blank"
                             rel="noopener noreferrer"
                           >
-                            View full input
+                            <span>View complete input</span>
                             <svg
-                              className="w-3 h-3"
+                              className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform"
                               fill="none"
                               stroke="currentColor"
                               viewBox="0 0 24 24"
@@ -380,7 +391,7 @@ export default function GraphNode({
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
                                 strokeWidth={2}
-                                d="M9 5l7 7-7 7"
+                                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
                               />
                             </svg>
                           </a>
@@ -389,24 +400,26 @@ export default function GraphNode({
                     )}
 
                     {/* Output Preview */}
-                    {span.output_preview && (
-                      <div>
-                        <h4 className="font-semibold text-foreground text-sm mb-2">
+                    {span.output_preview !== null && (
+                      <div className="space-y-2">
+                        <h4 className="text-xs font-semibold text-muted uppercase tracking-wide">
                           Output
                         </h4>
-                        <p className="text-xs text-foreground/70 bg-babyblue/10 p-2.5 rounded border border-foreground/10 line-clamp-4 wrap-break-word">
-                          {span.output_preview}
-                        </p>
-                        {span.output_blob_url && (
+                        <div className="p-4 rounded-lg bg-background border border-border">
+                          <p className="text-xs text-foreground/80 leading-relaxed line-clamp-6 whitespace-pre-wrap wrap-break-word font-mono">
+                            {span.output_preview}
+                          </p>
+                        </div>
+                        {span.output_blob_url !== null && (
                           <a
                             href={span.output_blob_url}
-                            className="inline-flex items-center gap-1 mt-1.5 text-xs text-mustard hover:underline font-medium transition"
+                            className="inline-flex items-center gap-1.5 text-xs text-babyblue hover:text-foreground font-medium transition group"
                             target="_blank"
                             rel="noopener noreferrer"
                           >
-                            View full output
+                            <span>View complete output</span>
                             <svg
-                              className="w-3 h-3"
+                              className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform"
                               fill="none"
                               stroke="currentColor"
                               viewBox="0 0 24 24"
@@ -415,7 +428,7 @@ export default function GraphNode({
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
                                 strokeWidth={2}
-                                d="M9 5l7 7-7 7"
+                                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
                               />
                             </svg>
                           </a>
@@ -424,33 +437,42 @@ export default function GraphNode({
                     )}
 
                     {/* Error Message */}
-                    {span.error_message && (
-                      <div className="rounded bg-red-50 p-2.5 border border-red-200">
-                        <h4 className="font-semibold text-red-700 text-sm mb-1.5">
+                    {span.error_message !== null && (
+                      <div className="space-y-2">
+                        <h4 className="text-xs font-semibold text-error uppercase tracking-wide">
                           Error
                         </h4>
-                        <p className="text-xs text-red-600 wrap-break-word">
-                          {span.error_message}
-                        </p>
+                        <div className="p-4 rounded-lg bg-red-50 border border-error/30">
+                          <p className="text-xs text-error/90 leading-relaxed wrap-break-word font-mono">
+                            {span.error_message}
+                          </p>
+                        </div>
                       </div>
                     )}
 
                     {/* Metadata */}
-                    <div className="pt-3 border-t border-foreground/10">
-                      <div className="text-xs text-foreground/50 space-y-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="shrink-0">Trace ID:</span>
-                          <span className="font-mono text-foreground/70 bg-foreground/5 px-1.5 py-0.5 rounded">
-                            {span.trace_id}
+                    <div className="space-y-2 pt-2 border-t border-border">
+                      <h4 className="text-xs font-semibold text-muted uppercase tracking-wide">
+                        Metadata
+                      </h4>
+                      <div className="space-y-2 text-[11px]">
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted font-medium w-24 shrink-0">
+                            Trace ID
                           </span>
+                          <code className="flex-1 px-2 py-1 rounded bg-background border border-border font-mono text-foreground">
+                            {span.trace_id}
+                          </code>
                         </div>
-                        {span.parent_span_ids &&
+                        {span.parent_span_ids !== null &&
                           span.parent_span_ids.length > 0 && (
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="shrink-0">Parent Spans:</span>
-                              <span className="font-mono text-foreground/70 bg-foreground/5 px-1.5 py-0.5 rounded">
-                                {span.parent_span_ids.join(", ")}
+                            <div className="flex items-start gap-2">
+                              <span className="text-muted font-medium w-24 shrink-0">
+                                Parent Spans
                               </span>
+                              <code className="flex-1 px-2 py-1 rounded bg-background border border-border font-mono text-foreground">
+                                {span.parent_span_ids.join(", ")}
+                              </code>
                             </div>
                           )}
                       </div>

@@ -9,12 +9,12 @@ export default function DashboardLayout({
     <div className="flex h-screen overflow-hidden bg-background">
       {/* Main content area */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Unified header bar */}
-        <div className="flex items-center justify-between px-8 py-3 bg-white/80 backdrop-blur-sm border-b border-foreground/10 shadow-sm">
+        {/* Header bar */}
+        <header className="flex items-center justify-between px-6 py-3.5 bg-card border-b border-border">
           <NavMenu />
-        </div>
+        </header>
         {/* Content area */}
-        <div className="flex-1 overflow-hidden">{children}</div>
+        <main className="flex-1 overflow-hidden">{children}</main>
       </div>
     </div>
   );

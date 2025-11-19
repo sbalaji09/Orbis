@@ -11,34 +11,44 @@ function formatDuration(ms: number): string {
 
 export function TraceRow({ trace }: { trace: Trace }) {
   const router = useRouter();
+  const isError = trace.status === "failed";
 
   return (
     <button
       onClick={() => router.push(`/dashboard/trace/${trace.trace_id}`)}
-      className="w-full px-6 py-4 text-left transition-all hover:bg-babyblue/15 group"
+      className="w-full px-5 py-3.5 text-left transition-all hover:bg-babyblue/8 border-b border-border group"
     >
       <div className="flex items-center justify-between gap-4">
         {/* Left: ID and Status */}
-        <div className="flex items-center gap-3">
-          <span className="font-mono text-base font-semibold text-foreground">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          <span className="font-mono text-sm font-semibold text-foreground group-hover:text-babyblue transition-colors">
             #{trace.trace_id}
           </span>
-          {trace.status === "failed" ? (
-            <span className="px-2 py-0.5 text-xs font-semibold bg-red-100 text-red-700 rounded">
-              ERROR
+          <div
+            className={`flex items-center gap-1.5 px-2 py-1 rounded-md ${
+              isError ? "bg-red-50" : "bg-emerald-50"
+            }`}
+          >
+            <div
+              className={`w-1.5 h-1.5 rounded-full ${
+                isError ? "bg-error" : "bg-success"
+              }`}
+            />
+            <span
+              className={`text-[10px] font-semibold uppercase tracking-wide ${
+                isError ? "text-error" : "text-success"
+              }`}
+            >
+              {isError ? "Error" : "Success"}
             </span>
-          ) : (
-            <span className="px-2 py-0.5 text-xs font-semibold bg-green-100 text-green-700 rounded">
-              SUCCESS
-            </span>
-          )}
+          </div>
         </div>
 
         {/* Right: Metrics */}
-        <div className="flex items-center gap-6 text-sm">
-          <div className="flex items-center gap-2 text-foreground/60">
+        <div className="flex items-center gap-5 text-xs shrink-0">
+          <div className="flex items-center gap-1.5 text-muted font-mono">
             <svg
-              className="w-4 h-4"
+              className="w-3.5 h-3.5"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -52,9 +62,9 @@ export function TraceRow({ trace }: { trace: Trace }) {
             </svg>
             <span>{formatDuration(trace.duration)}</span>
           </div>
-          <div className="flex items-center gap-2 text-foreground/60">
+          <div className="flex items-center gap-1.5 text-mustard font-mono font-semibold">
             <svg
-              className="w-4 h-4"
+              className="w-3.5 h-3.5"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -68,9 +78,9 @@ export function TraceRow({ trace }: { trace: Trace }) {
             </svg>
             <span>${(trace.total_cost || 0).toFixed(4)}</span>
           </div>
-          <div className="flex items-center gap-2 text-foreground/60">
+          <div className="flex items-center gap-1.5 text-muted font-mono">
             <svg
-              className="w-4 h-4"
+              className="w-3.5 h-3.5"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -82,10 +92,13 @@ export function TraceRow({ trace }: { trace: Trace }) {
                 d="M13 10V3L4 14h7v7l9-11h-7z"
               />
             </svg>
-            <span className="font-mono">{trace.total_tokens || 0}</span>
+            <span>{trace.total_tokens?.toLocaleString() || 0}</span>
           </div>
-          <div className="text-xs text-foreground/40">
-            {new Date(trace.start_time).toLocaleTimeString()}
+          <div className="text-xs text-muted min-w-[60px] text-right">
+            {new Date(trace.start_time).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
           </div>
         </div>
       </div>

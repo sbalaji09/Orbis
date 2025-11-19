@@ -38,11 +38,11 @@ function calculateDAGLayout(spans: Span[]): NodePosition[] {
     levelGroups.get(level)!.push(span);
   });
 
-  // Position nodes
-  const horizontalSpacing = 200;
-  const verticalSpacing = 180;
-  const startX = 100;
-  const startY = 100;
+  // Position nodes with generous spacing for clean layout
+  const horizontalSpacing = 260;
+  const verticalSpacing = 200;
+  const startX = 130;
+  const startY = 120;
 
   levelGroups.forEach((spansInLevel, level) => {
     const levelWidth = (spansInLevel.length - 1) * horizontalSpacing;
@@ -87,7 +87,7 @@ function calculateEdges(positions: NodePosition[]): Edge[] {
 function ArrowMarker() {
   return (
     <defs>
-      {/* Sleek triangular arrowhead */}
+      {/* Arrowhead marker */}
       <marker
         id="arrowhead"
         markerWidth="10"
@@ -97,7 +97,7 @@ function ArrowMarker() {
         orient="auto"
         markerUnits="strokeWidth"
       >
-        <polygon points="0,0 0,10 10,5" fill="#374151" stroke="none" />
+        <polygon points="0,0 0,10 10,5" fill="#cbdceb" stroke="none" />
       </marker>
     </defs>
   );
@@ -116,12 +116,12 @@ interface Edge {
 
 // Edge component to draw connections between spans
 function Edge({ from, to }: Edge) {
-  // Node dimensions now correspond to card-style nodes (width x height)
-  const nodeWidth = 220; // px
-  const nodeHeight = 64; // px
+  // Node dimensions updated to match spacious GraphNode
+  const nodeWidth = 200; // w-[200px]
+  const nodeHeight = 95; // approximate height with status stripe + content
   const halfW = nodeWidth / 2;
   const halfH = nodeHeight / 2;
-  const gap = 8; // gap between node edge and line start/end
+  const gap = 12;
 
   const dx = to.x - from.x;
   const dy = to.y - from.y;
@@ -129,16 +129,11 @@ function Edge({ from, to }: Edge) {
   const cos = Math.cos(angle);
   const sin = Math.sin(angle);
 
-  // For axis-aligned rectangle centered at (cx,cy), the ray intersection distance t is:
-  // tx = halfW / |cos|, ty = halfH / |sin|, t = min(tx, ty)
+  // Calculate rectangle intersection
   const tx = Math.abs(cos) < 1e-6 ? Infinity : halfW / Math.abs(cos);
   const ty = Math.abs(sin) < 1e-6 ? Infinity : halfH / Math.abs(sin);
   const fromT = Math.min(tx, ty);
-
-  // Reverse direction for 'to' node (we trace from center of 'to' backwards)
-  const toTx = tx;
-  const toTy = ty;
-  const toT = Math.min(toTx, toTy);
+  const toT = Math.min(tx, ty);
 
   const arrowheadSize = 8;
 
@@ -153,11 +148,12 @@ function Edge({ from, to }: Edge) {
     <g>
       <path
         d={path}
-        stroke="#374151"
-        strokeWidth="1.6"
+        stroke="#cbdceb"
+        strokeWidth="2"
         fill="none"
         markerEnd="url(#arrowhead)"
         strokeLinecap="round"
+        opacity="0.7"
       />
     </g>
   );
