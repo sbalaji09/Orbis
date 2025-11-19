@@ -4,196 +4,333 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-background">
       {/* Navigation */}
-      <nav className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-linear-to-br from-babyblue to-accent-teal rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-lg">O</span>
+      <nav className="border-b border-slate/10 bg-background/95 backdrop-blur sticky top-0 z-50">
+        <div className="max-w-6xl mx-auto px-8 py-5 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-7 h-7 bg-linear-to-br from-babyblue to-babyblue/80 rounded-md flex items-center justify-center shadow-sm">
+              <div className="w-3 h-3 border-2 border-white rounded-sm" />
             </div>
-            <div className="flex flex-col">
-              <span className="text-base font-semibold text-foreground leading-none">
-                Orbis
-              </span>
-              <span className="text-[9px] text-slate/70 font-medium uppercase tracking-widest">
-                Observability
-              </span>
-            </div>
+            <span className="text-lg font-semibold text-foreground tracking-tight">
+              Orbis
+            </span>
           </div>
-          <Link
-            href="/dashboard"
-            className="px-4 py-2 bg-babyblue text-white rounded-lg font-medium text-sm hover:bg-babyblue/90 transition-colors duration-200"
-          >
-            View Dashboard
-          </Link>
+          <div className="flex items-center gap-6">
+            <Link
+              href="#features"
+              className="text-sm font-medium text-slate hover:text-babyblue transition-colors duration-200"
+            >
+              Features
+            </Link>
+            <Link
+              href="#how-it-works"
+              className="text-sm font-medium text-slate hover:text-babyblue transition-colors duration-200"
+            >
+              How it works
+            </Link>
+            <Link
+              href="/dashboard"
+              className="px-4 py-2 bg-foreground text-background rounded-md font-medium text-sm hover:bg-foreground/90 transition-all duration-200 shadow-sm hover:shadow-md"
+            >
+              Dashboard
+            </Link>
+          </div>
         </div>
       </nav>
 
       {/* Hero Section */}
       <section className="relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-6 py-20 lg:py-32">
-          <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-babyblue-light/60 border border-babyblue/20 mb-6">
-              <div className="w-1.5 h-1.5 rounded-full bg-accent-teal animate-pulse" />
-              <span className="text-xs font-semibold text-babyblue uppercase tracking-wide">
-                Developer-First Observability
-              </span>
-            </div>
-            <h1 className="text-5xl lg:text-6xl font-bold text-foreground mb-6 leading-tight">
-              See exactly what your{" "}
-              <span className="text-babyblue">AI agents</span> are doing
-            </h1>
-            <p className="text-xl text-slate mb-8 leading-relaxed">
-              Track every LLM call, monitor costs in real-time, and visualize
-              complex agent workflows with automatic trace capture and
-              intelligent analytics.
-            </p>
-            <div className="flex items-center gap-4">
-              <Link
-                href="/dashboard"
-                className="px-6 py-3 bg-babyblue text-white rounded-lg font-semibold hover:bg-babyblue/90 transition-all duration-200 hover:-translate-y-0.5 shadow-lg hover:shadow-xl"
-              >
-                Get Started
-              </Link>
-              <button className="px-6 py-3 border border-border rounded-lg font-semibold text-foreground hover:bg-slate/5 transition-colors duration-200">
-                View Demo
-              </button>
-            </div>
-          </div>
-        </div>
+        {/* Subtle gradient background */}
+        <div className="absolute inset-0 bg-linear-to-br from-babyblue/3 via-transparent to-accent-purple/2" />
 
-        {/* Decorative gradient */}
-        <div className="absolute top-0 right-0 w-1/2 h-full bg-linear-to-l from-babyblue-light/20 to-transparent pointer-events-none" />
-      </section>
-
-      {/* How It Works */}
-      <section className="py-20 bg-card border-y border-border">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl lg:text-4xl font-bold text-foreground mb-4">
-              Three steps to complete visibility
-            </h2>
-            <p className="text-lg text-slate max-w-2xl mx-auto">
-              Install our SDK, and we&apos;ll automatically capture everything
-              your AI agents do
-            </p>
-          </div>
-
-          <div className="grid lg:grid-cols-3 gap-8">
-            {/* Step 1 */}
-            <div className="relative">
-              <div className="absolute -top-4 -left-4 w-12 h-12 rounded-full bg-babyblue-light border-4 border-background flex items-center justify-center">
-                <span className="text-xl font-bold text-babyblue">1</span>
+        <div className="relative max-w-6xl mx-auto px-8 pt-16 pb-12">
+          <div className="grid lg:grid-cols-12 gap-12 items-start">
+            {/* Left column - Main content */}
+            <div className="lg:col-span-7">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-success/30 bg-linear-to-r from-success/10 to-success/5 mb-6 shadow-sm">
+                <div className="w-1.5 h-1.5 rounded-full bg-success animate-pulse shadow-success/50 shadow-sm" />
+                <span className="text-[10px] font-bold text-success tracking-widest">
+                  PRODUCTION READY
+                </span>
               </div>
-              <div className="p-6 rounded-xl border border-border bg-background h-full">
-                <div className="w-10 h-10 rounded-lg bg-babyblue/10 flex items-center justify-center mb-4">
-                  <svg
-                    className="w-5 h-5 text-babyblue"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
-                    />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-semibold text-foreground mb-2">
-                  Install the SDK
-                </h3>
-                <p className="text-sm text-slate mb-4">
-                  Add one decorator to your functions and we&apos;ll handle the
-                  rest
-                </p>
-                <div className="p-3 rounded-lg bg-slate/5 border border-border">
-                  <code className="text-xs font-mono text-slate">
-                    @observe()
-                    <br />
-                    def my_agent():
-                    <br />
-                    &nbsp;&nbsp;...
+
+              <h1 className="text-[54px] font-bold text-foreground mb-5 leading-[1.08] tracking-[-0.03em]">
+                Know what your{" "}
+                <span className="relative inline-block">
+                  <span className="text-babyblue italic font-serif">
+                    AI agents
+                  </span>
+                  <div className="absolute -bottom-1 left-0 w-full h-1 bg-linear-to-r from-babyblue/30 via-babyblue/50 to-transparent" />
+                </span>{" "}
+                are doing
+              </h1>
+
+              <p className="text-[18px] text-slate leading-[1.6] mb-8 max-w-[520px] font-light">
+                Every LLM call traced. Every dollar accounted for. Every
+                workflow visualized. Production-grade observability built for
+                modern AI development.
+              </p>
+
+              <div className="flex items-center gap-3 mb-10">
+                <Link
+                  href="/dashboard"
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-foreground text-background font-medium text-sm hover:bg-foreground/90 transition-all duration-200 shadow-md hover:shadow-lg hover:scale-[1.02]"
+                >
+                  View Dashboard
+                  <span className="text-xs">→</span>
+                </Link>
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] uppercase tracking-widest text-slate/50 font-semibold">
+                    Quick start
+                  </span>
+                  <code className="px-3 py-1.5 text-[13px] text-foreground font-mono bg-slate/5 border border-slate/15 rounded shadow-sm">
+                    pip install orbis-sdk
                   </code>
                 </div>
               </div>
             </div>
 
-            {/* Step 2 */}
-            <div className="relative">
-              <div className="absolute -top-4 -left-4 w-12 h-12 rounded-full bg-babyblue-light border-4 border-background flex items-center justify-center">
-                <span className="text-xl font-bold text-babyblue">2</span>
-              </div>
-              <div className="p-6 rounded-xl border border-border bg-background h-full">
-                <div className="w-10 h-10 rounded-lg bg-accent-teal/10 flex items-center justify-center mb-4">
-                  <svg
-                    className="w-5 h-5 text-accent-teal"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                    />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-semibold text-foreground mb-2">
-                  Data flows automatically
-                </h3>
-                <p className="text-sm text-slate mb-4">
-                  Traces are captured, processed, and stored without impacting
-                  your agent&apos;s performance
-                </p>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 h-1 bg-babyblue/20 rounded-full overflow-hidden">
-                    <div className="h-full w-2/3 bg-babyblue rounded-full" />
+            {/* Right column - Stats */}
+            <div className="lg:col-span-5">
+              <div className="bg-linear-to-br from-slate/3 to-babyblue/2 border border-slate/15 p-7 space-y-6 shadow-sm rounded">
+                <div className="relative pl-5">
+                  <div className="absolute top-0 left-0 w-0.5 h-full bg-linear-to-b from-babyblue to-babyblue/20" />
+                  <div className="text-[10px] uppercase tracking-[0.12em] text-babyblue/70 font-bold mb-2">
+                    Latency
                   </div>
-                  <span className="text-xs font-mono text-slate">
-                    Processing...
-                  </span>
+                  <div className="text-[36px] font-bold text-foreground tracking-tight leading-none mb-1">
+                    &lt;5ms
+                  </div>
+                  <div className="text-[13px] text-slate/70">
+                    overhead per trace
+                  </div>
+                </div>
+                <div className="relative pl-5">
+                  <div className="absolute top-0 left-0 w-0.5 h-full bg-linear-to-b from-success to-success/20" />
+                  <div className="text-[10px] uppercase tracking-[0.12em] text-success/70 font-bold mb-2">
+                    Coverage
+                  </div>
+                  <div className="text-[36px] font-bold text-foreground tracking-tight leading-none mb-1">
+                    100%
+                  </div>
+                  <div className="text-[13px] text-slate/70">
+                    automatic capture rate
+                  </div>
+                </div>
+                <div className="relative pl-5">
+                  <div className="absolute top-0 left-0 w-0.5 h-full bg-linear-to-b from-mustard to-mustard/20" />
+                  <div className="text-[10px] uppercase tracking-[0.12em] text-mustard/70 font-bold mb-2">
+                    Cost tracking
+                  </div>
+                  <div className="text-[36px] font-bold text-foreground tracking-tight leading-none mb-1">
+                    Real-time
+                  </div>
+                  <div className="text-[13px] text-slate/70">
+                    token-level precision
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* How It Works */}
+      <section
+        id="how-it-works"
+        className="py-16 border-t border-slate/10 bg-linear-to-b from-slate/2 to-transparent"
+      >
+        <div className="max-w-6xl mx-auto px-8">
+          <div className="mb-12">
+            <div className="inline-flex items-center gap-2 mb-3">
+              <div className="w-1 h-1 rounded-full bg-babyblue" />
+              <span className="text-[10px] uppercase tracking-[0.15em] text-babyblue font-bold">
+                Implementation
+              </span>
+            </div>
+            <h2 className="text-[38px] font-bold text-foreground tracking-tight mb-3 leading-[1.15]">
+              Three steps to full visibility
+            </h2>
+            <p className="text-[16px] text-slate/70 max-w-[540px] font-light leading-relaxed">
+              One decorator captures your entire agent execution. No manual
+              logging, no configuration, no overhead.
+            </p>
+          </div>
+
+          <div className="space-y-10">
+            {/* Step 1 */}
+            <div className="grid lg:grid-cols-12 gap-6 items-start">
+              <div className="lg:col-span-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-8 h-8 rounded bg-linear-to-br from-babyblue to-babyblue/70 flex items-center justify-center shadow-sm">
+                    <span className="text-[11px] font-bold text-white tracking-wider">
+                      01
+                    </span>
+                  </div>
+                  <h3 className="text-[22px] font-semibold text-foreground tracking-tight">
+                    Add decorator
+                  </h3>
+                </div>
+                <p className="text-[15px] text-slate/70 leading-relaxed font-light pl-11">
+                  Wrap your agent function with @observe(). That&apos;s it. No
+                  config, no setup, no instrumentation code.
+                </p>
+              </div>
+              <div className="lg:col-span-8">
+                <div className="relative p-5 bg-linear-to-br from-slate/3 to-babyblue/2 border border-slate/15 shadow-sm rounded overflow-hidden">
+                  <div className="absolute top-0 left-0 right-0 h-0.5 bg-linear-to-r from-babyblue via-babyblue/50 to-transparent" />
+                  <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate/10">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-babyblue/30" />
+                      <span className="text-[10px] font-bold text-slate/50 uppercase tracking-widest">
+                        Python
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-babyblue font-semibold">
+                      example.py
+                    </span>
+                  </div>
+                  <pre className="font-mono text-[14px] leading-[1.7]">
+                    <span className="text-babyblue font-bold">@observe()</span>
+                    {"\n"}
+                    <span className="text-accent-teal font-medium">
+                      def
+                    </span>{" "}
+                    <span className="text-foreground font-semibold">
+                      my_agent
+                    </span>
+                    <span className="text-slate/60">(query: str):</span>
+                    {"\n"}
+                    <span className="text-slate/40">
+                      {" "}
+                      # Automatically traced
+                    </span>
+                    {"\n"}
+                    <span className="text-slate/60"> </span>
+                    <span className="text-accent-teal font-medium">
+                      return
+                    </span>{" "}
+                    <span className="text-foreground font-medium">process</span>
+                    <span className="text-slate/60">(query)</span>
+                  </pre>
+                </div>
+              </div>
+            </div>
+
+            {/* Step 2 */}
+            <div className="grid lg:grid-cols-12 gap-6 items-start">
+              <div className="lg:col-span-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-8 h-8 rounded bg-linear-to-br from-accent-teal to-accent-teal/70 flex items-center justify-center shadow-sm">
+                    <span className="text-[11px] font-bold text-white tracking-wider">
+                      02
+                    </span>
+                  </div>
+                  <h3 className="text-[22px] font-semibold text-foreground tracking-tight">
+                    Run agent
+                  </h3>
+                </div>
+                <p className="text-[15px] text-slate/70 leading-relaxed font-light pl-11">
+                  Execute normally. SDK captures everything in the background
+                  with zero performance impact.
+                </p>
+              </div>
+              <div className="lg:col-span-8">
+                <div className="relative p-5 bg-linear-to-br from-slate/3 to-accent-teal/2 border border-slate/15 shadow-sm rounded overflow-hidden space-y-3">
+                  <div className="absolute top-0 left-0 right-0 h-0.5 bg-linear-to-r from-accent-teal via-accent-teal/50 to-transparent" />
+                  <div className="flex items-center justify-between pb-2.5 border-b border-slate/10">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-success shadow-sm shadow-success/30" />
+                      <span className="text-[13px] font-semibold text-slate/80">
+                        Span captured
+                      </span>
+                    </div>
+                    <span className="font-mono text-[13px] text-slate/60 font-medium">
+                      2.3s
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between pb-2.5 border-b border-slate/10">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-mustard shadow-sm shadow-mustard/30" />
+                      <span className="text-[13px] font-semibold text-slate/80">
+                        Cost calculated
+                      </span>
+                    </div>
+                    <span className="font-mono text-[13px] text-mustard font-bold">
+                      $0.004
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-babyblue shadow-sm shadow-babyblue/30" />
+                      <span className="text-[13px] font-semibold text-slate/80">
+                        Trace sent
+                      </span>
+                    </div>
+                    <span className="font-mono text-[13px] text-slate/60 font-medium">
+                      async
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Step 3 */}
-            <div className="relative">
-              <div className="absolute -top-4 -left-4 w-12 h-12 rounded-full bg-babyblue-light border-4 border-background flex items-center justify-center">
-                <span className="text-xl font-bold text-babyblue">3</span>
-              </div>
-              <div className="p-6 rounded-xl border border-border bg-background h-full">
-                <div className="w-10 h-10 rounded-lg bg-accent-purple/10 flex items-center justify-center mb-4">
-                  <svg
-                    className="w-5 h-5 text-accent-purple"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                    />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-semibold text-foreground mb-2">
-                  Visualize everything
-                </h3>
-                <p className="text-sm text-slate mb-4">
-                  Rich dashboards show costs, performance, and execution flows
-                  in real-time
-                </p>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-xs text-slate">
-                    <div className="w-2 h-2 rounded-full bg-success" />
-                    <span>95% success rate</span>
+            <div className="grid lg:grid-cols-12 gap-6 items-start">
+              <div className="lg:col-span-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-8 h-8 rounded bg-linear-to-br from-accent-purple to-accent-purple/70 flex items-center justify-center shadow-sm">
+                    <span className="text-[11px] font-bold text-white tracking-wider">
+                      03
+                    </span>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-slate">
-                    <div className="w-2 h-2 rounded-full bg-mustard" />
-                    <span>$0.42 avg cost</span>
+                  <h3 className="text-[22px] font-semibold text-foreground tracking-tight">
+                    View traces
+                  </h3>
+                </div>
+                <p className="text-[15px] text-slate/70 leading-relaxed font-light pl-11">
+                  Full execution DAG in dashboard. See what happened, what it
+                  cost, and where time was spent.
+                </p>
+              </div>
+              <div className="lg:col-span-8">
+                <div className="relative p-5 bg-linear-to-br from-slate/3 to-accent-purple/2 border border-slate/15 shadow-sm rounded overflow-hidden">
+                  <div className="absolute top-0 left-0 right-0 h-0.5 bg-linear-to-r from-accent-purple via-accent-purple/50 to-transparent" />
+                  <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate/10">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-accent-purple/30" />
+                      <span className="text-[10px] font-bold text-slate/50 uppercase tracking-widest">
+                        Latest execution
+                      </span>
+                    </div>
+                    <span className="text-[10px] px-2.5 py-1 bg-linear-to-r from-success/15 to-success/5 text-success font-bold uppercase tracking-widest rounded-full border border-success/20">
+                      Success
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-5">
+                    <div className="border-l-2 border-babyblue/30 pl-3">
+                      <div className="text-[10px] uppercase tracking-widest text-slate/50 font-bold mb-1.5">
+                        Duration
+                      </div>
+                      <div className="font-mono text-[22px] font-bold text-foreground leading-none">
+                        3.2s
+                      </div>
+                    </div>
+                    <div className="border-l-2 border-mustard/30 pl-3">
+                      <div className="text-[10px] uppercase tracking-widest text-slate/50 font-bold mb-1.5">
+                        Cost
+                      </div>
+                      <div className="font-mono text-[22px] font-bold text-mustard leading-none">
+                        $0.012
+                      </div>
+                    </div>
+                    <div className="border-l-2 border-accent-purple/30 pl-3">
+                      <div className="text-[10px] uppercase tracking-widest text-slate/50 font-bold mb-1.5">
+                        Spans
+                      </div>
+                      <div className="font-mono text-[22px] font-bold text-foreground leading-none">
+                        7
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -203,320 +340,217 @@ export default function Home() {
       </section>
 
       {/* Features Grid */}
-      <section className="py-20">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl lg:text-4xl font-bold text-foreground mb-4">
-              Everything you need to understand your agents
+      <section
+        id="features"
+        className="py-16 border-t border-slate/10 bg-linear-to-b from-transparent via-babyblue/1 to-transparent"
+      >
+        <div className="max-w-6xl mx-auto px-8">
+          <div className="mb-12">
+            <div className="inline-flex items-center gap-2 mb-3">
+              <div className="w-1 h-1 rounded-full bg-babyblue" />
+              <span className="text-[10px] uppercase tracking-[0.15em] text-babyblue font-bold">
+                Capabilities
+              </span>
+            </div>
+            <h2 className="text-[38px] font-bold text-foreground mb-3 tracking-tight leading-[1.15]">
+              Built for production
             </h2>
-            <p className="text-lg text-slate max-w-2xl mx-auto">
-              Five powerful features to monitor, debug, and optimize your AI
-              workflows
+            <p className="text-[16px] text-slate/70 max-w-[560px] font-light leading-relaxed">
+              Everything you need to build, monitor, and optimize AI agents at
+              scale.
             </p>
           </div>
 
-          <div className="grid lg:grid-cols-2 gap-6">
-            {/* Feature 1: DAG Visualization */}
-            <div className="p-8 rounded-xl border border-border bg-card hover:border-babyblue/30 transition-all duration-300 group">
-              <div className="flex items-start gap-4 mb-4">
-                <div className="w-12 h-12 rounded-xl bg-babyblue/10 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-200">
-                  <svg
-                    className="w-6 h-6 text-babyblue"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-3zM14 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1h-4a1 1 0 01-1-1v-3z"
-                    />
-                  </svg>
+          <div className="grid lg:grid-cols-2 gap-5">
+            {/* Feature 1 */}
+            <div className="group relative p-6 border border-slate/15 bg-linear-to-br from-babyblue/2 to-transparent hover:border-babyblue/30 transition-all duration-300 shadow-sm hover:shadow-md rounded overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-0.5 bg-linear-to-r from-babyblue/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="flex items-start justify-between mb-4">
+                <div className="w-11 h-11 rounded-lg bg-linear-to-br from-babyblue/10 to-babyblue/5 border border-babyblue/20 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <div className="w-2.5 h-2.5 bg-babyblue rounded-sm" />
                 </div>
-                <div className="flex-1">
-                  <h3 className="text-xl font-semibold text-foreground mb-2">
-                    DAG Trace Visualization
-                  </h3>
-                  <p className="text-sm text-slate mb-4">
-                    Interactive flowcharts show exactly how your agent executes.
-                    Click any node to see the full prompt and response, hover
-                    for instant metrics.
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <span className="px-2 py-1 text-xs font-medium bg-babyblue-light text-babyblue rounded-md">
-                      Parent-child relationships
-                    </span>
-                    <span className="px-2 py-1 text-xs font-medium bg-babyblue-light text-babyblue rounded-md">
-                      Timeline view
-                    </span>
-                    <span className="px-2 py-1 text-xs font-medium bg-babyblue-light text-babyblue rounded-md">
-                      Detailed panels
-                    </span>
-                  </div>
-                </div>
+                <span className="text-[9px] uppercase tracking-[0.12em] text-slate/40 font-bold">
+                  Core
+                </span>
               </div>
+              <h3 className="text-[19px] font-semibold text-foreground mb-2.5 tracking-tight group-hover:text-babyblue transition-colors">
+                DAG Visualization
+              </h3>
+              <p className="text-[14px] text-slate/70 leading-relaxed font-light">
+                See the full execution graph. Every span is a node, every
+                relationship an edge. Navigate complex workflows visually.
+              </p>
             </div>
 
-            {/* Feature 2: Cost Analysis */}
-            <div className="p-8 rounded-xl border border-border bg-card hover:border-mustard/30 transition-all duration-300 group">
-              <div className="flex items-start gap-4 mb-4">
-                <div className="w-12 h-12 rounded-xl bg-mustard/10 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-200">
-                  <svg
-                    className="w-6 h-6 text-mustard"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
+            {/* Feature 2 */}
+            <div className="group relative p-6 border border-slate/15 bg-linear-to-br from-mustard/2 to-transparent hover:border-mustard/30 transition-all duration-300 shadow-sm hover:shadow-md rounded overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-0.5 bg-linear-to-r from-mustard/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="flex items-start justify-between mb-4">
+                <div className="w-11 h-11 rounded-lg bg-linear-to-br from-mustard/10 to-mustard/5 border border-mustard/20 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <span className="text-base font-bold text-mustard">$</span>
                 </div>
-                <div className="flex-1">
-                  <h3 className="text-xl font-semibold text-foreground mb-2">
-                    Cost Analysis
-                  </h3>
-                  <p className="text-sm text-slate mb-4">
-                    Know exactly where your money goes. Track costs by model,
-                    user, and prompt. Identify expensive operations and optimize
-                    token usage.
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <span className="px-2 py-1 text-xs font-medium bg-mustard/10 text-mustard rounded-md">
-                      Real-time tracking
-                    </span>
-                    <span className="px-2 py-1 text-xs font-medium bg-mustard/10 text-mustard rounded-md">
-                      Cost breakdown
-                    </span>
-                    <span className="px-2 py-1 text-xs font-medium bg-mustard/10 text-mustard rounded-md">
-                      Token analysis
-                    </span>
-                  </div>
-                </div>
+                <span className="text-[9px] uppercase tracking-[0.12em] text-slate/40 font-bold">
+                  Core
+                </span>
               </div>
+              <h3 className="text-[19px] font-semibold text-foreground mb-2.5 tracking-tight group-hover:text-mustard transition-colors">
+                Cost Tracking
+              </h3>
+              <p className="text-[14px] text-slate/70 leading-relaxed font-light">
+                Token-level cost calculation. See which models and prompts drive
+                your spend. Optimize for efficiency.
+              </p>
             </div>
 
-            {/* Feature 3: Prompt Versioning */}
-            <div className="p-8 rounded-xl border border-border bg-card hover:border-accent-teal/30 transition-all duration-300 group">
-              <div className="flex items-start gap-4 mb-4">
-                <div className="w-12 h-12 rounded-xl bg-accent-teal/10 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-200">
-                  <svg
-                    className="w-6 h-6 text-accent-teal"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
-                    />
-                  </svg>
+            {/* Feature 3 */}
+            <div className="group relative p-6 border border-slate/15 bg-linear-to-br from-accent-teal/2 to-transparent hover:border-accent-teal/30 transition-all duration-300 shadow-sm hover:shadow-md rounded overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-0.5 bg-linear-to-r from-accent-teal/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="flex items-start justify-between mb-4">
+                <div className="w-11 h-11 rounded-lg bg-linear-to-br from-accent-teal/10 to-accent-teal/5 border border-accent-teal/20 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <span className="text-xs font-bold text-accent-teal font-mono">
+                    v2
+                  </span>
                 </div>
-                <div className="flex-1">
-                  <h3 className="text-xl font-semibold text-foreground mb-2">
-                    Prompt Versioning
-                  </h3>
-                  <p className="text-sm text-slate mb-4">
-                    Git for your prompts. Track every change, compare versions
-                    side-by-side, and rollback instantly. See which versions
-                    perform best.
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <span className="px-2 py-1 text-xs font-medium bg-accent-teal/10 text-accent-teal rounded-md">
-                      Version history
-                    </span>
-                    <span className="px-2 py-1 text-xs font-medium bg-accent-teal/10 text-accent-teal rounded-md">
-                      Diff viewer
-                    </span>
-                    <span className="px-2 py-1 text-xs font-medium bg-accent-teal/10 text-accent-teal rounded-md">
-                      One-click rollback
-                    </span>
-                  </div>
-                </div>
+                <span className="text-[9px] uppercase tracking-[0.12em] text-slate/40 font-bold">
+                  Advanced
+                </span>
               </div>
+              <h3 className="text-[19px] font-semibold text-foreground mb-2.5 tracking-tight group-hover:text-accent-teal transition-colors">
+                Prompt Versioning
+              </h3>
+              <p className="text-[14px] text-slate/70 leading-relaxed font-light">
+                Git for prompts. Auto-increment versions, compare diffs,
+                rollback instantly. Full audit trail.
+              </p>
             </div>
 
-            {/* Feature 4: LLM-as-Judge */}
-            <div className="p-8 rounded-xl border border-border bg-card hover:border-accent-purple/30 transition-all duration-300 group">
-              <div className="flex items-start gap-4 mb-4">
-                <div className="w-12 h-12 rounded-xl bg-accent-purple/10 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-200">
-                  <svg
-                    className="w-6 h-6 text-accent-purple"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
+            {/* Feature 4 */}
+            <div className="group relative p-6 border border-slate/15 bg-linear-to-br from-accent-purple/2 to-transparent hover:border-accent-purple/30 transition-all duration-300 shadow-sm hover:shadow-md rounded overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-0.5 bg-linear-to-r from-accent-purple/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="flex items-start justify-between mb-4">
+                <div className="w-11 h-11 rounded-lg bg-linear-to-br from-accent-purple/10 to-accent-purple/5 border border-accent-purple/20 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <span className="text-base font-bold text-accent-purple">
+                    ✓
+                  </span>
                 </div>
-                <div className="flex-1">
-                  <h3 className="text-xl font-semibold text-foreground mb-2">
-                    Evaluation System
-                  </h3>
-                  <p className="text-sm text-slate mb-4">
-                    Automatic quality scoring with LLM-as-a-judge. Track
-                    relevance, accuracy, and safety. Get alerts when quality
-                    drops.
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <span className="px-2 py-1 text-xs font-medium bg-accent-purple/10 text-accent-purple rounded-md">
-                      Auto-grading
-                    </span>
-                    <span className="px-2 py-1 text-xs font-medium bg-accent-purple/10 text-accent-purple rounded-md">
-                      Quality tracking
-                    </span>
-                    <span className="px-2 py-1 text-xs font-medium bg-accent-purple/10 text-accent-purple rounded-md">
-                      Regression alerts
-                    </span>
-                  </div>
-                </div>
+                <span className="text-[9px] uppercase tracking-[0.12em] text-slate/40 font-bold">
+                  Quality
+                </span>
               </div>
+              <h3 className="text-[19px] font-semibold text-foreground mb-2.5 tracking-tight group-hover:text-accent-purple transition-colors">
+                Quality Evaluation
+              </h3>
+              <p className="text-[14px] text-slate/70 leading-relaxed font-light">
+                LLM-as-judge grades every trace. Monitor relevance, accuracy,
+                safety. Catch regressions early.
+              </p>
             </div>
 
-            {/* Feature 5: Workflow Analysis */}
-            <div className="lg:col-span-2 p-8 rounded-xl border border-border bg-linear-to-r from-babyblue-light/30 to-transparent hover:border-babyblue/30 transition-all duration-300 group">
-              <div className="flex items-start gap-4 mb-4">
-                <div className="w-12 h-12 rounded-xl bg-babyblue/10 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-200">
-                  <svg
-                    className="w-6 h-6 text-babyblue"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
-                    />
-                  </svg>
+            {/* Feature 5 */}
+            <div className="group relative p-6 border border-slate/15 bg-linear-to-br from-slate/3 to-transparent hover:border-slate/25 transition-all duration-300 shadow-sm hover:shadow-md rounded overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-0.5 bg-linear-to-r from-slate/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="flex items-start justify-between mb-4">
+                <div className="w-11 h-11 rounded-lg bg-linear-to-br from-slate/10 to-slate/5 border border-slate/20 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <span className="text-base font-bold text-foreground">∞</span>
                 </div>
-                <div className="flex-1">
-                  <h3 className="text-xl font-semibold text-foreground mb-2">
-                    Workflow Analysis
-                  </h3>
-                  <p className="text-sm text-slate mb-4">
-                    Discover patterns in how your agents execute. Identify
-                    bottlenecks, common error paths, and optimization
-                    opportunities with Sankey diagrams and heatmaps.
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <span className="px-2 py-1 text-xs font-medium bg-babyblue-light text-babyblue rounded-md">
-                      Pattern detection
-                    </span>
-                    <span className="px-2 py-1 text-xs font-medium bg-babyblue-light text-babyblue rounded-md">
-                      Bottleneck identification
-                    </span>
-                    <span className="px-2 py-1 text-xs font-medium bg-babyblue-light text-babyblue rounded-md">
-                      Error analysis
-                    </span>
-                    <span className="px-2 py-1 text-xs font-medium bg-babyblue-light text-babyblue rounded-md">
-                      Flow visualization
-                    </span>
-                  </div>
+                <span className="text-[9px] uppercase tracking-[0.12em] text-slate/40 font-bold">
+                  Analytics
+                </span>
+              </div>
+              <h3 className="text-[19px] font-semibold text-foreground mb-2.5 tracking-tight group-hover:text-slate transition-colors">
+                Workflow Analysis
+              </h3>
+              <p className="text-[14px] text-slate/70 leading-relaxed font-light">
+                Understand patterns across thousands of traces. Find bottlenecks
+                and errors. Optimize systematically.
+              </p>
+            </div>
+
+            {/* Feature 6 - Highlight */}
+            <div className="group relative p-6 border-2 border-babyblue/40 bg-linear-to-br from-babyblue/5 to-babyblue/2 shadow-md hover:shadow-lg transition-all duration-300 rounded overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-linear-to-r from-babyblue via-accent-teal to-accent-purple" />
+              <div className="flex items-start justify-between mb-4">
+                <div className="w-11 h-11 rounded-lg bg-linear-to-br from-babyblue/20 to-babyblue/10 border-2 border-babyblue/40 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <span className="text-base font-bold text-babyblue">→</span>
+                </div>
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-linear-to-r from-babyblue/15 to-babyblue/5 border border-babyblue/30">
+                  <div className="w-1.5 h-1.5 rounded-full bg-babyblue animate-pulse shadow-sm shadow-babyblue/50" />
+                  <span className="text-[9px] uppercase tracking-[0.12em] text-babyblue font-bold">
+                    Soon
+                  </span>
                 </div>
               </div>
+              <h3 className="text-[19px] font-semibold text-foreground mb-2.5 tracking-tight">
+                Prompt Playground
+              </h3>
+              <p className="text-[14px] text-slate/70 leading-relaxed font-light">
+                Test prompts directly in the dashboard. Compare outputs across
+                models and versions. Iterate faster.
+              </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Technical Deep Dive */}
-      <section className="py-20 bg-slate/5 border-y border-border">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl lg:text-4xl font-bold text-foreground mb-4">
-              Built for production
+      {/* System Architecture */}
+      <section className="py-16 border-t border-slate/10 bg-linear-to-b from-transparent to-slate/2">
+        <div className="max-w-6xl mx-auto px-8">
+          <div className="mb-12">
+            <div className="inline-flex items-center gap-2 mb-3">
+              <div className="w-1 h-1 rounded-full bg-slate/50" />
+              <span className="text-[10px] uppercase tracking-[0.15em] text-slate/50 font-bold">
+                Technical
+              </span>
+            </div>
+            <h2 className="text-[38px] font-bold text-foreground mb-3 tracking-tight leading-[1.15]">
+              Enterprise infrastructure
             </h2>
-            <p className="text-lg text-slate max-w-2xl mx-auto">
-              Enterprise-grade infrastructure that scales with your needs
+            <p className="text-[16px] text-slate/70 max-w-[560px] font-light leading-relaxed">
+              Production-grade architecture designed to scale with your team and
+              workload.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="text-center">
-              <div className="w-16 h-16 rounded-2xl bg-babyblue/10 border border-babyblue/20 flex items-center justify-center mx-auto mb-4">
-                <svg
-                  className="w-8 h-8 text-babyblue"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M13 10V3L4 14h7v7l9-11h-7z"
-                  />
-                </svg>
+          <div className="grid md:grid-cols-3 gap-5">
+            <div className="relative p-6 pl-5 border-l-3 border-babyblue/30 bg-linear-to-br from-babyblue/2 to-transparent rounded-r shadow-sm">
+              <div className="absolute top-0 left-0 w-0.5 h-full bg-linear-to-b from-babyblue to-transparent" />
+              <div className="text-[10px] uppercase tracking-[0.12em] text-babyblue font-bold mb-3">
+                Performance
               </div>
-              <h3 className="text-lg font-semibold text-foreground mb-2">
-                Zero Latency Impact
+              <h3 className="text-[19px] font-semibold text-foreground mb-2.5 tracking-tight">
+                Async processing
               </h3>
-              <p className="text-sm text-slate">
-                Async batching and background processing means your agents run
-                at full speed
+              <p className="text-[14px] text-slate/70 leading-relaxed font-light">
+                Background workers send data without blocking your agent. Zero
+                performance impact on production.
               </p>
             </div>
 
-            <div className="text-center">
-              <div className="w-16 h-16 rounded-2xl bg-accent-teal/10 border border-accent-teal/20 flex items-center justify-center mx-auto mb-4">
-                <svg
-                  className="w-8 h-8 text-accent-teal"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                  />
-                </svg>
+            <div className="relative p-6 pl-5 border-l-3 border-success/30 bg-linear-to-br from-success/2 to-transparent rounded-r shadow-sm">
+              <div className="absolute top-0 left-0 w-0.5 h-full bg-linear-to-b from-success to-transparent" />
+              <div className="text-[10px] uppercase tracking-[0.12em] text-success font-bold mb-3">
+                Security
               </div>
-              <h3 className="text-lg font-semibold text-foreground mb-2">
-                Secure by Default
+              <h3 className="text-[19px] font-semibold text-foreground mb-2.5 tracking-tight">
+                Secure by design
               </h3>
-              <p className="text-sm text-slate">
-                End-to-end encryption, SOC 2 compliant infrastructure, and
-                granular access controls
+              <p className="text-[14px] text-slate/70 leading-relaxed font-light">
+                End-to-end encryption for all data. Granular access controls.
+                SOC 2 Type II compliant.
               </p>
             </div>
 
-            <div className="text-center">
-              <div className="w-16 h-16 rounded-2xl bg-accent-purple/10 border border-accent-purple/20 flex items-center justify-center mx-auto mb-4">
-                <svg
-                  className="w-8 h-8 text-accent-purple"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"
-                  />
-                </svg>
+            <div className="relative p-6 pl-5 border-l-3 border-accent-teal/30 bg-linear-to-br from-accent-teal/2 to-transparent rounded-r shadow-sm">
+              <div className="absolute top-0 left-0 w-0.5 h-full bg-linear-to-b from-accent-teal to-transparent" />
+              <div className="text-[10px] uppercase tracking-[0.12em] text-accent-teal font-bold mb-3">
+                Storage
               </div>
-              <h3 className="text-lg font-semibold text-foreground mb-2">
-                Optimized Storage
+              <h3 className="text-[19px] font-semibold text-foreground mb-2.5 tracking-tight">
+                Smart storage
               </h3>
-              <p className="text-sm text-slate">
-                Large prompts in S3, metadata in PostgreSQL, and TimescaleDB for
-                time-series
+              <p className="text-[14px] text-slate/70 leading-relaxed font-light">
+                Large prompts in S3, structured data in Postgres, time-series in
+                TimescaleDB. Optimized for every use case.
               </p>
             </div>
           </div>
@@ -524,79 +558,187 @@ export default function Home() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20">
-        <div className="max-w-4xl mx-auto px-6 text-center">
-          <h2 className="text-3xl lg:text-4xl font-bold text-foreground mb-4">
-            Ready to see what your agents are doing?
-          </h2>
-          <p className="text-lg text-slate mb-8">
-            Install the SDK in minutes and get instant visibility into your AI
-            workflows
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link
-              href="/dashboard"
-              className="px-8 py-4 bg-babyblue text-white rounded-lg font-semibold hover:bg-babyblue/90 transition-all duration-200 hover:-translate-y-0.5 shadow-lg hover:shadow-xl"
-            >
-              Start Monitoring Now
-            </Link>
-            <button className="px-8 py-4 border border-border rounded-lg font-semibold text-foreground hover:bg-slate/5 transition-colors duration-200">
-              Read Documentation
-            </button>
+      <section className="py-16 border-t border-slate/10">
+        <div className="max-w-5xl mx-auto px-8">
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center gap-2 mb-3 justify-center">
+              <div className="w-1 h-1 rounded-full bg-babyblue" />
+              <span className="text-[10px] uppercase tracking-[0.15em] text-babyblue font-bold">
+                Quick Start
+              </span>
+            </div>
+            <h2 className="text-[38px] font-bold text-foreground mb-3 tracking-tight leading-[1.15]">
+              Start tracing in 30 seconds
+            </h2>
+            <p className="text-[16px] text-slate/70 font-light">
+              Install the SDK and instrument your first agent. No configuration
+              required.
+            </p>
           </div>
 
           {/* Code snippet */}
-          <div className="mt-12 p-6 rounded-xl border border-border bg-slate/5 text-left max-w-2xl mx-auto">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-semibold text-slate uppercase tracking-wide">
-                Quick Start
-              </span>
-              <button className="text-xs text-babyblue hover:text-babyblue/80 font-medium">
-                Copy
-              </button>
+          <div className="max-w-3xl mx-auto mb-10">
+            <div className="relative p-6 border border-slate/15 bg-linear-to-br from-slate/3 to-babyblue/2 shadow-md rounded overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-linear-to-r from-babyblue via-accent-teal to-accent-purple" />
+              <div className="flex items-center justify-between mb-5 pb-4 border-b border-slate/10">
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] font-semibold text-slate/50 uppercase tracking-wider">
+                    Terminal
+                  </span>
+                  <span className="text-[10px] text-slate/40">•</span>
+                  <span className="text-[10px] text-babyblue font-medium">
+                    setup.py
+                  </span>
+                </div>
+                <button className="text-[10px] text-babyblue hover:text-babyblue/80 font-semibold uppercase tracking-wider transition-colors duration-200">
+                  Copy
+                </button>
+              </div>
+              <div className="font-mono text-[14px] space-y-4">
+                <div>
+                  <span className="text-slate/40">$ </span>
+                  <span className="text-foreground font-medium">
+                    pip install orbis-sdk
+                  </span>
+                </div>
+                <div className="pt-3 space-y-1.5">
+                  <div>
+                    <span className="text-accent-teal">from</span>{" "}
+                    <span className="text-foreground">orbis</span>{" "}
+                    <span className="text-accent-teal">import</span>{" "}
+                    <span className="text-foreground">observe</span>
+                  </div>
+                  <div className="text-slate/40">
+                    <br />
+                  </div>
+                  <div>
+                    <span className="text-babyblue font-semibold">
+                      @observe()
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-accent-teal">def</span>{" "}
+                    <span className="text-foreground font-medium">
+                      my_agent
+                    </span>
+                    <span className="text-slate/60">(query: str):</span>
+                  </div>
+                  <div className="pl-4 text-slate/40">
+                    # Automatically traced with full context
+                  </div>
+                  <div className="pl-4">
+                    <span className="text-accent-teal">return</span>{" "}
+                    <span className="text-foreground">process</span>
+                    <span className="text-slate/60">(query)</span>
+                  </div>
+                </div>
+              </div>
             </div>
-            <code className="text-sm font-mono text-foreground block">
-              <span className="text-accent-purple">pip install</span> orbis-sdk
-              <br />
-              <br />
-              <span className="text-accent-teal">from</span> orbis{" "}
-              <span className="text-accent-teal">import</span> observe
-              <br />
-              <br />
-              <span className="text-babyblue">@observe()</span>
-              <br />
-              <span className="text-accent-teal">def</span>{" "}
-              <span className="text-mustard">my_agent</span>():
-              <br />
-              &nbsp;&nbsp;
-              <span className="text-slate/60"># Your agent code here</span>
-              <br />
-              &nbsp;&nbsp;
-              <span className="text-accent-teal">return</span> result
-            </code>
+          </div>
+
+          <div className="flex items-center justify-center gap-4">
+            <Link
+              href="/dashboard"
+              className="px-7 py-3 bg-foreground text-background font-medium text-sm hover:bg-foreground/90 transition-all duration-200 shadow-sm hover:shadow-md"
+            >
+              View Dashboard
+            </Link>
+            <a
+              href="#features"
+              className="px-7 py-3 border border-slate/20 font-medium text-sm text-foreground hover:bg-slate/5 transition-colors duration-200"
+            >
+              Explore Features
+            </a>
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border bg-card py-12">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 bg-linear-to-br from-babyblue to-accent-teal rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-lg">O</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-base font-semibold text-foreground leading-none">
+      <footer className="border-t border-slate/10 py-16">
+        <div className="max-w-6xl mx-auto px-8">
+          <div className="flex items-start justify-between mb-10">
+            <div>
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-7 h-7 bg-linear-to-br from-babyblue to-babyblue/80 rounded-md flex items-center justify-center shadow-sm">
+                  <div className="w-3 h-3 border-2 border-white rounded-sm" />
+                </div>
+                <span className="text-lg font-semibold text-foreground tracking-tight">
                   Orbis
                 </span>
-                <span className="text-[9px] text-slate/70 font-medium uppercase tracking-widest">
-                  Observability
-                </span>
+              </div>
+              <p className="text-sm text-slate/70 max-w-xs">
+                Observability for AI agents. Every call traced, every dollar
+                tracked.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-12">
+              <div>
+                <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider mb-3">
+                  Product
+                </h4>
+                <ul className="space-y-2 text-sm">
+                  <li>
+                    <a
+                      href="#features"
+                      className="text-slate/70 hover:text-babyblue transition-colors duration-200"
+                    >
+                      Features
+                    </a>
+                  </li>
+                  <li>
+                    <Link
+                      href="/dashboard"
+                      className="text-slate/70 hover:text-babyblue transition-colors duration-200"
+                    >
+                      Dashboard
+                    </Link>
+                  </li>
+                  <li>
+                    <a
+                      href="#"
+                      className="text-slate/70 hover:text-babyblue transition-colors duration-200"
+                    >
+                      Documentation
+                    </a>
+                  </li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider mb-3">
+                  Resources
+                </h4>
+                <ul className="space-y-2 text-sm">
+                  <li>
+                    <a
+                      href="#"
+                      className="text-slate/70 hover:text-babyblue transition-colors duration-200"
+                    >
+                      GitHub
+                    </a>
+                  </li>
+                  <li>
+                    <a
+                      href="#"
+                      className="text-slate/70 hover:text-babyblue transition-colors duration-200"
+                    >
+                      Examples
+                    </a>
+                  </li>
+                  <li>
+                    <a
+                      href="#"
+                      className="text-slate/70 hover:text-babyblue transition-colors duration-200"
+                    >
+                      Support
+                    </a>
+                  </li>
+                </ul>
               </div>
             </div>
-            <p className="text-sm text-slate">
-              © 2025 Orbis. Built for AI developers.
+          </div>
+          <div className="pt-8 border-t border-slate/10">
+            <p className="text-xs text-slate/60">
+              © 2025 Orbis. Built for developers who ship AI agents.
             </p>
           </div>
         </div>
