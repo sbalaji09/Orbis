@@ -56,10 +56,10 @@ export default function Home() {
               <h1 className="text-[54px] font-bold text-foreground mb-5 leading-[1.08] tracking-[-0.03em]">
                 Know what your{" "}
                 <span className="relative inline-block">
-                  <span className="text-babyblue italic font-serif">
+                  <span className="text-mustard italic font-bold font-serif">
                     AI agents
                   </span>
-                  <div className="absolute -bottom-1 left-0 w-full h-1 bg-linear-to-r from-babyblue/30 via-babyblue/50 to-transparent" />
+                  <div className="absolute -bottom-1 left-0 w-full h-1 bg-linear-to-r from-mustard/30 via-mustard/50 to-transparent" />
                 </span>{" "}
                 are doing
               </h1>

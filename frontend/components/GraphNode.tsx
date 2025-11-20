@@ -162,7 +162,7 @@ export default function GraphNode({
                     d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                   />
                 </svg>
-                <span className="font-mono font-medium">
+                <span className="font-mono font-semibold">
                   {formatDuration(span.duration)}
                 </span>
               </div>
@@ -287,7 +287,7 @@ export default function GraphNode({
                           <span className="text-[10px] font-medium text-muted uppercase tracking-wide">
                             Duration
                           </span>
-                          <span className="text-lg font-semibold text-foreground font-mono">
+                          <span className="text-lg text-foreground font-mono">
                             {formatDuration(span.duration)}
                           </span>
                         </div>
@@ -295,7 +295,7 @@ export default function GraphNode({
                           <span className="text-[10px] font-medium text-muted uppercase tracking-wide">
                             Cost
                           </span>
-                          <span className="text-lg font-semibold text-mustard font-mono">
+                          <span className="text-lg text-mustard font-mono">
                             {formatCost(span.cost)}
                           </span>
                         </div>
@@ -329,7 +329,7 @@ export default function GraphNode({
                               <span className="text-[10px] font-medium text-muted uppercase tracking-wide">
                                 Prompt
                               </span>
-                              <span className="text-base font-semibold text-foreground font-mono">
+                              <span className="text-base text-foreground font-mono">
                                 {span.prompt_tokens?.toLocaleString() || 0}
                               </span>
                             </div>
@@ -340,7 +340,7 @@ export default function GraphNode({
                               <span className="text-[10px] font-medium text-muted uppercase tracking-wide">
                                 Completion
                               </span>
-                              <span className="text-base font-semibold text-foreground font-mono">
+                              <span className="text-base text-foreground font-mono">
                                 {span.completion_tokens?.toLocaleString() || 0}
                               </span>
                             </div>
@@ -351,7 +351,7 @@ export default function GraphNode({
                               <span className="text-[10px] font-medium text-muted uppercase tracking-wide">
                                 Total
                               </span>
-                              <span className="text-base font-semibold text-foreground font-mono">
+                              <span className="text-base text-foreground font-mono">
                                 {(
                                   (span.prompt_tokens || 0) +
                                   (span.completion_tokens || 0)
