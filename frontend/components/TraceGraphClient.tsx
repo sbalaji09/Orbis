@@ -137,10 +137,12 @@ function Edge({ from, to }: Edge) {
 
   const arrowheadSize = 8;
 
-  const fromX = from.x + cos * (fromT + gap);
-  const fromY = from.y + sin * (fromT + gap);
-  const toX = to.x - cos * (toT + gap + arrowheadSize);
-  const toY = to.y - sin * (toT + gap + arrowheadSize);
+  const fromX = Math.round((from.x + cos * (fromT + gap)) * 100) / 100;
+  const fromY = Math.round((from.y + sin * (fromT + gap)) * 100) / 100;
+  const toX =
+    Math.round((to.x - cos * (toT + gap + arrowheadSize)) * 100) / 100;
+  const toY =
+    Math.round((to.y - sin * (toT + gap + arrowheadSize)) * 100) / 100;
 
   const path = `M ${fromX} ${fromY} L ${toX} ${toY}`;
 

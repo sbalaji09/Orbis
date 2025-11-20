@@ -18,8 +18,9 @@ interface GraphNodeProps {
 
 function formatDuration(duration: number | null): string {
   if (duration === null) return "N/A";
-  if (duration < 1) return `${(duration * 1000).toFixed(0)}ms`;
-  return `${duration.toFixed(2)}s`;
+  if (duration < 1) return `${duration.toFixed(2)}ms`;
+  if (duration < 1000) return `${duration.toFixed(0)}ms`;
+  return `${(duration / 1000).toFixed(3)}s`;
 }
 
 function formatCost(cost: number | null): string {
