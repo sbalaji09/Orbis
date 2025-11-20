@@ -18,6 +18,7 @@ class OrbisCallbackHandler(BaseCallbackHandler):
     def __init__(self):
         super().__init__()
         self.active_spans: Dict[str, Span] = {}
+        self.span_stack: List[str] = []
 
     # chain callbacks
     def on_chain_start(
