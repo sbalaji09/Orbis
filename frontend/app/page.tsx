@@ -1,3 +1,4 @@
+import { Logo } from "@/components/Logo";
 import Link from "next/link";
 
 export default function Home() {
@@ -6,10 +7,9 @@ export default function Home() {
       {/* Navigation */}
       <nav className="border-b border-slate/10 bg-background/95 backdrop-blur sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-8 py-5 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-7 h-7 bg-linear-to-br from-babyblue to-babyblue/80 rounded-md flex items-center justify-center shadow-sm">
-              <div className="w-3 h-3 border-2 border-white rounded-sm" />
-            </div>
+          <div className="flex items-center">
+            {/* <div className="w-3 h-3 border-2 border-white rounded-sm" /> */}
+            <Logo className="w-16 h-16" />
             <span className="text-lg font-semibold text-foreground tracking-tight">
               Orbis
             </span>
