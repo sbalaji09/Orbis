@@ -95,9 +95,12 @@ export function TraceRow({ trace }: { trace: Trace }) {
             <span>{trace.total_tokens?.toLocaleString() || 0}</span>
           </div>
           <div className="text-xs text-muted min-w-[60px] text-right">
-            {new Date(trace.start_time).toLocaleTimeString([], {
+            {new Date(trace.start_time + "Z").toLocaleString([], {
               hour: "2-digit",
               minute: "2-digit",
+              month: "2-digit",
+              day: "2-digit",
+              year: "numeric",
             })}
           </div>
         </div>

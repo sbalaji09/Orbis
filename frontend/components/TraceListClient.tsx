@@ -136,10 +136,13 @@ export function TraceListClient({
                                   </div>
                                   <p className="text-[10px] text-muted mb-1.5 font-mono">
                                     {new Date(
-                                      trace.start_time
+                                      trace.start_time + "Z"
                                     ).toLocaleTimeString([], {
                                       hour: "2-digit",
                                       minute: "2-digit",
+                                      month: "2-digit",
+                                      day: "2-digit",
+                                      year: "numeric",
                                     })}
                                   </p>
                                   <div className="flex items-center gap-2 text-[10px]">

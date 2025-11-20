@@ -28,7 +28,7 @@ function formatCost(cost: number | null): string {
 }
 
 function formatDate(date: Date): string {
-  return new Date(date).toLocaleString();
+  return new Date(date.toString() + "Z").toLocaleString();
 }
 
 interface DraggableGraphNodeProps extends GraphNodeProps {
