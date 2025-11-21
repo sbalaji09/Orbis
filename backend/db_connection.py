@@ -481,6 +481,15 @@ class SupabaseDB:
         conn = self.get_connection()
         try:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # First get the API key before deleting
+                sql_get = """
+                    SELECT api_key FROM agents
+                    WHERE user_id = %s AND agent_id = %s
+                """
+                cur.execute(sql_get, (user_id, agent_id))
+                result = cur.fetchone()
+                api_key = result['api_key'] if result else None
+
                 sql = """
                     DELETE FROM agents
                     WHERE user_id = %s
@@ -488,7 +497,7 @@ class SupabaseDB:
                 """
                 cur.execute(sql, (user_id, agent_id))
                 conn.commit()
-                return "Successfully deleted agent"
+                return {"message": "Successfully deleted agent", "api_key": api_key}
         finally:
             self.return_connection(conn)
 
