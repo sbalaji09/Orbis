@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { Agent, Trace } from "@/lib/types";
 import {
   Disclosure,
@@ -16,6 +16,7 @@ export function TraceListClient({
   traces: Trace[];
 }) {
   const router = useRouter();
+  const pathname = usePathname();
 
   // Group traces by agent
   const tracesByAgent = agents.map((agent) => ({
@@ -29,75 +30,113 @@ export function TraceListClient({
     <Disclosure defaultOpen={true}>
       {({ open }) => (
         <div
-          className={`bg-card border-l border-border h-full flex flex-col transition-all duration-300 ${
-            open ? "w-80" : "w-14"
-          }`}
+          className="bg-white border-l-2 border-black h-full flex flex-col overflow-hidden relative box-border"
+          style={{
+            width: open ? "224px" : "56px",
+            transition: "width 300ms ease-in-out",
+          }}
         >
-          {/* Header bar */}
+          {/* Header bar - terminal style */}
           <div
-            className={`px-4 py-3.5 border-b border-border flex items-center shrink-0 bg-babyblue/5 ${
-              open ? "justify-between" : "justify-center"
-            }`}
+            className="shrink-0 bg-[#F5F3F0] border-b-2 border-black relative"
+            style={{ height: "60px" }}
           >
-            {open && (
-              <div>
-                <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide">
-                  Traces
-                </h2>
-                <p className="text-xs text-muted mt-0.5 font-mono">
-                  {totalTraces} total
-                </p>
-              </div>
-            )}
-            <DisclosureButton className="p-1.5 hover:bg-foreground/5 rounded-md transition-colors">
-              <svg
-                className={`w-4 h-4 text-muted transition-transform ${
-                  open ? "" : "rotate-180"
-                }`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+            {/* Arrow button - absolute positioned */}
+            <div
+              className="absolute z-10"
+              style={{
+                top: "50%",
+                right: "12px",
+                transform: "translateY(-50%)",
+              }}
+            >
+              <DisclosureButton className="p-1.5 hover:bg-black/10 transition-colors rounded">
+                <svg
+                  className={`w-4 h-4 text-black transition-transform duration-300 ${
+                    open ? "" : "rotate-180"
+                  }`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2.5}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M9 5l7 7-7 7"
+                  />
+                </svg>
+              </DisclosureButton>
+            </div>
+
+            {/* Text content - fixed positioning */}
+            <div
+              className="absolute"
+              style={{
+                top: "50%",
+                left: "16px",
+                transform: "translateY(-50%)",
+                width: "240px",
+                opacity: open ? 1 : 0,
+                visibility: open ? "visible" : "hidden",
+                transition: "opacity 250ms ease-in-out, visibility 250ms",
+              }}
+            >
+              <h2
+                className="text-sm font-bold text-black uppercase tracking-wide"
+                style={{ width: "100px" }}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 5l7 7-7 7"
-                />
-              </svg>
-            </DisclosureButton>
+                {`// TRACES`}
+              </h2>
+              <p
+                className="text-[10px] text-black/50 mt-0.5 font-mono font-semibold"
+                style={{ width: "80px" }}
+              >
+                {totalTraces} active
+              </p>
+            </div>
           </div>
 
-          <DisclosurePanel className="flex-1 overflow-y-auto min-h-0">
-            <div>
+          <div
+            className="flex-1 min-h-0"
+            style={{
+              opacity: open ? 1 : 0,
+              visibility: open ? "visible" : "hidden",
+              transition: "opacity 300ms ease-in-out, visibility 300ms",
+              pointerEvents: open ? "auto" : "none",
+              overflow: "hidden",
+              width: "224px",
+            }}
+          >
+            <div className="h-full overflow-y-auto overflow-x-hidden">
               {tracesByAgent.map(({ agent, traces }) => (
                 <Disclosure key={agent.agent_id} defaultOpen={true}>
                   {({ open: agentOpen }) => (
-                    <div className="border-b border-border">
+                    <div className="border-b-2 border-black">
                       {/* Agent Header */}
-                      <DisclosureButton className="w-full px-4 py-2.5 bg-background hover:bg-babyblue/5 transition-colors">
+                      <DisclosureButton className="w-full px-4 py-3 bg-white hover:bg-[#5B5FFF]/5 transition-colors border-b-2 border-black/10">
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-2">
                             <svg
-                              className={`w-3.5 h-3.5 text-muted transition-transform ${
+                              className={`w-3 h-3 text-black/60 transition-transform ${
                                 agentOpen ? "rotate-90" : ""
                               }`}
                               fill="none"
                               stroke="currentColor"
                               viewBox="0 0 24 24"
+                              strokeWidth={2.5}
                             >
                               <path
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
-                                strokeWidth={2}
                                 d="M9 5l7 7-7 7"
                               />
                             </svg>
-                            <span className="text-xs font-sans font-semibold text-foreground lowercase tracking-wide">
+                            <span className="text-xs font-bold text-black tracking-tight">
                               {agent.agent_name}
                             </span>
                           </div>
-                          <span className="px-2 py-0.5 text-[10px] font-mono bg-mustard/10 text-mustard rounded-md border border-mustard/20">
+                          <span className="px-2 py-0.5 text-[9px] font-mono font-bold bg-black/10 text-black border border-black/20">
                             {traces.length}
                           </span>
                         </div>
@@ -105,14 +144,17 @@ export function TraceListClient({
 
                       {/* Agent Traces */}
                       <DisclosurePanel>
-                        <div className="bg-card">
+                        <div className="bg-white">
                           {traces.length === 0 ? (
-                            <div className="px-4 py-3 text-xs text-muted text-center">
-                              No traces
+                            <div className="px-4 py-4 text-xs text-black/40 text-center font-mono">
+                              {`// no traces found`}
                             </div>
                           ) : (
                             traces.map((trace) => {
                               const hasErrors = trace.status === "failed";
+                              const isActive =
+                                pathname ===
+                                `/dashboard/trace/${trace.trace_id}`;
 
                               return (
                                 <button
@@ -122,52 +164,131 @@ export function TraceListClient({
                                       `/dashboard/trace/${trace.trace_id}`
                                     )
                                   }
-                                  className="w-full px-4 py-2.5 text-left transition-all hover:bg-babyblue/8 border-b border-border/50 last:border-b-0 group"
+                                  className={`w-full py-2.5 px-3 text-left transition-all border-b border-black/10 last:border-b-0 group relative ${
+                                    isActive
+                                      ? "bg-[#5B5FFF]/10 border-l-[3px] border-l-black shadow-[inset_3px_0_0_0_rgba(0,0,0,0.1)]"
+                                      : "hover:bg-[#5B5FFF]/5 hover:border-l-4 hover:border-l-[#5B5FFF]"
+                                  }`}
                                 >
+                                  {/* Compact single-row layout */}
                                   <div className="flex items-center justify-between gap-2 mb-1.5">
-                                    <span className="font-sans text-xs font-semibold text-foreground group-hover:text-babyblue transition-colors">
-                                      #{trace.trace_id}
-                                    </span>
-                                    <div
-                                      className={`w-1.5 h-1.5 rounded-full ${
-                                        hasErrors ? "bg-error" : "bg-success"
-                                      }`}
-                                    />
+                                    {/* Left: ID + Status */}
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <span
+                                        className={`font-mono text-xs font-bold transition-colors ${
+                                          isActive
+                                            ? "text-black"
+                                            : "text-black/80 group-hover:text-[#5B5FFF]"
+                                        }`}
+                                      >
+                                        #{trace.trace_id.substring(0, 8)}
+                                      </span>
+                                      <div
+                                        className={`flex items-center gap-1 px-1.5 py-0.5 border ${
+                                          hasErrors
+                                            ? "bg-red-50 border-red-500"
+                                            : "bg-emerald-50 border-emerald-500"
+                                        }`}
+                                      >
+                                        <div
+                                          className={`w-1 h-1 ${
+                                            hasErrors
+                                              ? "bg-red-500"
+                                              : "bg-emerald-500"
+                                          }`}
+                                        />
+                                        <span
+                                          className={`text-[8px] font-bold uppercase tracking-wide ${
+                                            hasErrors
+                                              ? "text-red-600"
+                                              : "text-emerald-600"
+                                          }`}
+                                        >
+                                          {hasErrors ? "err" : "ok"}
+                                        </span>
+                                      </div>
+                                    </div>
                                   </div>
-                                  <p className="text-[10px] text-muted mb-1.5 font-mono">
+
+                                  {/* Datetime */}
+                                  <div
+                                    className={`text-[11px] font-mono font-bold mb-1.5 ${
+                                      isActive
+                                        ? "text-black/70"
+                                        : "text-black/60"
+                                    }`}
+                                  >
                                     {new Date(
                                       trace.start_time + "Z"
                                     ).toLocaleTimeString([], {
                                       hour: "2-digit",
                                       minute: "2-digit",
+                                    })}{" "}
+                                    {new Date(
+                                      trace.start_time + "Z"
+                                    ).toLocaleDateString([], {
                                       month: "2-digit",
                                       day: "2-digit",
-                                      year: "numeric",
                                     })}
-                                  </p>
-                                  <div className="flex items-center gap-2 text-[10px]">
-                                    <div className="flex items-center gap-1 text-muted font-mono font-semibold">
+                                  </div>
+
+                                  {/* Metrics - compact */}
+                                  <div
+                                    className={`flex items-center gap-2.5 text-[9px] pt-1.5 ${
+                                      isActive
+                                        ? "border-t border-black/20"
+                                        : "border-t border-black/5"
+                                    }`}
+                                  >
+                                    <div
+                                      className={`flex items-center gap-1 ${
+                                        isActive
+                                          ? "text-black/70"
+                                          : "text-black/60"
+                                      }`}
+                                    >
                                       <svg
-                                        className="w-3 h-3"
+                                        className="w-2.5 h-2.5 opacity-50"
                                         fill="none"
                                         stroke="currentColor"
                                         viewBox="0 0 24 24"
+                                        strokeWidth={2}
                                       >
                                         <path
                                           strokeLinecap="round"
                                           strokeLinejoin="round"
-                                          strokeWidth={2}
                                           d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                                         />
                                       </svg>
-                                      <span>
+                                      <span className="font-mono font-bold">
                                         {(trace.duration / 1000).toFixed(1)}s
                                       </span>
                                     </div>
-                                    <span className="text-border">•</span>
-                                    <span className="text-mustard font-mono font-semibold">
-                                      ${(trace.total_cost || 0).toFixed(4)}
-                                    </span>
+                                    <span className="text-black/20">•</span>
+                                    <div
+                                      className={`flex items-center gap-1 ${
+                                        isActive
+                                          ? "text-black/70"
+                                          : "text-black/60"
+                                      }`}
+                                    >
+                                      <svg
+                                        className="w-2.5 h-2.5 opacity-50"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                        strokeWidth={2}
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                        />
+                                      </svg>
+                                      <span className="font-mono font-bold">
+                                        ${(trace.total_cost || 0).toFixed(4)}
+                                      </span>
+                                    </div>
                                   </div>
                                 </button>
                               );
@@ -180,7 +301,7 @@ export function TraceListClient({
                 </Disclosure>
               ))}
             </div>
-          </DisclosurePanel>
+          </div>
         </div>
       )}
     </Disclosure>

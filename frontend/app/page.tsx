@@ -22,9 +22,9 @@ export default function Home() {
       <nav className="border-b border-black/10 bg-background/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-12">
-            <div className="flex items-center gap-3">
-              <Logo className="w-10 h-10" />
-              <span className="tracking-tight">$ orbis.ai</span>
+            <div className="flex items-center">
+              <Logo className="w-12 h-12" />
+              <span className="tracking-tight font-semibold">$ orbis.ai</span>
             </div>
             <div className="hidden md:flex items-center gap-8">
               <a
