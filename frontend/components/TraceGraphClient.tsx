@@ -90,14 +90,14 @@ function ArrowMarker() {
       {/* Arrowhead marker */}
       <marker
         id="arrowhead"
-        markerWidth="10"
-        markerHeight="10"
-        refX="8"
-        refY="5"
+        markerWidth="6"
+        markerHeight="6"
+        refX="6"
+        refY="3"
         orient="auto"
         markerUnits="strokeWidth"
       >
-        <polygon points="0,0 0,10 10,5" fill="#cbdceb" stroke="none" />
+        <polygon points="0,0 0,6 6,3" fill="#000000" stroke="none" />
       </marker>
     </defs>
   );
@@ -150,12 +150,12 @@ function Edge({ from, to }: Edge) {
     <g>
       <path
         d={path}
-        stroke="#cbdceb"
-        strokeWidth="2"
+        stroke="#000000"
+        strokeWidth="2.5"
         fill="none"
         markerEnd="url(#arrowhead)"
         strokeLinecap="round"
-        opacity="0.7"
+        opacity="0.8"
       />
     </g>
   );

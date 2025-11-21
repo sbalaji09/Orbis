@@ -3,12 +3,12 @@
 
 :root {
   --background: #f5f3f0;
-  --foreground: #000000;
+  --foreground: #0c0f0a;
   --babyblue: #5b5fff;
   --babyblue-light: #e8f2f8;
   --mustard: #ffd600;
   --slate: #475569;
-  --border: #000000;
+  --border: #0c0f0a;
   --card: #ffffff;
   --muted: #64748b;
   --success: #4caf50;
@@ -35,6 +35,7 @@
   --color-accent-purple: var(--accent-purple);
   --color-accent-teal: var(--accent-teal);
   --color-green: var(--green);
+  --color-black: var(--foreground);
   --font-mono: "JetBrains Mono", "Fira Code", "Consolas", "Monaco",
     "Courier New", monospace;
   --font-sans: "Zalando Sans", -apple-system, BlinkMacSystemFont, "Segoe UI",

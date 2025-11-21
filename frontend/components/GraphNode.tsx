@@ -105,32 +105,43 @@ export default function GraphNode({
     <>
       <div className="relative inline-block">
         <button
-          className={`group relative w-[200px] rounded-lg border bg-card text-left overflow-hidden
-            focus:outline-none focus:ring-2 focus:ring-babyblue/30 focus:ring-offset-2
+          className={`group relative w-[200px] border-2 border-black bg-white text-left overflow-hidden
+            focus:outline-none focus:ring-2 focus:ring-[#FFD600] focus:ring-offset-2
             ${
               isDragging
-                ? "cursor-grabbing shadow-xl border-slate/40 scale-[1.02]"
-                : "cursor-grab hover:border-slate/30 hover:shadow-lg hover:-translate-y-px border-border shadow-sm"
+                ? "cursor-grabbing shadow-[8px_8px_0_rgba(0,0,0,0.2)] scale-[1.02]"
+                : "cursor-grab hover:shadow-[6px_6px_0_rgba(0,0,0,0.2)] shadow-[4px_4px_0_rgba(0,0,0,0.15)]"
             }
             transition-all duration-300 ease-in-out`}
           onMouseDown={handleMouseDown}
           onMouseEnter={() => setShowTooltip(true)}
           onMouseLeave={() => setShowTooltip(false)}
         >
-          {/* Status accent stripe */}
-          <div className={`h-0.5 ${status.dot} transition-all duration-300`} />
+          {/* Terminal-style colored top bar */}
+          <div
+            className={`h-6 ${status.dot} border-b-2 border-black flex items-center px-2 gap-1`}
+          >
+            <div className="w-2 h-2 rounded-full bg-white/30"></div>
+            <div className="w-2 h-2 rounded-full bg-white/30"></div>
+            <div className="w-2 h-2 rounded-full bg-white/30"></div>
+          </div>
 
           {/* Content */}
           <div className="p-3">
             {/* Header: Name + Status */}
             <div className="flex items-start justify-between gap-2 mb-2">
-              <h3 className="text-xs font-semibold text-foreground leading-tight truncate flex-1 transition-colors duration-200">
+              <h3 className="text-xs font-semibold tracking-tight leading-tight truncate flex-1 transition-colors duration-200">
                 {span.name}
               </h3>
               <div
-                className={`flex items-center gap-1 px-1.5 py-0.5 rounded ${status.bg} shrink-0 transition-transform duration-200`}
+                className={`flex items-center gap-1 px-1.5 py-0.5 border ${
+                  status.bg
+                } ${status.dot.replace(
+                  "bg-",
+                  "border-"
+                )} shrink-0 transition-transform duration-200`}
               >
-                <div className={`w-1 h-1 rounded-full ${status.dot}`} />
+                <div className={`w-1 h-1 ${status.dot}`} />
                 <span
                   className={`text-[8px] font-bold uppercase tracking-wide ${status.text}`}
                 >
@@ -141,14 +152,14 @@ export default function GraphNode({
 
             {/* Model - only show if exists */}
             {span.llm_model && (
-              <div className="text-[9px] text-slate/80 font-medium mb-2 truncate">
-                {span.llm_model}
+              <div className="text-[9px] text-black/60 font-medium mb-2 truncate">
+                {`// ${span.llm_model}`}
               </div>
             )}
 
             {/* Metrics - clean inline layout */}
-            <div className="flex items-center gap-3 text-[9px] pt-2 border-t border-border/60">
-              <div className="flex items-center gap-1 text-slate">
+            <div className="flex items-center gap-3 text-[9px] pt-2 border-t-2 border-black/10">
+              <div className="flex items-center gap-1 text-black/60">
                 <svg
                   className="w-3 h-3 opacity-50 transition-opacity duration-200 group-hover:opacity-70"
                   fill="none"
@@ -168,7 +179,7 @@ export default function GraphNode({
               </div>
 
               {span.cost !== null && (
-                <div className="flex items-center gap-1 text-mustard ml-auto">
+                <div className="flex items-center gap-1 text-[#FFD600] ml-auto">
                   <svg
                     className="w-3 h-3 opacity-70 transition-opacity duration-200 group-hover:opacity-90"
                     fill="none"
@@ -193,8 +204,8 @@ export default function GraphNode({
 
         {/* Tooltip */}
         {showTooltip && !isDragging && (
-          <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md bg-foreground/95 px-2.5 py-1.5 shadow-lg pointer-events-none z-50">
-            <div className="flex items-center gap-1.5 text-[9px] text-white/90 font-mono">
+          <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 -translate-y-full whitespace-nowrap bg-black border-2 border-black px-2.5 py-1.5 shadow-[4px_4px_0_rgba(0,0,0,0.2)] pointer-events-none z-50">
+            <div className="flex items-center gap-1.5 text-[9px] text-[#FFD600] font-mono">
               <span className="opacity-60">ID</span>
               <span className="font-semibold">{span.span_id}</span>
             </div>
@@ -228,7 +239,7 @@ export default function GraphNode({
                 leaveFrom="opacity-100 scale-100"
                 leaveTo="opacity-0 scale-95"
               >
-                <DialogPanel className="w-full max-w-2xl max-h-[90vh] overflow-hidden rounded-2xl border border-border bg-card text-sm text-foreground shadow-2xl flex flex-col">
+                <DialogPanel className="w-full max-w-2xl max-h-[90vh] overflow-hidden border-2 border-black bg-white text-sm shadow-[8px_8px_0_rgba(0,0,0,0.2)] flex flex-col">
                   {/* Header */}
                   <div className="flex items-start justify-between gap-4 px-6 py-4 border-b border-border bg-linear-to-r from-babyblue/5 to-transparent">
                     <div className="min-w-0 flex-1 space-y-1">
@@ -279,36 +290,36 @@ export default function GraphNode({
                   <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
                     {/* Timing Information */}
                     <div className="space-y-3">
-                      <h4 className="text-xs font-semibold text-muted uppercase tracking-wide">
-                        Performance
+                      <h4 className="text-xs font-semibold text-black/40 uppercase tracking-wide">
+                        {`/* Performance */`}
                       </h4>
                       <div className="grid grid-cols-2 gap-3">
-                        <div className="flex flex-col gap-1 p-3 rounded-lg bg-babyblue/5 border border-babyblue/20">
-                          <span className="text-[10px] font-medium text-muted uppercase tracking-wide">
+                        <div className="flex flex-col gap-1 p-3 bg-white border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.1)]">
+                          <span className="text-[10px] font-medium text-black/60 uppercase tracking-wide">
                             Duration
                           </span>
-                          <span className="text-lg text-foreground font-mono">
+                          <span className="text-lg font-mono">
                             {formatDuration(span.duration)}
                           </span>
                         </div>
-                        <div className="flex flex-col gap-1 p-3 rounded-lg bg-mustard/5 border border-mustard/20">
-                          <span className="text-[10px] font-medium text-muted uppercase tracking-wide">
+                        <div className="flex flex-col gap-1 p-3 bg-[#FFD600]/10 border-2 border-[#FFD600] shadow-[2px_2px_0_rgba(0,0,0,0.1)]">
+                          <span className="text-[10px] font-medium text-black/60 uppercase tracking-wide">
                             Cost
                           </span>
-                          <span className="text-lg text-mustard font-mono">
+                          <span className="text-lg text-[#FFD600] font-mono">
                             {formatCost(span.cost)}
                           </span>
                         </div>
                       </div>
-                      <div className="text-[11px] text-muted space-y-1 pt-2 border-t border-border">
+                      <div className="text-[11px] text-black/60 space-y-1 pt-2 border-t-2 border-black/10">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium w-12">Start</span>
+                          <span className="font-medium w-12">{`// Start`}</span>
                           <span className="font-mono">
                             {formatDate(span.start_time)}
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="font-medium w-12">End</span>
+                          <span className="font-medium w-12">{`// End`}</span>
                           <span className="font-mono">
                             {formatDate(span.end_time)}
                           </span>
@@ -320,27 +331,27 @@ export default function GraphNode({
                     {(span.prompt_tokens !== null ||
                       span.completion_tokens !== null) && (
                       <div className="space-y-3">
-                        <h4 className="text-xs font-semibold text-muted uppercase tracking-wide">
-                          Token Usage
+                        <h4 className="text-xs font-semibold text-black/40 uppercase tracking-wide">
+                          {`/* Token Usage */`}
                         </h4>
                         <div className="flex items-center gap-3">
-                          <div className="flex-1 flex items-center gap-2 p-3 rounded-lg bg-background">
+                          <div className="flex-1 flex items-center gap-2 p-3 bg-white border-2 border-black">
                             <div className="flex flex-col gap-0.5">
-                              <span className="text-[10px] font-medium text-muted uppercase tracking-wide">
+                              <span className="text-[10px] font-medium text-black/60 uppercase tracking-wide">
                                 Prompt
                               </span>
-                              <span className="text-base text-foreground font-mono">
+                              <span className="text-base font-mono">
                                 {span.prompt_tokens?.toLocaleString() || 0}
                               </span>
                             </div>
                           </div>
-                          <div className="text-muted text-sm">+</div>
-                          <div className="flex-1 flex items-center gap-2 p-3 rounded-lg bg-background">
+                          <div className="text-black/60 text-sm">+</div>
+                          <div className="flex-1 flex items-center gap-2 p-3 bg-white border-2 border-black">
                             <div className="flex flex-col gap-0.5">
-                              <span className="text-[10px] font-medium text-muted uppercase tracking-wide">
+                              <span className="text-[10px] font-medium text-black/60 uppercase tracking-wide">
                                 Completion
                               </span>
-                              <span className="text-base text-foreground font-mono">
+                              <span className="text-base font-mono">
                                 {span.completion_tokens?.toLocaleString() || 0}
                               </span>
                             </div>

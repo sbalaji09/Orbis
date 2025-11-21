@@ -17,9 +17,9 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F5F3F0]">
+    <div className="min-h-screen bg-background">
       {/* Navigation */}
-      <nav className="border-b border-black/10 bg-[#F5F3F0]/80 backdrop-blur-sm sticky top-0 z-50">
+      <nav className="border-b border-black/10 bg-background/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-12">
             <div className="flex items-center gap-3">
@@ -98,7 +98,7 @@ export default function Home() {
         </div>
 
         {/* DAG Animation */}
-        <div className="text-center mb-12">
+        <div className="text-center">
           <div className="text-xs mb-4 text-black/40 tracking-[0.15em] uppercase">{`/* LIVE EXECUTION VISUALIZATION */`}</div>
           <h2 className="text-2xl tracking-tight mb-8 text-black/60">
             {`// Watch your agent workflow come to life`}
