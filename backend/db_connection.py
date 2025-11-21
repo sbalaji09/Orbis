@@ -58,15 +58,16 @@ class SupabaseDB:
                 if trace_data.get('agent_id') is not None:
                     sql = """
                         INSERT INTO traces (
-                            trace_id, user_id, agent_id, start_time, status,
+                            trace_id, trace_hash_id, user_id, agent_id, start_time, status,
                             total_cost, total_tokens
                         ) VALUES (
-                            %s, %s, %s, %s, %s, %s, %s
+                            %s, %s, %s, %s, %s, %s, %s, %s
                         )
                         RETURNING trace_id
                     """
                     cur.execute(sql, (
                         trace_data.get('trace_id'),
+                        trace_data.get('trace_hash_id'),
                         trace_data.get('user_id'),
                         trace_data.get('agent_id'),
                         trace_data.get('start_time'),
@@ -77,15 +78,16 @@ class SupabaseDB:
                 else:
                     sql = """
                         INSERT INTO traces (
-                            trace_id, user_id, start_time, status,
+                            trace_id, trace_hash_id, user_id, start_time, status,
                             total_cost, total_tokens
                         ) VALUES (
-                            %s, %s, %s, %s, %s, %s
+                            %s, %s, %s, %s, %s, %s, %s
                         )
                         RETURNING trace_id
                     """
                     cur.execute(sql, (
                         trace_data.get('trace_id'),
+                        trace_data.get('trace_hash_id'),
                         trace_data.get('user_id'),
                         trace_data.get('start_time'),
                         trace_data.get('status', 'running'),

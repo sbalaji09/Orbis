@@ -17,6 +17,7 @@ CREATE TABLE agents (
 -- Create tables with UUID for trace_id and span_id
 CREATE TABLE traces (
     trace_id UUID PRIMARY KEY,
+    trash_hash_id TEXT,
     start_time TIMESTAMP,
     end_time TIMESTAMP,
     duration FLOAT DEFAULT 0,
