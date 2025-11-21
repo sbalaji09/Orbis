@@ -61,7 +61,11 @@ h6 {
   letter-spacing: -0.02em;
 }
 
-/* Custom scrollbar */
+* {
+  box-sizing: border-box;
+}
+
+/* Custom scrollbar
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -78,4 +82,4 @@ h6 {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--muted);
-}
+} */
