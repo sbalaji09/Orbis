@@ -29,19 +29,19 @@ export default function Home() {
             <div className="hidden md:flex items-center gap-8">
               <a
                 href="#features"
-                className="text-sm hover:opacity-70 transition-opacity hover:text-[#FFD600]"
+                className="text-sm hover:opacity-70 transition-opacity hover:text-[#5B5FFF]"
               >
                 /features
               </a>
               <a
                 href="#how-it-works"
-                className="text-sm hover:opacity-70 transition-opacity hover:text-[#FFD600]"
+                className="text-sm hover:opacity-70 transition-opacity hover:text-[#5B5FFF]"
               >
                 /how-it-works
               </a>
               <a
                 href="#docs"
-                className="text-sm hover:opacity-70 transition-opacity hover:text-[#FFD600]"
+                className="text-sm hover:opacity-70 transition-opacity hover:text-[#5B5FFF]"
               >
                 /docs
               </a>
@@ -480,7 +480,7 @@ def my_agent(query: str):
     # Automatically traced with full context
     return process(query)`)
                   }
-                  className="text-white/40 hover:text-[#FFD600] transition-colors"
+                  className="text-white/40 hover:text-[#5B5FFF] transition-colors"
                 >
                   {copied ? (
                     <span className="text-[#FFD600]">✓</span>
@@ -540,25 +540,25 @@ def my_agent(query: str):
               <div className="space-y-3">
                 <a
                   href="#features"
-                  className="block text-sm hover:text-[#FFD600] transition-colors"
+                  className="block text-sm hover:text-[#5B5FFF] transition-colors"
                 >
                   /features
                 </a>
                 <a
                   href="#"
-                  className="block text-sm hover:text-[#FFD600] transition-colors"
+                  className="block text-sm hover:text-[#5B5FFF] transition-colors"
                 >
                   /dashboard
                 </a>
                 <a
                   href="#"
-                  className="block text-sm hover:text-[#FFD600] transition-colors"
+                  className="block text-sm hover:text-[#5B5FFF] transition-colors"
                 >
                   /docs
                 </a>
                 <a
                   href="#"
-                  className="block text-sm hover:text-[#FFD600] transition-colors"
+                  className="block text-sm hover:text-[#5B5FFF] transition-colors"
                 >
                   /pricing
                 </a>
@@ -570,25 +570,25 @@ def my_agent(query: str):
               <div className="space-y-3">
                 <a
                   href="#"
-                  className="block text-sm hover:text-[#FFD600] transition-colors"
+                  className="block text-sm hover:text-[#5B5FFF] transition-colors"
                 >
                   github.com/orbis
                 </a>
                 <a
                   href="#"
-                  className="block text-sm hover:text-[#FFD600] transition-colors"
+                  className="block text-sm hover:text-[#5B5FFF] transition-colors"
                 >
                   /examples
                 </a>
                 <a
                   href="#"
-                  className="block text-sm hover:text-[#FFD600] transition-colors"
+                  className="block text-sm hover:text-[#5B5FFF] transition-colors"
                 >
                   /api-reference
                 </a>
                 <a
                   href="#"
-                  className="block text-sm hover:text-[#FFD600] transition-colors"
+                  className="block text-sm hover:text-[#5B5FFF] transition-colors"
                 >
                   /support
                 </a>
@@ -600,25 +600,25 @@ def my_agent(query: str):
               <div className="space-y-3">
                 <a
                   href="#"
-                  className="block text-sm hover:text-[#FFD600] transition-colors"
+                  className="block text-sm hover:text-[#5B5FFF] transition-colors"
                 >
                   /about
                 </a>
                 <a
                   href="#"
-                  className="block text-sm hover:text-[#FFD600] transition-colors"
+                  className="block text-sm hover:text-[#5B5FFF] transition-colors"
                 >
                   /blog
                 </a>
                 <a
                   href="#"
-                  className="block text-sm hover:text-[#FFD600] transition-colors"
+                  className="block text-sm hover:text-[#5B5FFF] transition-colors"
                 >
                   /privacy
                 </a>
                 <a
                   href="#"
-                  className="block text-sm hover:text-[#FFD600] transition-colors"
+                  className="block text-sm hover:text-[#5B5FFF] transition-colors"
                 >
                   /terms
                 </a>
@@ -633,19 +633,19 @@ def my_agent(query: str):
             <div className="flex items-center gap-6">
               <a
                 href="#"
-                className="text-sm text-black/50 hover:text-[#FFD600] transition-colors"
+                className="text-sm text-black/50 hover:text-[#5B5FFF] transition-colors"
               >
                 twitter.com
               </a>
               <a
                 href="#"
-                className="text-sm text-black/50 hover:text-[#FFD600] transition-colors"
+                className="text-sm text-black/50 hover:text-[#5B5FFF] transition-colors"
               >
                 github.com
               </a>
               <a
                 href="#"
-                className="text-sm text-black/50 hover:text-[#FFD600] transition-colors"
+                className="text-sm text-black/50 hover:text-[#5B5FFF] transition-colors"
               >
                 discord.gg
               </a>
