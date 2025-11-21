@@ -14,7 +14,8 @@ from .integrations import (
     instrument_gemini,
     instrument_langchain,
     get_langchain_callbacks, 
-    instrument_all
+    instrument_all,
+    uninstrument_all
 )
 
 __all__ = [
@@ -28,5 +29,6 @@ __all__ = [
     "instrument_gemini",
     "instrument_langchain",
     "get_langchain_callbacks", 
-    "instrument_all"
+    "instrument_all",
+    "uninstrument_all"
 ]
