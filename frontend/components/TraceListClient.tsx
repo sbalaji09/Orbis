@@ -30,9 +30,9 @@ export function TraceListClient({
     <Disclosure defaultOpen={true}>
       {({ open }) => (
         <div
-          className="bg-white border-l-2 border-black h-full flex flex-col overflow-hidden relative"
+          className="bg-white border-l-2 border-black h-full flex flex-col overflow-hidden relative box-border"
           style={{
-            width: open ? "320px" : "56px",
+            width: open ? "224px" : "56px",
             transition: "width 300ms ease-in-out",
           }}
         >
@@ -98,11 +98,14 @@ export function TraceListClient({
           </div>
 
           <div
-            className="flex-1 min-h-0 overflow-hidden"
+            className="flex-1 min-h-0"
             style={{
               opacity: open ? 1 : 0,
-              transition: "opacity 300ms ease-in-out",
+              visibility: open ? "visible" : "hidden",
+              transition: "opacity 300ms ease-in-out, visibility 300ms",
               pointerEvents: open ? "auto" : "none",
+              overflow: "hidden",
+              width: "224px",
             }}
           >
             <div className="h-full overflow-y-auto overflow-x-hidden">
@@ -161,73 +164,77 @@ export function TraceListClient({
                                       `/dashboard/trace/${trace.trace_id}`
                                     )
                                   }
-                                  className={`w-full py-3 text-left transition-all border-b border-black/10 last:border-b-0 group relative ${
+                                  className={`w-full py-2.5 px-3 text-left transition-all border-b border-black/10 last:border-b-0 group relative ${
                                     isActive
-                                      ? "bg-[#5B5FFF]/10 border-l-[3px] border-l-black shadow-[inset_3px_0_0_0_rgba(0,0,0,0.1)] pl-[13px] pr-4"
-                                      : "hover:bg-[#5B5FFF]/5 hover:border-l-4 hover:border-l-[#5B5FFF] pl-4 pr-4"
+                                      ? "bg-[#5B5FFF]/10 border-l-[3px] border-l-black shadow-[inset_3px_0_0_0_rgba(0,0,0,0.1)]"
+                                      : "hover:bg-[#5B5FFF]/5 hover:border-l-4 hover:border-l-[#5B5FFF]"
                                   }`}
                                 >
-                                  {/* Trace ID and Status */}
-                                  <div className="flex items-center justify-between gap-2 mb-2">
-                                    <span
-                                      className={`font-mono text-xs font-bold transition-colors ${
-                                        isActive
-                                          ? "text-black"
-                                          : "text-black/80 group-hover:text-[#5B5FFF]"
-                                      }`}
-                                    >
-                                      #{trace.trace_id}
-                                    </span>
-                                    <div
-                                      className={`flex items-center gap-1 px-1.5 py-0.5 border ${
-                                        hasErrors
-                                          ? "bg-red-50 border-red-500"
-                                          : "bg-emerald-50 border-emerald-500"
-                                      }`}
-                                    >
-                                      <div
-                                        className={`w-1 h-1 ${
-                                          hasErrors
-                                            ? "bg-red-500"
-                                            : "bg-emerald-500"
-                                        }`}
-                                      />
+                                  {/* Compact single-row layout */}
+                                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                                    {/* Left: ID + Status */}
+                                    <div className="flex items-center gap-2 min-w-0">
                                       <span
-                                        className={`text-[8px] font-bold uppercase tracking-wide ${
-                                          hasErrors
-                                            ? "text-red-600"
-                                            : "text-emerald-600"
+                                        className={`font-mono text-xs font-bold transition-colors ${
+                                          isActive
+                                            ? "text-black"
+                                            : "text-black/80 group-hover:text-[#5B5FFF]"
                                         }`}
                                       >
-                                        {hasErrors ? "err" : "ok"}
+                                        #{trace.trace_id.substring(0, 8)}
                                       </span>
+                                      <div
+                                        className={`flex items-center gap-1 px-1.5 py-0.5 border ${
+                                          hasErrors
+                                            ? "bg-red-50 border-red-500"
+                                            : "bg-emerald-50 border-emerald-500"
+                                        }`}
+                                      >
+                                        <div
+                                          className={`w-1 h-1 ${
+                                            hasErrors
+                                              ? "bg-red-500"
+                                              : "bg-emerald-500"
+                                          }`}
+                                        />
+                                        <span
+                                          className={`text-[8px] font-bold uppercase tracking-wide ${
+                                            hasErrors
+                                              ? "text-red-600"
+                                              : "text-emerald-600"
+                                          }`}
+                                        >
+                                          {hasErrors ? "err" : "ok"}
+                                        </span>
+                                      </div>
                                     </div>
                                   </div>
 
-                                  {/* Timestamp */}
-                                  <p
-                                    className={`text-[10px] mb-2 font-mono ${
+                                  {/* Datetime */}
+                                  <div
+                                    className={`text-[11px] font-mono font-bold mb-1.5 ${
                                       isActive
-                                        ? "text-black/50"
-                                        : "text-black/40"
+                                        ? "text-black/70"
+                                        : "text-black/60"
                                     }`}
                                   >
-                                    {`// ${new Date(
+                                    {new Date(
                                       trace.start_time + "Z"
                                     ).toLocaleTimeString([], {
                                       hour: "2-digit",
                                       minute: "2-digit",
-                                    })} ${new Date(
+                                    })}{" "}
+                                    {new Date(
                                       trace.start_time + "Z"
                                     ).toLocaleDateString([], {
                                       month: "2-digit",
                                       day: "2-digit",
-                                    })}`}
-                                  </p>
+                                    })}
+                                  </div>
 
-                                  {/* Metrics */}
+                                  {/* Metrics - compact */}
                                   <div
-                                    className={`flex items-center gap-3 text-[10px] pt-2 ${
+                                    className={`flex items-center gap-2.5 text-[9px] pt-1.5 ${
                                       isActive
                                         ? "border-t border-black/20"
                                         : "border-t border-black/5"
@@ -241,7 +248,7 @@ export function TraceListClient({
                                       }`}
                                     >
                                       <svg
-                                        className="w-3 h-3 opacity-50"
+                                        className="w-2.5 h-2.5 opacity-50"
                                         fill="none"
                                         stroke="currentColor"
                                         viewBox="0 0 24 24"
@@ -259,14 +266,14 @@ export function TraceListClient({
                                     </div>
                                     <span className="text-black/20">•</span>
                                     <div
-                                      className={`flex items-center gap-1 ml-auto ${
+                                      className={`flex items-center gap-1 ${
                                         isActive
                                           ? "text-black/70"
                                           : "text-black/60"
                                       }`}
                                     >
                                       <svg
-                                        className="w-3 h-3 opacity-50"
+                                        className="w-2.5 h-2.5 opacity-50"
                                         fill="none"
                                         stroke="currentColor"
                                         viewBox="0 0 24 24"

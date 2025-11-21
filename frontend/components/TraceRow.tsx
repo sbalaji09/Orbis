@@ -19,11 +19,25 @@ export function TraceRow({ trace }: { trace: Trace }) {
       className="w-full px-5 py-3.5 text-left transition-all hover:bg-mustard/5 hover:shadow-[inset_4px_0_0_#FFD600] border-b-2 border-black last:border-b-0 group"
     >
       <div className="flex items-center justify-between gap-4">
-        {/* Left: ID and Status */}
+        {/* Left: Truncated ID with prominent datetime */}
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <span className="font-mono text-sm font-semibold tracking-tight group-hover:text-babyblue transition-colors">
-            #{trace.trace_id}
+            #{trace.trace_id.substring(0, 8)}
           </span>
+          <span className="text-muted">•</span>
+          <span className="text-sm text-foreground font-medium">
+            {new Date(trace.start_time + "Z").toLocaleString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+              month: "2-digit",
+              day: "2-digit",
+              year: "numeric",
+            })}
+          </span>
+        </div>
+
+        {/* Right: Status and Metrics */}
+        <div className="flex items-center gap-5 text-xs shrink-0">
           <div
             className={`flex items-center gap-1.5 px-2 py-1 border-2 ${
               isError
@@ -42,10 +56,6 @@ export function TraceRow({ trace }: { trace: Trace }) {
               {isError ? "Error" : "Success"}
             </span>
           </div>
-        </div>
-
-        {/* Right: Metrics */}
-        <div className="flex items-center gap-5 text-xs shrink-0">
           <div className="flex items-center gap-1.5 text-muted font-mono">
             <svg
               className="w-3.5 h-3.5"
@@ -93,15 +103,6 @@ export function TraceRow({ trace }: { trace: Trace }) {
               />
             </svg>
             <span>{trace.total_tokens?.toLocaleString() || 0}</span>
-          </div>
-          <div className="text-xs text-muted min-w-[60px] text-right">
-            {new Date(trace.start_time + "Z").toLocaleString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-              month: "2-digit",
-              day: "2-digit",
-              year: "numeric",
-            })}
           </div>
         </div>
       </div>
