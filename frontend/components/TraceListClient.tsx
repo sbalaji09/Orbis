@@ -93,11 +93,11 @@ export function TraceListClient({
                                 d="M9 5l7 7-7 7"
                               />
                             </svg>
-                            <span className="text-xs font-semibold text-foreground uppercase tracking-wide">
+                            <span className="text-xs font-sans font-semibold text-foreground lowercase tracking-wide">
                               {agent.agent_name}
                             </span>
                           </div>
-                          <span className="px-2 py-0.5 text-[10px] font-mono font-semibold bg-mustard/10 text-mustard rounded-md border border-mustard/20">
+                          <span className="px-2 py-0.5 text-[10px] font-mono bg-mustard/10 text-mustard rounded-md border border-mustard/20">
                             {traces.length}
                           </span>
                         </div>
@@ -125,7 +125,7 @@ export function TraceListClient({
                                   className="w-full px-4 py-2.5 text-left transition-all hover:bg-babyblue/8 border-b border-border/50 last:border-b-0 group"
                                 >
                                   <div className="flex items-center justify-between gap-2 mb-1.5">
-                                    <span className="font-mono text-xs font-semibold text-foreground group-hover:text-babyblue transition-colors">
+                                    <span className="font-sans text-xs font-semibold text-foreground group-hover:text-babyblue transition-colors">
                                       #{trace.trace_id}
                                     </span>
                                     <div
@@ -146,7 +146,7 @@ export function TraceListClient({
                                     })}
                                   </p>
                                   <div className="flex items-center gap-2 text-[10px]">
-                                    <div className="flex items-center gap-1 text-muted font-mono">
+                                    <div className="flex items-center gap-1 text-muted font-mono font-semibold">
                                       <svg
                                         className="w-3 h-3"
                                         fill="none"

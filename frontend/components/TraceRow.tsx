@@ -16,23 +16,23 @@ export function TraceRow({ trace }: { trace: Trace }) {
   return (
     <button
       onClick={() => router.push(`/dashboard/trace/${trace.trace_id}`)}
-      className="w-full px-5 py-3.5 text-left transition-all hover:bg-babyblue/8 border-b border-border group"
+      className="w-full px-5 py-3.5 text-left transition-all hover:bg-mustard/5 hover:shadow-[inset_4px_0_0_#FFD600] border-b-2 border-black last:border-b-0 group"
     >
       <div className="flex items-center justify-between gap-4">
         {/* Left: ID and Status */}
         <div className="flex items-center gap-3 min-w-0 flex-1">
-          <span className="font-mono text-sm font-semibold text-foreground group-hover:text-babyblue transition-colors">
+          <span className="font-mono text-sm font-semibold tracking-tight group-hover:text-babyblue transition-colors">
             #{trace.trace_id}
           </span>
           <div
-            className={`flex items-center gap-1.5 px-2 py-1 rounded-md ${
-              isError ? "bg-red-50" : "bg-emerald-50"
+            className={`flex items-center gap-1.5 px-2 py-1 border-2 ${
+              isError
+                ? "bg-error/10 border-error"
+                : "bg-success/10 border-success"
             }`}
           >
             <div
-              className={`w-1.5 h-1.5 rounded-full ${
-                isError ? "bg-error" : "bg-success"
-              }`}
+              className={`w-1.5 h-1.5 ${isError ? "bg-error" : "bg-success"}`}
             />
             <span
               className={`text-[10px] font-semibold uppercase tracking-wide ${
@@ -62,7 +62,7 @@ export function TraceRow({ trace }: { trace: Trace }) {
             </svg>
             <span>{formatDuration(trace.duration)}</span>
           </div>
-          <div className="flex items-center gap-1.5 text-mustard font-mono font-semibold">
+          <div className="flex items-center gap-1.5 text-muted font-mono">
             <svg
               className="w-3.5 h-3.5"
               fill="none"

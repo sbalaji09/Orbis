@@ -1,745 +1,655 @@
+"use client";
+
 import Link from "next/link";
+import { Logo } from "@/components/Logo";
+import { AnimatedDAG } from "@/components/AnimatedDAG";
+import { ArrowUpRight, Copy, Zap, Shield, Database } from "lucide-react";
+import { Tab, TabGroup, TabList, TabPanel, TabPanels } from "@headlessui/react";
+import { useState } from "react";
 
 export default function Home() {
+  const [copied, setCopied] = useState(false);
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Navigation */}
-      <nav className="border-b border-slate/10 bg-background/95 backdrop-blur sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-8 py-5 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-7 h-7 bg-linear-to-br from-babyblue to-babyblue/80 rounded-md flex items-center justify-center shadow-sm">
-              <div className="w-3 h-3 border-2 border-white rounded-sm" />
+      <nav className="border-b border-black/10 bg-background/80 backdrop-blur-sm sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-12">
+            <div className="flex items-center gap-3">
+              <Logo className="w-10 h-10" />
+              <span className="tracking-tight">$ orbis.ai</span>
             </div>
-            <span className="text-lg font-semibold text-foreground tracking-tight">
-              Orbis
-            </span>
+            <div className="hidden md:flex items-center gap-8">
+              <a
+                href="#features"
+                className="text-sm hover:opacity-70 transition-opacity hover:text-[#FFD600]"
+              >
+                /features
+              </a>
+              <a
+                href="#how-it-works"
+                className="text-sm hover:opacity-70 transition-opacity hover:text-[#FFD600]"
+              >
+                /how-it-works
+              </a>
+              <a
+                href="#docs"
+                className="text-sm hover:opacity-70 transition-opacity hover:text-[#FFD600]"
+              >
+                /docs
+              </a>
+            </div>
           </div>
-          <div className="flex items-center gap-6">
-            <Link
-              href="#features"
-              className="text-sm font-medium text-slate hover:text-babyblue transition-colors duration-200"
-            >
-              Features
-            </Link>
-            <Link
-              href="#how-it-works"
-              className="text-sm font-medium text-slate hover:text-babyblue transition-colors duration-200"
-            >
-              How it works
-            </Link>
+          <div className="flex items-center gap-3">
+            <button className="text-sm px-4 py-2 hover:opacity-70 transition-opacity">
+              login()
+            </button>
             <Link
               href="/dashboard"
-              className="px-4 py-2 bg-foreground text-background rounded-md font-medium text-sm hover:bg-foreground/90 transition-all duration-200 shadow-sm hover:shadow-md"
+              className="text-sm px-4 py-2 bg-black hover:bg-black/90 text-[#FFD600] border border-black transition-colors"
             >
-              Dashboard
+              dashboard.open()
             </Link>
           </div>
         </div>
       </nav>
 
       {/* Hero Section */}
-      <section className="relative overflow-hidden">
-        {/* Subtle gradient background */}
-        <div className="absolute inset-0 bg-linear-to-br from-babyblue/3 via-transparent to-accent-purple/2" />
+      <section className="max-w-7xl mx-auto px-6 pt-12 pb-16">
+        <div className="max-w-4xl mx-auto text-center">
+          <div className="inline-flex items-center gap-2 mb-8 px-3 py-1.5 bg-transparent text-[#4CAF50] border border-transparent">
+            <div className="w-2 h-2 bg-[#4CAF50] rounded-full animate-pulse"></div>
+            <span className="text-xs tracking-wider uppercase">{`// PRODUCTION_READY`}</span>
+          </div>
 
-        <div className="relative max-w-6xl mx-auto px-8 pt-16 pb-12">
-          <div className="grid lg:grid-cols-12 gap-12 items-start">
-            {/* Left column - Main content */}
-            <div className="lg:col-span-7">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-success/30 bg-linear-to-r from-success/10 to-success/5 mb-6 shadow-sm">
-                <div className="w-1.5 h-1.5 rounded-full bg-success animate-pulse shadow-success/50 shadow-sm" />
-                <span className="text-[10px] font-bold text-success tracking-widest">
-                  PRODUCTION READY
-                </span>
-              </div>
+          <h1 className="mb-6 text-6xl lg:text-7xl leading-[1.1] tracking-tight">
+            {`>`} Know what your{" "}
+            <span className="text-[#5B5FFF]">AI_agents</span> are doing
+          </h1>
 
-              <h1 className="text-[54px] font-bold text-foreground mb-5 leading-[1.08] tracking-[-0.03em]">
-                Know what your{" "}
-                <span className="relative inline-block">
-                  <span className="text-babyblue italic font-serif">
-                    AI agents
-                  </span>
-                  <div className="absolute -bottom-1 left-0 w-full h-1 bg-linear-to-r from-babyblue/30 via-babyblue/50 to-transparent" />
-                </span>{" "}
-                are doing
-              </h1>
+          <p className="text-xl text-black/60 mb-10 leading-relaxed max-w-3xl mx-auto">
+            {`// Every LLM call traced. Every dollar accounted for.`}
+            <br />
+            {`// Every workflow visualized. Production-grade observability.`}
+          </p>
 
-              <p className="text-[18px] text-slate leading-[1.6] mb-8 max-w-[520px] font-light">
-                Every LLM call traced. Every dollar accounted for. Every
-                workflow visualized. Production-grade observability built for
-                modern AI development.
-              </p>
-
-              <div className="flex items-center gap-3 mb-10">
-                <Link
-                  href="/dashboard"
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-foreground text-background font-medium text-sm hover:bg-foreground/90 transition-all duration-200 shadow-md hover:shadow-lg hover:scale-[1.02]"
-                >
-                  View Dashboard
-                  <span className="text-xs">→</span>
-                </Link>
-                <div className="flex flex-col gap-1">
-                  <span className="text-[10px] uppercase tracking-widest text-slate/50 font-semibold">
-                    Quick start
-                  </span>
-                  <code className="px-3 py-1.5 text-[13px] text-foreground font-mono bg-slate/5 border border-slate/15 rounded shadow-sm">
-                    pip install orbis-sdk
-                  </code>
-                </div>
-              </div>
-            </div>
-
-            {/* Right column - Stats */}
-            <div className="lg:col-span-5">
-              <div className="bg-linear-to-br from-slate/3 to-babyblue/2 border border-slate/15 p-7 space-y-6 shadow-sm rounded">
-                <div className="relative pl-5">
-                  <div className="absolute top-0 left-0 w-0.5 h-full bg-linear-to-b from-babyblue to-babyblue/20" />
-                  <div className="text-[10px] uppercase tracking-[0.12em] text-babyblue/70 font-bold mb-2">
-                    Latency
-                  </div>
-                  <div className="text-[36px] font-bold text-foreground tracking-tight leading-none mb-1">
-                    &lt;5ms
-                  </div>
-                  <div className="text-[13px] text-slate/70">
-                    overhead per trace
-                  </div>
-                </div>
-                <div className="relative pl-5">
-                  <div className="absolute top-0 left-0 w-0.5 h-full bg-linear-to-b from-success to-success/20" />
-                  <div className="text-[10px] uppercase tracking-[0.12em] text-success/70 font-bold mb-2">
-                    Coverage
-                  </div>
-                  <div className="text-[36px] font-bold text-foreground tracking-tight leading-none mb-1">
-                    100%
-                  </div>
-                  <div className="text-[13px] text-slate/70">
-                    automatic capture rate
-                  </div>
-                </div>
-                <div className="relative pl-5">
-                  <div className="absolute top-0 left-0 w-0.5 h-full bg-linear-to-b from-mustard to-mustard/20" />
-                  <div className="text-[10px] uppercase tracking-[0.12em] text-mustard/70 font-bold mb-2">
-                    Cost tracking
-                  </div>
-                  <div className="text-[36px] font-bold text-foreground tracking-tight leading-none mb-1">
-                    Real-time
-                  </div>
-                  <div className="text-[13px] text-slate/70">
-                    token-level precision
-                  </div>
-                </div>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
+            <Link
+              href="/dashboard"
+              className="bg-black hover:bg-black/90 text-[#FFD600] px-6 py-2.5 border-2 border-black inline-flex items-center gap-2"
+            >
+              view_dashboard()
+              <ArrowUpRight className="h-4 w-4" />
+            </Link>
+            <div className="flex items-center gap-3">
+              <div className="inline-flex items-center gap-2 bg-black text-white border-2 border-black px-4 py-2.5">
+                <span className="text-sm text-[#FFD600]">$</span>
+                <span className="text-sm">pip install orbis-sdk</span>
               </div>
             </div>
           </div>
         </div>
+
+        {/* DAG Animation */}
+        <div className="text-center">
+          <div className="text-xs mb-4 text-black/40 tracking-[0.15em] uppercase">{`/* LIVE EXECUTION VISUALIZATION */`}</div>
+          <h2 className="text-2xl tracking-tight mb-8 text-black/60">
+            {`// Watch your agent workflow come to life`}
+          </h2>
+        </div>
+
+        <AnimatedDAG />
       </section>
 
-      {/* How It Works */}
-      <section
-        id="how-it-works"
-        className="py-16 border-t border-slate/10 bg-linear-to-b from-slate/2 to-transparent"
-      >
-        <div className="max-w-6xl mx-auto px-8">
-          <div className="mb-12">
-            <div className="inline-flex items-center gap-2 mb-3">
-              <div className="w-1 h-1 rounded-full bg-babyblue" />
-              <span className="text-[10px] uppercase tracking-[0.15em] text-babyblue font-bold">
-                Implementation
-              </span>
+      {/* Stats Section */}
+      {/* <section className="border-y border-black/10 bg-white">
+        <div className="max-w-7xl mx-auto px-6 py-12">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-16">
+            <div>
+              <div className="text-xs mb-3 text-black/40 tracking-wide uppercase">
+                Companies
+              </div>
+              <div className="text-5xl tracking-tight mb-2">200+</div>
+              <div className="text-sm text-black/50">building with Orbis</div>
             </div>
-            <h2 className="text-[38px] font-bold text-foreground tracking-tight mb-3 leading-[1.15]">
-              Three steps to full visibility
-            </h2>
-            <p className="text-[16px] text-slate/70 max-w-[540px] font-light leading-relaxed">
-              One decorator captures your entire agent execution. No manual
-              logging, no configuration, no overhead.
-            </p>
+            <div>
+              <div className="text-xs mb-3 text-black/40 tracking-wide uppercase">
+                Traces
+              </div>
+              <div className="text-5xl tracking-tight mb-2">50M+</div>
+              <div className="text-sm text-black/50">captured per month</div>
+            </div>
+            <div>
+              <div className="text-xs mb-3 text-black/40 tracking-wide uppercase">
+                Uptime
+              </div>
+              <div className="text-5xl tracking-tight mb-2">99.9%</div>
+              <div className="text-sm text-black/50">guaranteed SLA</div>
+            </div>
+          </div>
+        </div>
+      </section> */}
+
+      {/* How It Works */}
+      <section id="how-it-works" className="max-w-7xl mx-auto px-6 py-16">
+        <div className="text-center mb-12">
+          <div className="text-xs mb-4 text-black/40 tracking-[0.15em] uppercase">{`/* How it works */`}</div>
+          <h2 className="text-4xl lg:text-5xl tracking-tight mb-6">
+            <span className="text-black/40">{`> `}</span>
+            Three steps to full visibility
+          </h2>
+          <p className="text-lg text-black/60 max-w-2xl mx-auto leading-relaxed">
+            {`// One decorator captures your entire agent execution.`}
+            <br />
+            {`// No manual logging, no configuration, no overhead.`}
+          </p>
+        </div>
+
+        <TabGroup>
+          <div className="flex justify-center">
+            <TabList className="grid grid-cols-3 w-full bg-transparent border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.1)] h-auto p-0 rounded-none gap-0">
+              <Tab className="px-8 py-4 rounded-none border-r-2 border-black transition-colors data-selected:bg-black data-selected:text-[#FFD600] text-black/60 hover:bg-black/5">
+                <span className="mr-2">01</span> Add decorator
+              </Tab>
+              <Tab className="px-8 py-4 rounded-none border-r-2 border-black transition-colors data-selected:bg-black data-selected:text-[#FFD600] text-black/60 hover:bg-black/5">
+                <span className="mr-2">02</span> Run agent
+              </Tab>
+              <Tab className="px-8 py-4 rounded-none transition-colors data-selected:bg-black data-selected:text-[#FFD600] text-black/60 hover:bg-black/5">
+                <span className="mr-2">03</span> View traces
+              </Tab>
+            </TabList>
           </div>
 
-          <div className="space-y-10">
-            {/* Step 1 */}
-            <div className="grid lg:grid-cols-12 gap-6 items-start">
-              <div className="lg:col-span-4">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-8 h-8 rounded bg-linear-to-br from-babyblue to-babyblue/70 flex items-center justify-center shadow-sm">
-                    <span className="text-[11px] font-bold text-white tracking-wider">
-                      01
-                    </span>
-                  </div>
-                  <h3 className="text-[22px] font-semibold text-foreground tracking-tight">
-                    Add decorator
+          <TabPanels className="mt-16">
+            <TabPanel>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+                <div>
+                  <h3 className="text-3xl tracking-tight mb-4">
+                    <span className="text-black/40">$ </span>Add decorator
                   </h3>
+                  <p className="text-lg text-black/60 leading-relaxed">
+                    {`// Wrap your agent function with @observe().`}
+                    <br />
+                    {`// That's it. No config, no setup, no instrumentation code.`}
+                  </p>
                 </div>
-                <p className="text-[15px] text-slate/70 leading-relaxed font-light pl-11">
-                  Wrap your agent function with @observe(). That&apos;s it. No
-                  config, no setup, no instrumentation code.
-                </p>
-              </div>
-              <div className="lg:col-span-8">
-                <div className="relative p-5 bg-linear-to-br from-slate/3 to-babyblue/2 border border-slate/15 shadow-sm rounded overflow-hidden">
-                  <div className="absolute top-0 left-0 right-0 h-0.5 bg-linear-to-r from-babyblue via-babyblue/50 to-transparent" />
-                  <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate/10">
+                <div className="bg-black border-2 border-black overflow-hidden shadow-[8px_8px_0_rgba(0,0,0,0.2)]">
+                  <div className="border-b-2 border-white/20 px-6 py-3 flex items-center gap-2">
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-babyblue/30" />
-                      <span className="text-[10px] font-bold text-slate/50 uppercase tracking-widest">
-                        Python
-                      </span>
+                      <div className="w-3 h-3 bg-red-500 border border-white/30"></div>
+                      <div className="w-3 h-3 bg-yellow-500 border border-white/30"></div>
+                      <div className="w-3 h-3 bg-green-500 border border-white/30"></div>
                     </div>
-                    <span className="text-[10px] text-babyblue font-semibold">
-                      example.py
-                    </span>
+                    <span className="text-xs text-[#FFD600] ml-2">{`> example.py`}</span>
                   </div>
-                  <pre className="font-mono text-[14px] leading-[1.7]">
-                    <span className="text-babyblue font-bold">@observe()</span>
-                    {"\n"}
-                    <span className="text-accent-teal font-medium">
-                      def
-                    </span>{" "}
-                    <span className="text-foreground font-semibold">
-                      my_agent
-                    </span>
-                    <span className="text-slate/60">(query: str):</span>
-                    {"\n"}
-                    <span className="text-slate/40">
-                      {" "}
-                      # Automatically traced
-                    </span>
-                    {"\n"}
-                    <span className="text-slate/60"> </span>
-                    <span className="text-accent-teal font-medium">
-                      return
-                    </span>{" "}
-                    <span className="text-foreground font-medium">process</span>
-                    <span className="text-slate/60">(query)</span>
+                  <pre className="p-6 overflow-x-auto">
+                    <code className="text-sm text-white/90 leading-relaxed">
+                      {`@observe()
+def my_agent(query: str):
+    # Automatically traced
+    return process(query)`}
+                    </code>
                   </pre>
                 </div>
               </div>
-            </div>
+            </TabPanel>
 
-            {/* Step 2 */}
-            <div className="grid lg:grid-cols-12 gap-6 items-start">
-              <div className="lg:col-span-4">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-8 h-8 rounded bg-linear-to-br from-accent-teal to-accent-teal/70 flex items-center justify-center shadow-sm">
-                    <span className="text-[11px] font-bold text-white tracking-wider">
-                      02
-                    </span>
-                  </div>
-                  <h3 className="text-[22px] font-semibold text-foreground tracking-tight">
-                    Run agent
+            <TabPanel>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+                <div>
+                  <h3 className="text-3xl tracking-tight mb-4">
+                    <span className="text-black/40">$ </span>Run agent
                   </h3>
+                  <p className="text-lg text-black/60 leading-relaxed">
+                    {`// Execute normally. SDK captures everything in the background`}
+                    <br />
+                    {`// with zero performance impact.`}
+                  </p>
                 </div>
-                <p className="text-[15px] text-slate/70 leading-relaxed font-light pl-11">
-                  Execute normally. SDK captures everything in the background
-                  with zero performance impact.
-                </p>
-              </div>
-              <div className="lg:col-span-8">
-                <div className="relative p-5 bg-linear-to-br from-slate/3 to-accent-teal/2 border border-slate/15 shadow-sm rounded overflow-hidden space-y-3">
-                  <div className="absolute top-0 left-0 right-0 h-0.5 bg-linear-to-r from-accent-teal via-accent-teal/50 to-transparent" />
-                  <div className="flex items-center justify-between pb-2.5 border-b border-slate/10">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-success shadow-sm shadow-success/30" />
-                      <span className="text-[13px] font-semibold text-slate/80">
-                        Span captured
+                <div className="bg-white border-2 border-black p-8 shadow-[6px_6px_0_rgba(0,0,0,0.1)]">
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between pb-6 border-b-2 border-black/10">
+                      <span className="text-sm text-black/50">{`// span_captured`}</span>
+                      <span className="text-lg bg-black text-[#FFD600] px-3 py-1">
+                        2.3s
                       </span>
                     </div>
-                    <span className="font-mono text-[13px] text-slate/60 font-medium">
-                      2.3s
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between pb-2.5 border-b border-slate/10">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-mustard shadow-sm shadow-mustard/30" />
-                      <span className="text-[13px] font-semibold text-slate/80">
-                        Cost calculated
+                    <div className="flex items-center justify-between pb-6 border-b-2 border-black/10">
+                      <span className="text-sm text-black/50">{`// cost_calculated`}</span>
+                      <span className="text-lg bg-black text-[#FFD600] px-3 py-1">
+                        $0.004
                       </span>
                     </div>
-                    <span className="font-mono text-[13px] text-mustard font-bold">
-                      $0.004
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-babyblue shadow-sm shadow-babyblue/30" />
-                      <span className="text-[13px] font-semibold text-slate/80">
-                        Trace sent
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-black/50">{`// trace_sent`}</span>
+                      <span className="text-lg bg-black text-[#5B5FFF] px-3 py-1">
+                        async
                       </span>
                     </div>
-                    <span className="font-mono text-[13px] text-slate/60 font-medium">
-                      async
-                    </span>
                   </div>
                 </div>
               </div>
-            </div>
+            </TabPanel>
 
-            {/* Step 3 */}
-            <div className="grid lg:grid-cols-12 gap-6 items-start">
-              <div className="lg:col-span-4">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-8 h-8 rounded bg-linear-to-br from-accent-purple to-accent-purple/70 flex items-center justify-center shadow-sm">
-                    <span className="text-[11px] font-bold text-white tracking-wider">
-                      03
-                    </span>
-                  </div>
-                  <h3 className="text-[22px] font-semibold text-foreground tracking-tight">
-                    View traces
+            <TabPanel>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+                <div>
+                  <h3 className="text-3xl tracking-tight mb-4">
+                    <span className="text-black/40">$ </span>View traces
                   </h3>
+                  <p className="text-lg text-black/60 leading-relaxed">
+                    {`// Full execution DAG in dashboard. See what happened,`}
+                    <br />
+                    {`// what it cost, and where time was spent.`}
+                  </p>
                 </div>
-                <p className="text-[15px] text-slate/70 leading-relaxed font-light pl-11">
-                  Full execution DAG in dashboard. See what happened, what it
-                  cost, and where time was spent.
-                </p>
-              </div>
-              <div className="lg:col-span-8">
-                <div className="relative p-5 bg-linear-to-br from-slate/3 to-accent-purple/2 border border-slate/15 shadow-sm rounded overflow-hidden">
-                  <div className="absolute top-0 left-0 right-0 h-0.5 bg-linear-to-r from-accent-purple via-accent-purple/50 to-transparent" />
-                  <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate/10">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-accent-purple/30" />
-                      <span className="text-[10px] font-bold text-slate/50 uppercase tracking-widest">
-                        Latest execution
-                      </span>
-                    </div>
-                    <span className="text-[10px] px-2.5 py-1 bg-linear-to-r from-success/15 to-success/5 text-success font-bold uppercase tracking-widest rounded-full border border-success/20">
-                      Success
-                    </span>
+                <div className="bg-white border-2 border-black p-8 shadow-[6px_6px_0_rgba(0,0,0,0.1)]">
+                  <div className="mb-6">
+                    <span className="text-sm text-black/50">{`// latest_execution`}</span>
                   </div>
-                  <div className="grid grid-cols-3 gap-5">
-                    <div className="border-l-2 border-babyblue/30 pl-3">
-                      <div className="text-[10px] uppercase tracking-widest text-slate/50 font-bold mb-1.5">
-                        Duration
-                      </div>
-                      <div className="font-mono text-[22px] font-bold text-foreground leading-none">
-                        3.2s
+                  <div className="grid grid-cols-2 gap-8">
+                    <div>
+                      <div className="text-sm text-black/50 mb-2">status:</div>
+                      <div className="text-lg bg-[#f5f5f5] text-[#4CAF50] px-3 py-1 inline-block">
+                        SUCCESS
                       </div>
                     </div>
-                    <div className="border-l-2 border-mustard/30 pl-3">
-                      <div className="text-[10px] uppercase tracking-widest text-slate/50 font-bold mb-1.5">
-                        Cost
+                    <div>
+                      <div className="text-sm text-black/50 mb-2">
+                        duration:
                       </div>
-                      <div className="font-mono text-[22px] font-bold text-mustard leading-none">
-                        $0.012
-                      </div>
+                      <div className="text-lg">3.2s</div>
                     </div>
-                    <div className="border-l-2 border-accent-purple/30 pl-3">
-                      <div className="text-[10px] uppercase tracking-widest text-slate/50 font-bold mb-1.5">
-                        Spans
-                      </div>
-                      <div className="font-mono text-[22px] font-bold text-foreground leading-none">
-                        7
-                      </div>
+                    <div>
+                      <div className="text-sm text-black/50 mb-2">cost:</div>
+                      <div className="text-lg">$0.012</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-black/50 mb-2">spans:</div>
+                      <div className="text-lg">7</div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
+            </TabPanel>
+          </TabPanels>
+        </TabGroup>
       </section>
 
-      {/* Features Grid */}
-      <section
-        id="features"
-        className="py-16 border-t border-slate/10 bg-linear-to-b from-transparent via-babyblue/1 to-transparent"
-      >
-        <div className="max-w-6xl mx-auto px-8">
-          <div className="mb-12">
-            <div className="inline-flex items-center gap-2 mb-3">
-              <div className="w-1 h-1 rounded-full bg-babyblue" />
-              <span className="text-[10px] uppercase tracking-[0.15em] text-babyblue font-bold">
-                Capabilities
-              </span>
-            </div>
-            <h2 className="text-[38px] font-bold text-foreground mb-3 tracking-tight leading-[1.15]">
-              Built for production
+      {/* Features */}
+      <section id="features" className="bg-white py-16 border-y-2 border-black">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="text-center mb-12">
+            <div className="text-xs mb-4 text-black/40 tracking-[0.15em] uppercase">{`/* Capabilities */`}</div>
+            <h2 className="text-4xl lg:text-5xl tracking-tight mb-6">
+              <span className="text-black/40">{`> `}</span>Built for production
             </h2>
-            <p className="text-[16px] text-slate/70 max-w-[560px] font-light leading-relaxed">
-              Everything you need to build, monitor, and optimize AI agents at
-              scale.
+            <p className="text-lg text-black/60 max-w-2xl mx-auto leading-relaxed">
+              {`// Everything you need to build, monitor, and optimize`}
+              <br />
+              {`// AI agents at scale.`}
             </p>
           </div>
 
-          <div className="grid lg:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* Feature 1 */}
-            <div className="group relative p-6 border border-slate/15 bg-linear-to-br from-babyblue/2 to-transparent hover:border-babyblue/30 transition-all duration-300 shadow-sm hover:shadow-md rounded overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-0.5 bg-linear-to-r from-babyblue/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className="flex items-start justify-between mb-4">
-                <div className="w-11 h-11 rounded-lg bg-linear-to-br from-babyblue/10 to-babyblue/5 border border-babyblue/20 flex items-center justify-center group-hover:scale-105 transition-transform">
-                  <div className="w-2.5 h-2.5 bg-babyblue rounded-sm" />
-                </div>
-                <span className="text-[9px] uppercase tracking-[0.12em] text-slate/40 font-bold">
-                  Core
-                </span>
+            <div className="border-2 border-black bg-[#F5F3F0] p-8 hover:shadow-[6px_6px_0_rgba(0,0,0,0.2)] transition-all group">
+              <div className="flex items-start justify-between mb-6">
+                <div className="text-xs text-black/40 tracking-wide uppercase">{`// Core`}</div>
               </div>
-              <h3 className="text-[19px] font-semibold text-foreground mb-2.5 tracking-tight group-hover:text-babyblue transition-colors">
+              <h3 className="text-xl tracking-tight mb-3">
                 DAG Visualization
+                <span className="text-black/40">()</span>
               </h3>
-              <p className="text-[14px] text-slate/70 leading-relaxed font-light">
-                See the full execution graph. Every span is a node, every
-                relationship an edge. Navigate complex workflows visually.
-              </p>
+              <p className="text-sm text-black/60 leading-relaxed">{`// See the full execution graph. Every span is a node, every relationship an edge. Navigate complex workflows visually.`}</p>
             </div>
 
             {/* Feature 2 */}
-            <div className="group relative p-6 border border-slate/15 bg-linear-to-br from-mustard/2 to-transparent hover:border-mustard/30 transition-all duration-300 shadow-sm hover:shadow-md rounded overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-0.5 bg-linear-to-r from-mustard/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className="flex items-start justify-between mb-4">
-                <div className="w-11 h-11 rounded-lg bg-linear-to-br from-mustard/10 to-mustard/5 border border-mustard/20 flex items-center justify-center group-hover:scale-105 transition-transform">
-                  <span className="text-base font-bold text-mustard">$</span>
-                </div>
-                <span className="text-[9px] uppercase tracking-[0.12em] text-slate/40 font-bold">
-                  Core
-                </span>
+            <div className="border-2 border-black bg-[#F5F3F0] p-8 hover:shadow-[6px_6px_0_rgba(0,0,0,0.2)] transition-all group">
+              <div className="flex items-start justify-between mb-6">
+                <div className="text-xs text-black/40 tracking-wide uppercase">{`// Core`}</div>
               </div>
-              <h3 className="text-[19px] font-semibold text-foreground mb-2.5 tracking-tight group-hover:text-mustard transition-colors">
+              <h3 className="text-xl tracking-tight mb-3">
                 Cost Tracking
+                <span className="text-black/40">()</span>
               </h3>
-              <p className="text-[14px] text-slate/70 leading-relaxed font-light">
-                Token-level cost calculation. See which models and prompts drive
-                your spend. Optimize for efficiency.
-              </p>
+              <p className="text-sm text-black/60 leading-relaxed">{`// Token-level cost calculation. See which models and prompts drive your spend. Optimize for efficiency.`}</p>
             </div>
 
             {/* Feature 3 */}
-            <div className="group relative p-6 border border-slate/15 bg-linear-to-br from-accent-teal/2 to-transparent hover:border-accent-teal/30 transition-all duration-300 shadow-sm hover:shadow-md rounded overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-0.5 bg-linear-to-r from-accent-teal/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className="flex items-start justify-between mb-4">
-                <div className="w-11 h-11 rounded-lg bg-linear-to-br from-accent-teal/10 to-accent-teal/5 border border-accent-teal/20 flex items-center justify-center group-hover:scale-105 transition-transform">
-                  <span className="text-xs font-bold text-accent-teal font-mono">
-                    v2
-                  </span>
+            <div className="border-2 border-black bg-[#F5F3F0] p-8 hover:shadow-[6px_6px_0_rgba(0,0,0,0.2)] transition-all group">
+              <div className="flex items-start justify-between mb-6">
+                <div className="text-xs text-black/40 tracking-wide uppercase">{`// Advanced`}</div>
+                <div className="w-8 h-8 border-2 border-black bg-[#5B5FFF] text-white flex items-center justify-center text-sm shadow-[2px_2px_0_rgba(0,0,0,0.3)]">
+                  v2
                 </div>
-                <span className="text-[9px] uppercase tracking-[0.12em] text-slate/40 font-bold">
-                  Advanced
-                </span>
               </div>
-              <h3 className="text-[19px] font-semibold text-foreground mb-2.5 tracking-tight group-hover:text-accent-teal transition-colors">
+              <h3 className="text-xl tracking-tight mb-3">
                 Prompt Versioning
+                <span className="text-black/40">()</span>
               </h3>
-              <p className="text-[14px] text-slate/70 leading-relaxed font-light">
-                Git for prompts. Auto-increment versions, compare diffs,
-                rollback instantly. Full audit trail.
-              </p>
+              <p className="text-sm text-black/60 leading-relaxed">{`// Git for prompts. Auto-increment versions, compare diffs, rollback instantly. Full audit trail.`}</p>
             </div>
 
             {/* Feature 4 */}
-            <div className="group relative p-6 border border-slate/15 bg-linear-to-br from-accent-purple/2 to-transparent hover:border-accent-purple/30 transition-all duration-300 shadow-sm hover:shadow-md rounded overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-0.5 bg-linear-to-r from-accent-purple/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className="flex items-start justify-between mb-4">
-                <div className="w-11 h-11 rounded-lg bg-linear-to-br from-accent-purple/10 to-accent-purple/5 border border-accent-purple/20 flex items-center justify-center group-hover:scale-105 transition-transform">
-                  <span className="text-base font-bold text-accent-purple">
-                    ✓
-                  </span>
+            <div className="border-2 border-black bg-[#F5F3F0] p-8 hover:shadow-[6px_6px_0_rgba(0,0,0,0.2)] transition-all group">
+              <div className="flex items-start justify-between mb-6">
+                <div className="text-xs text-black/40 tracking-wide uppercase">{`// Quality`}</div>
+                <div className="w-8 h-8 border-2 border-black bg-[#5B5FFF] text-white flex items-center justify-center text-sm shadow-[2px_2px_0_rgba(0,0,0,0.3)]">
+                  v3
                 </div>
-                <span className="text-[9px] uppercase tracking-[0.12em] text-slate/40 font-bold">
-                  Quality
-                </span>
               </div>
-              <h3 className="text-[19px] font-semibold text-foreground mb-2.5 tracking-tight group-hover:text-accent-purple transition-colors">
+              <h3 className="text-xl tracking-tight mb-3">
                 Quality Evaluation
+                <span className="text-black/40">()</span>
               </h3>
-              <p className="text-[14px] text-slate/70 leading-relaxed font-light">
-                LLM-as-judge grades every trace. Monitor relevance, accuracy,
-                safety. Catch regressions early.
-              </p>
+              <p className="text-sm text-black/60 leading-relaxed">{`// LLM-as-judge grades every trace. Monitor relevance, accuracy, safety. Catch regressions early.`}</p>
             </div>
 
             {/* Feature 5 */}
-            <div className="group relative p-6 border border-slate/15 bg-linear-to-br from-slate/3 to-transparent hover:border-slate/25 transition-all duration-300 shadow-sm hover:shadow-md rounded overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-0.5 bg-linear-to-r from-slate/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className="flex items-start justify-between mb-4">
-                <div className="w-11 h-11 rounded-lg bg-linear-to-br from-slate/10 to-slate/5 border border-slate/20 flex items-center justify-center group-hover:scale-105 transition-transform">
-                  <span className="text-base font-bold text-foreground">∞</span>
+            <div className="border-2 border-black bg-[#F5F3F0] p-8 hover:shadow-[6px_6px_0_rgba(0,0,0,0.2)] transition-all group">
+              <div className="flex items-start justify-between mb-6">
+                <div className="text-xs text-black/40 tracking-wide uppercase">{`// Analytics`}</div>
+                <div className="w-8 h-8 border-2 border-black bg-[#5B5FFF] text-white flex items-center justify-center text-sm shadow-[2px_2px_0_rgba(0,0,0,0.3)]">
+                  v4
                 </div>
-                <span className="text-[9px] uppercase tracking-[0.12em] text-slate/40 font-bold">
-                  Analytics
-                </span>
               </div>
-              <h3 className="text-[19px] font-semibold text-foreground mb-2.5 tracking-tight group-hover:text-slate transition-colors">
+              <h3 className="text-xl tracking-tight mb-3">
                 Workflow Analysis
+                <span className="text-black/40">()</span>
               </h3>
-              <p className="text-[14px] text-slate/70 leading-relaxed font-light">
-                Understand patterns across thousands of traces. Find bottlenecks
-                and errors. Optimize systematically.
-              </p>
+              <p className="text-sm text-black/60 leading-relaxed">{`// Understand patterns across thousands of traces. Find bottlenecks and errors. Optimize systematically.`}</p>
             </div>
 
-            {/* Feature 6 - Highlight */}
-            <div className="group relative p-6 border-2 border-babyblue/40 bg-linear-to-br from-babyblue/5 to-babyblue/2 shadow-md hover:shadow-lg transition-all duration-300 rounded overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-1 bg-linear-to-r from-babyblue via-accent-teal to-accent-purple" />
-              <div className="flex items-start justify-between mb-4">
-                <div className="w-11 h-11 rounded-lg bg-linear-to-br from-babyblue/20 to-babyblue/10 border-2 border-babyblue/40 flex items-center justify-center group-hover:scale-105 transition-transform">
-                  <span className="text-base font-bold text-babyblue">→</span>
-                </div>
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-linear-to-r from-babyblue/15 to-babyblue/5 border border-babyblue/30">
-                  <div className="w-1.5 h-1.5 rounded-full bg-babyblue animate-pulse shadow-sm shadow-babyblue/50" />
-                  <span className="text-[9px] uppercase tracking-[0.12em] text-babyblue font-bold">
-                    Soon
-                  </span>
+            {/* Feature 6 */}
+            <div className="border-2 border-black bg-[#F5F3F0] p-8 hover:shadow-[6px_6px_0_rgba(0,0,0,0.2)] transition-all group">
+              <div className="flex items-start justify-between mb-6">
+                <div className="text-xs text-black/40 tracking-wide uppercase">{`// Soon`}</div>
+                <div className="w-8 h-8 border-2 border-black bg-[#5B5FFF] text-white flex items-center justify-center text-sm shadow-[2px_2px_0_rgba(0,0,0,0.3)]">
+                  v5
                 </div>
               </div>
-              <h3 className="text-[19px] font-semibold text-foreground mb-2.5 tracking-tight">
+              <h3 className="text-xl tracking-tight mb-3">
                 Prompt Playground
+                <span className="text-black/40">()</span>
               </h3>
-              <p className="text-[14px] text-slate/70 leading-relaxed font-light">
-                Test prompts directly in the dashboard. Compare outputs across
-                models and versions. Iterate faster.
-              </p>
+              <p className="text-sm text-black/60 leading-relaxed">{`// Test prompts directly in the dashboard. Compare outputs across models and versions. Iterate faster.`}</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* System Architecture */}
-      <section className="py-16 border-t border-slate/10 bg-linear-to-b from-transparent to-slate/2">
-        <div className="max-w-6xl mx-auto px-8">
-          <div className="mb-12">
-            <div className="inline-flex items-center gap-2 mb-3">
-              <div className="w-1 h-1 rounded-full bg-slate/50" />
-              <span className="text-[10px] uppercase tracking-[0.15em] text-slate/50 font-bold">
-                Technical
-              </span>
+      {/* Technical */}
+      <section className="max-w-7xl mx-auto px-6 py-16">
+        <div className="text-center mb-12">
+          <div className="text-xs mb-4 text-black/40 tracking-[0.15em] uppercase">{`/* Technical */`}</div>
+          <h2 className="text-4xl lg:text-5xl tracking-tight mb-6">
+            <span className="text-black/40">{`> `}</span>Enterprise
+            infrastructure
+          </h2>
+          <p className="text-lg text-black/60 max-w-2xl mx-auto leading-relaxed">
+            {`// Production-grade architecture designed to scale`}
+            <br />
+            {`// with your team and workload.`}
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+          <div className="text-center">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-[#FFD600] border-2 border-black mb-6 shadow-[4px_4px_0_rgba(0,0,0,0.2)]">
+              <Zap className="w-7 h-7 text-white" />
             </div>
-            <h2 className="text-[38px] font-bold text-foreground mb-3 tracking-tight leading-[1.15]">
-              Enterprise infrastructure
-            </h2>
-            <p className="text-[16px] text-slate/70 max-w-[560px] font-light leading-relaxed">
-              Production-grade architecture designed to scale with your team and
-              workload.
-            </p>
+            <div className="text-xs text-black/40 mb-3 tracking-wide uppercase">{`// Performance`}</div>
+            <h3 className="text-xl tracking-tight mb-3">
+              Async processing
+              <span className="text-black/40">()</span>
+            </h3>
+            <p className="text-sm text-black/60 leading-relaxed">{`// Background workers send data without blocking your agent. Zero performance impact on production.`}</p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-5">
-            <div className="relative p-6 pl-5 border-l-3 border-babyblue/30 bg-linear-to-br from-babyblue/2 to-transparent rounded-r shadow-sm">
-              <div className="absolute top-0 left-0 w-0.5 h-full bg-linear-to-b from-babyblue to-transparent" />
-              <div className="text-[10px] uppercase tracking-[0.12em] text-babyblue font-bold mb-3">
-                Performance
-              </div>
-              <h3 className="text-[19px] font-semibold text-foreground mb-2.5 tracking-tight">
-                Async processing
-              </h3>
-              <p className="text-[14px] text-slate/70 leading-relaxed font-light">
-                Background workers send data without blocking your agent. Zero
-                performance impact on production.
-              </p>
+          <div className="text-center">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-[#5B5FFF] border-2 border-black mb-6 shadow-[4px_4px_0_rgba(0,0,0,0.2)]">
+              <Shield className="w-7 h-7 text-white" />
             </div>
+            <div className="text-xs text-black/40 mb-3 tracking-wide uppercase">{`// Security`}</div>
+            <h3 className="text-xl tracking-tight mb-3">
+              Secure by design
+              <span className="text-black/40">()</span>
+            </h3>
+            <p className="text-sm text-black/60 leading-relaxed">{`// End-to-end encryption for all data. Granular access controls. SOC 2 Type II compliant.`}</p>
+          </div>
 
-            <div className="relative p-6 pl-5 border-l-3 border-success/30 bg-linear-to-br from-success/2 to-transparent rounded-r shadow-sm">
-              <div className="absolute top-0 left-0 w-0.5 h-full bg-linear-to-b from-success to-transparent" />
-              <div className="text-[10px] uppercase tracking-[0.12em] text-success font-bold mb-3">
-                Security
-              </div>
-              <h3 className="text-[19px] font-semibold text-foreground mb-2.5 tracking-tight">
-                Secure by design
-              </h3>
-              <p className="text-[14px] text-slate/70 leading-relaxed font-light">
-                End-to-end encryption for all data. Granular access controls.
-                SOC 2 Type II compliant.
-              </p>
+          <div className="text-center">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-[#4CAF50] border-2 border-black mb-6 shadow-[4px_4px_0_rgba(0,0,0,0.2)]">
+              <Database className="w-7 h-7 text-white" />
             </div>
-
-            <div className="relative p-6 pl-5 border-l-3 border-accent-teal/30 bg-linear-to-br from-accent-teal/2 to-transparent rounded-r shadow-sm">
-              <div className="absolute top-0 left-0 w-0.5 h-full bg-linear-to-b from-accent-teal to-transparent" />
-              <div className="text-[10px] uppercase tracking-[0.12em] text-accent-teal font-bold mb-3">
-                Storage
-              </div>
-              <h3 className="text-[19px] font-semibold text-foreground mb-2.5 tracking-tight">
-                Smart storage
-              </h3>
-              <p className="text-[14px] text-slate/70 leading-relaxed font-light">
-                Large prompts in S3, structured data in Postgres, time-series in
-                TimescaleDB. Optimized for every use case.
-              </p>
-            </div>
+            <div className="text-xs text-black/40 mb-3 tracking-wide uppercase">{`// Storage`}</div>
+            <h3 className="text-xl tracking-tight mb-3">
+              Smart storage
+              <span className="text-black/40">()</span>
+            </h3>
+            <p className="text-sm text-black/60 leading-relaxed">{`// Large prompts in S3, structured data in Postgres, time-series in TimescaleDB. Optimized for every use case.`}</p>
           </div>
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-16 border-t border-slate/10">
-        <div className="max-w-5xl mx-auto px-8">
+      {/* Quick Start */}
+      <section className="bg-white py-16 border-y-2 border-black">
+        <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-12">
-            <div className="inline-flex items-center gap-2 mb-3 justify-center">
-              <div className="w-1 h-1 rounded-full bg-babyblue" />
-              <span className="text-[10px] uppercase tracking-[0.15em] text-babyblue font-bold">
-                Quick Start
-              </span>
+            <div className="text-xs mb-4 text-black/40 tracking-[0.15em] uppercase">
+              {`/* Quick Start */`}
             </div>
-            <h2 className="text-[38px] font-bold text-foreground mb-3 tracking-tight leading-[1.15]">
+            <h2 className="text-4xl lg:text-5xl tracking-tight mb-6">
+              <span className="text-black/40">{`> `}</span>
               Start tracing in 30 seconds
             </h2>
-            <p className="text-[16px] text-slate/70 font-light">
-              Install the SDK and instrument your first agent. No configuration
-              required.
+            <p className="text-lg text-black/60 max-w-2xl mx-auto leading-relaxed">
+              {`// Install the SDK and instrument your first agent.`}
+              <br />
+              {`// No configuration required.`}
             </p>
           </div>
 
-          {/* Code snippet */}
-          <div className="max-w-3xl mx-auto mb-10">
-            <div className="relative p-6 border border-slate/15 bg-linear-to-br from-slate/3 to-babyblue/2 shadow-md rounded overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-1 bg-linear-to-r from-babyblue via-accent-teal to-accent-purple" />
-              <div className="flex items-center justify-between mb-5 pb-4 border-b border-slate/10">
-                <div className="flex items-center gap-3">
-                  <span className="text-[10px] font-semibold text-slate/50 uppercase tracking-wider">
-                    Terminal
-                  </span>
-                  <span className="text-[10px] text-slate/40">•</span>
-                  <span className="text-[10px] text-babyblue font-medium">
-                    setup.py
+          <div className="max-w-3xl mx-auto mb-12">
+            <div className="bg-black border-2 border-black overflow-hidden shadow-[8px_8px_0_rgba(0,0,0,0.2)]">
+              <div className="border-b-2 border-white/20 px-6 py-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-red-500 border border-white/30"></div>
+                  <div className="w-3 h-3 bg-yellow-500 border border-white/30"></div>
+                  <div className="w-3 h-3 bg-green-500 border border-white/30"></div>
+                  <span className="text-xs text-[#FFD600] ml-4">
+                    {`> setup.py`}
                   </span>
                 </div>
-                <button className="text-[10px] text-babyblue hover:text-babyblue/80 font-semibold uppercase tracking-wider transition-colors duration-200">
-                  Copy
+                <button
+                  onClick={() =>
+                    copyToClipboard(`pip install orbis-sdk
+
+from orbis import observe
+
+@observe()
+def my_agent(query: str):
+    # Automatically traced with full context
+    return process(query)`)
+                  }
+                  className="text-white/40 hover:text-[#FFD600] transition-colors"
+                >
+                  {copied ? (
+                    <span className="text-[#FFD600]">✓</span>
+                  ) : (
+                    <Copy className="w-4 h-4" />
+                  )}
                 </button>
               </div>
-              <div className="font-mono text-[14px] space-y-4">
-                <div>
-                  <span className="text-slate/40">$ </span>
-                  <span className="text-foreground font-medium">
-                    pip install orbis-sdk
-                  </span>
-                </div>
-                <div className="pt-3 space-y-1.5">
-                  <div>
-                    <span className="text-accent-teal">from</span>{" "}
-                    <span className="text-foreground">orbis</span>{" "}
-                    <span className="text-accent-teal">import</span>{" "}
-                    <span className="text-foreground">observe</span>
-                  </div>
-                  <div className="text-slate/40">
-                    <br />
-                  </div>
-                  <div>
-                    <span className="text-babyblue font-semibold">
-                      @observe()
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-accent-teal">def</span>{" "}
-                    <span className="text-foreground font-medium">
-                      my_agent
-                    </span>
-                    <span className="text-slate/60">(query: str):</span>
-                  </div>
-                  <div className="pl-4 text-slate/40">
-                    # Automatically traced with full context
-                  </div>
-                  <div className="pl-4">
-                    <span className="text-accent-teal">return</span>{" "}
-                    <span className="text-foreground">process</span>
-                    <span className="text-slate/60">(query)</span>
-                  </div>
-                </div>
-              </div>
+              <pre className="p-6 overflow-x-auto">
+                <code className="text-sm text-white/90">
+                  {`$ pip install orbis-sdk
+
+from orbis import observe
+
+@observe()
+def my_agent(query: str):
+    # Automatically traced with full context
+    return process(query)`}
+                </code>
+              </pre>
             </div>
           </div>
 
           <div className="flex items-center justify-center gap-4">
             <Link
               href="/dashboard"
-              className="px-7 py-3 bg-foreground text-background font-medium text-sm hover:bg-foreground/90 transition-all duration-200 shadow-sm hover:shadow-md"
+              className="bg-black hover:bg-black/90 text-[#FFD600] px-6 py-2.5 border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.2)] inline-flex items-center gap-2"
             >
-              View Dashboard
+              view_dashboard()
+              <ArrowUpRight className="h-4 w-4" />
             </Link>
-            <a
-              href="#features"
-              className="px-7 py-3 border border-slate/20 font-medium text-sm text-foreground hover:bg-slate/5 transition-colors duration-200"
-            >
-              Explore Features
-            </a>
+            <button className="border-2 border-black hover:bg-black/5 px-6 py-2.5 shadow-[4px_4px_0_rgba(0,0,0,0.1)]">
+              read_docs()
+            </button>
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-slate/10 py-16">
-        <div className="max-w-6xl mx-auto px-8">
-          <div className="flex items-start justify-between mb-10">
+      <footer className="border-t-2 border-black bg-[#F5F3F0]">
+        <div className="max-w-7xl mx-auto px-6 py-16">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
             <div>
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-7 h-7 bg-linear-to-br from-babyblue to-babyblue/80 rounded-md flex items-center justify-center shadow-sm">
-                  <div className="w-3 h-3 border-2 border-white rounded-sm" />
-                </div>
-                <span className="text-lg font-semibold text-foreground tracking-tight">
-                  Orbis
-                </span>
+              <div className="flex items-center gap-3 mb-4">
+                <Logo className="w-10 h-10" />
+                <span className="tracking-tight">$ orbis.ai</span>
               </div>
-              <p className="text-sm text-slate/70 max-w-xs">
-                Observability for AI agents. Every call traced, every dollar
-                tracked.
+              <p className="text-sm text-black/60 leading-relaxed">
+                {`// Observability for AI agents.`}
+                <br />
+                {`// Every call traced, every dollar tracked.`}
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-12">
-              <div>
-                <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider mb-3">
-                  Product
-                </h4>
-                <ul className="space-y-2 text-sm">
-                  <li>
-                    <a
-                      href="#features"
-                      className="text-slate/70 hover:text-babyblue transition-colors duration-200"
-                    >
-                      Features
-                    </a>
-                  </li>
-                  <li>
-                    <Link
-                      href="/dashboard"
-                      className="text-slate/70 hover:text-babyblue transition-colors duration-200"
-                    >
-                      Dashboard
-                    </Link>
-                  </li>
-                  <li>
-                    <a
-                      href="#"
-                      className="text-slate/70 hover:text-babyblue transition-colors duration-200"
-                    >
-                      Documentation
-                    </a>
-                  </li>
-                </ul>
+
+            <div>
+              <div className="text-xs mb-4 text-black/40 tracking-wide uppercase">{`/* Product */`}</div>
+              <div className="space-y-3">
+                <a
+                  href="#features"
+                  className="block text-sm hover:text-[#FFD600] transition-colors"
+                >
+                  /features
+                </a>
+                <a
+                  href="#"
+                  className="block text-sm hover:text-[#FFD600] transition-colors"
+                >
+                  /dashboard
+                </a>
+                <a
+                  href="#"
+                  className="block text-sm hover:text-[#FFD600] transition-colors"
+                >
+                  /docs
+                </a>
+                <a
+                  href="#"
+                  className="block text-sm hover:text-[#FFD600] transition-colors"
+                >
+                  /pricing
+                </a>
               </div>
-              <div>
-                <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider mb-3">
-                  Resources
-                </h4>
-                <ul className="space-y-2 text-sm">
-                  <li>
-                    <a
-                      href="#"
-                      className="text-slate/70 hover:text-babyblue transition-colors duration-200"
-                    >
-                      GitHub
-                    </a>
-                  </li>
-                  <li>
-                    <a
-                      href="#"
-                      className="text-slate/70 hover:text-babyblue transition-colors duration-200"
-                    >
-                      Examples
-                    </a>
-                  </li>
-                  <li>
-                    <a
-                      href="#"
-                      className="text-slate/70 hover:text-babyblue transition-colors duration-200"
-                    >
-                      Support
-                    </a>
-                  </li>
-                </ul>
+            </div>
+
+            <div>
+              <div className="text-xs mb-4 text-black/40 tracking-wide uppercase">{`/* Resources */`}</div>
+              <div className="space-y-3">
+                <a
+                  href="#"
+                  className="block text-sm hover:text-[#FFD600] transition-colors"
+                >
+                  github.com/orbis
+                </a>
+                <a
+                  href="#"
+                  className="block text-sm hover:text-[#FFD600] transition-colors"
+                >
+                  /examples
+                </a>
+                <a
+                  href="#"
+                  className="block text-sm hover:text-[#FFD600] transition-colors"
+                >
+                  /api-reference
+                </a>
+                <a
+                  href="#"
+                  className="block text-sm hover:text-[#FFD600] transition-colors"
+                >
+                  /support
+                </a>
+              </div>
+            </div>
+
+            <div>
+              <div className="text-xs mb-4 text-black/40 tracking-wide uppercase">{`/* Company */`}</div>
+              <div className="space-y-3">
+                <a
+                  href="#"
+                  className="block text-sm hover:text-[#FFD600] transition-colors"
+                >
+                  /about
+                </a>
+                <a
+                  href="#"
+                  className="block text-sm hover:text-[#FFD600] transition-colors"
+                >
+                  /blog
+                </a>
+                <a
+                  href="#"
+                  className="block text-sm hover:text-[#FFD600] transition-colors"
+                >
+                  /privacy
+                </a>
+                <a
+                  href="#"
+                  className="block text-sm hover:text-[#FFD600] transition-colors"
+                >
+                  /terms
+                </a>
               </div>
             </div>
           </div>
-          <div className="pt-8 border-t border-slate/10">
-            <p className="text-xs text-slate/60">
-              © 2025 Orbis. Built for developers who ship AI agents.
+
+          <div className="pt-8 border-t-2 border-black/10 flex flex-col md:flex-row items-center justify-between gap-4">
+            <p className="text-sm text-black/50">
+              {`// © 2025 Orbis. Built for developers who ship AI agents.`}
             </p>
+            <div className="flex items-center gap-6">
+              <a
+                href="#"
+                className="text-sm text-black/50 hover:text-[#FFD600] transition-colors"
+              >
+                twitter.com
+              </a>
+              <a
+                href="#"
+                className="text-sm text-black/50 hover:text-[#FFD600] transition-colors"
+              >
+                github.com
+              </a>
+              <a
+                href="#"
+                className="text-sm text-black/50 hover:text-[#FFD600] transition-colors"
+              >
+                discord.gg
+              </a>
+            </div>
           </div>
         </div>
       </footer>

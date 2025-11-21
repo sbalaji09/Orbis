@@ -90,14 +90,14 @@ function ArrowMarker() {
       {/* Arrowhead marker */}
       <marker
         id="arrowhead"
-        markerWidth="10"
-        markerHeight="10"
-        refX="8"
-        refY="5"
+        markerWidth="6"
+        markerHeight="6"
+        refX="6"
+        refY="3"
         orient="auto"
         markerUnits="strokeWidth"
       >
-        <polygon points="0,0 0,10 10,5" fill="#cbdceb" stroke="none" />
+        <polygon points="0,0 0,6 6,3" fill="#000000" stroke="none" />
       </marker>
     </defs>
   );
@@ -137,10 +137,12 @@ function Edge({ from, to }: Edge) {
 
   const arrowheadSize = 8;
 
-  const fromX = from.x + cos * (fromT + gap);
-  const fromY = from.y + sin * (fromT + gap);
-  const toX = to.x - cos * (toT + gap + arrowheadSize);
-  const toY = to.y - sin * (toT + gap + arrowheadSize);
+  const fromX = Math.round((from.x + cos * (fromT + gap)) * 100) / 100;
+  const fromY = Math.round((from.y + sin * (fromT + gap)) * 100) / 100;
+  const toX =
+    Math.round((to.x - cos * (toT + gap + arrowheadSize)) * 100) / 100;
+  const toY =
+    Math.round((to.y - sin * (toT + gap + arrowheadSize)) * 100) / 100;
 
   const path = `M ${fromX} ${fromY} L ${toX} ${toY}`;
 
@@ -148,12 +150,12 @@ function Edge({ from, to }: Edge) {
     <g>
       <path
         d={path}
-        stroke="#cbdceb"
-        strokeWidth="2"
+        stroke="#000000"
+        strokeWidth="2.5"
         fill="none"
         markerEnd="url(#arrowhead)"
         strokeLinecap="round"
-        opacity="0.7"
+        opacity="0.8"
       />
     </g>
   );
