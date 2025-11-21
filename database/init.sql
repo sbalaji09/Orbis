@@ -48,7 +48,7 @@ CREATE TABLE spans (
 );
 
 CREATE TABLE prompt_versions (
-    prompt_version_id SERIAL PRIMARY KEY,
+    prompt_version_id UUID PRIMARY KEY,
     name VARCHAR(50),
     version_number INT,
     s3_url VARCHAR(200),
@@ -57,11 +57,19 @@ CREATE TABLE prompt_versions (
 );
 
 CREATE TABLE evaluations (
-    evaluation_id SERIAL PRIMARY KEY,
+    evaluation_id UUID PRIMARY KEY,
     trace_id UUID REFERENCES traces(trace_id),
     evaluator_llm VARCHAR(200),
     score INT
 );
+
+CREATE TABLE api_keys {
+    api_key_id SERIAL PRIMARY KEY,
+    user_id REFERENCES auth.users(id),
+    agent_name REFERENCES agents(agent_name),
+    api_key_str TEXT,
+    created_at TIMESTAMP DEFAULT NOW(),
+}
 
 -- Create indexes
 CREATE INDEX idx_traces_user_id ON traces(user_id);
@@ -71,3 +79,4 @@ CREATE INDEX idx_spans_status ON spans(status);
 CREATE INDEX idx_prompt_versions_version_number ON prompt_versions(version_number);
 CREATE INDEX idx_evaluations_trace_id ON evaluations(trace_id);
 CREATE UNIQUE INDEX idx_agents_api_key ON agents(api_key);
+CREATE INDEX api_key_user_id ON api_keys(user_id);
