@@ -1,3 +1,4 @@
+import datetime
 import os
 import psycopg2
 from psycopg2.extras import RealDictCursor, execute_values
@@ -442,6 +443,72 @@ class SupabaseDB:
                 return [dict(row) for row in results]
         finally:
             self.return_connection(conn)
+    
+    def insert_api_key(self, user_id: str, agent_name: str, api_key_str: str) -> str:
+        conn = self.get_connection()
+        cur_time = datetime.now()
+        try:
+            with conn.cursor() as cur:
+                sql = """
+                    INSERT INTO api_keys (
+                        user_id,
+                        agent_name,
+                        api_key_str,
+                        cur_time
+                    ) VALUES (
+                        %s,
+                        %s,
+                        %s
+                    )
+                    RETURNING agent_id
+                """
+                cur.execute(sql, (
+                    user_id,
+                    agent_name,
+                    api_key_str,
+                    cur_time
+                ))
+                result = cur.fetchone()
+                conn.commit()
+                return f"API Key insertion successful with api_key_id: {result[0]}"
+        except Exception as e:
+            conn.rollback()
+            raise Exception(f"Failed to insert api key: {e}")
+        finally:
+            self.return_connection(conn)
+    
+    def get_api_keys_by_user(self, user_id: str, limit: int = 50, offset: int = 0) -> List[Dict]:
+        """Get all traces for a user with pagination"""
+        conn = self.get_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                sql = """
+                    SELECT * FROM api_keys
+                    WHERE user_id = %s
+                    ORDER BY created_at DESC
+                    LIMIT %s OFFSET %s
+                """
+                cur.execute(sql, (user_id, limit, offset))
+                results = cur.fetchall()
+                return [dict(row) for row in results]
+        finally:
+            self.return_connection(conn)
+    
+    def delete_api_key(self, api_key_id: str, user_id: str):
+        conn = self.get_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                sql = """
+                    DELETE FROM api_keys
+                    WHERE user_id = %s
+                    AND agent_id = %s
+                """
+                cur.execute(sql, (user_id, api_key_id))
+                conn.commit()
+                return "Successfully deleted API key"
+        finally:
+            self.return_connection(conn)
+
 
     # closes all the connections in the pool
     def close(self):

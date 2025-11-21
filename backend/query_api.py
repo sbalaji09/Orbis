@@ -25,8 +25,6 @@ app.add_middleware(
 )
 
 # health check endpoint
-
-
 @app.get("/health")
 async def health_check():
     return {
@@ -36,8 +34,6 @@ async def health_check():
     }
 
 # list all traces for a user with pagination
-
-
 @app.get("/traces")
 async def list_traces(
     user_id: str = Header(..., alias="X-User-ID"),
@@ -45,26 +41,24 @@ async def list_traces(
     offset: int = Query(0, ge=0, description="Number to skip for pagination"),
     status: Optional[str] = Query(None, description="Filter by status")
 ):
-    # try:
-    # get all the traces
-    traces = db.get_traces_by_user(user_id, limit=limit, offset=offset)
+    try:
+        # get all the traces
+        traces = db.get_traces_by_user(user_id, limit=limit, offset=offset)
 
-    # filter by the status
-    if status:
-        traces = [t for t in traces if t.get('status') == status]
+        # filter by the status
+        if status:
+            traces = [t for t in traces if t.get('status') == status]
 
-    return {
-        "traces": traces,
-        "count": len(traces),
-        "limit": limit,
-        "offset": offset
-    }
-    # except Exception as e:
-    #     raise HTTPException(status_code=500, detail=str(e))
+        return {
+            "traces": traces,
+            "count": len(traces),
+            "limit": limit,
+            "offset": offset
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # get the most recent traces for a user
-
-
 @app.get("/traces/recent")
 async def get_recent_traces(
     user_id: str = Header(..., alias="X-User-ID"),
@@ -80,8 +74,6 @@ async def get_recent_traces(
         raise HTTPException(status_code=500, detail=str(e))
 
 # get a specific trace by the trace id
-
-
 @app.get("/traces/{trace_id}")
 async def get_trace(
     trace_id: str,
@@ -104,8 +96,6 @@ async def get_trace(
     #     raise HTTPException(status_code=500, detail=str(e))
 
 # get all the spans for a specific trace
-
-
 @app.get("/traces/{trace_id}/spans")
 async def get_trace_spans(
     trace_id: str,
@@ -132,8 +122,6 @@ async def get_trace_spans(
         raise HTTPException(status_code=500, detail=str(e))
 
 # get trace summary with aggregated span information
-
-
 @app.get("/traces/{trace_id}/summary")
 async def get_trace_summary(
     trace_id: str,
@@ -156,8 +144,6 @@ async def get_trace_summary(
         raise HTTPException(status_code=500, detail=str(e))
 
 # get a specific span by ID
-
-
 @app.get("/spans/{span_id}")
 async def get_span(
     span_id: str,
@@ -182,8 +168,6 @@ async def get_span(
 
 # get aggregate matrics for a user
 # returns: total_traces, total_spans, total_cost, total_tokens, avg_cost_per_trace, total_duration
-
-
 @app.get("/metrics/user")
 async def get_user_metrics(
     user_id: str = Header(..., alias="X-User-ID")
@@ -195,8 +179,6 @@ async def get_user_metrics(
         raise HTTPException(status_code=500, detail=str(e))
 
 # search and filter traces
-
-
 @app.get("/search/traces")
 async def search_traces(
     user_id: str = Header(..., alias="X-User-ID"),
@@ -237,8 +219,6 @@ async def search_traces(
         raise HTTPException(status_code=500, detail=str(e))
 
 # get traces based on the specific agent
-
-
 @app.get("/traces/{agent_id}")
 async def get_traces_by_agent(agent_id: str, user_id: str, limit: int = 5, offset: int = 0):
     try:
@@ -259,15 +239,13 @@ async def get_traces_by_agent(agent_id: str, user_id: str, limit: int = 5, offse
         raise HTTPException(status_code=500, detail=str(e))
 
 # get all the agents belonging to a specific user
-
-
 @app.get("/agents")
 async def get_agents(user_id: str):
     # try:
     agents = db.get_agents(user_id)
 
-    # if not agents:
-    #     raise HTTPException(status_code=404, detail="Agents not found")
+    if not agents:
+        raise HTTPException(status_code=404, detail="Agents not found")
 
     return agents
     # except HTTPException:
