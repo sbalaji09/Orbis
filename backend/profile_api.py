@@ -6,10 +6,15 @@ from fastapi import HTTPException, Header
 from query_api import app
 import secrets
 import redis
+import bcrypt
 from db_connection import db
 from dotenv import load_dotenv
 
 load_dotenv()
+
+def hash_api_key(api_key: str) -> str:
+    """Hash an API key using bcrypt"""
+    return bcrypt.hashpw(api_key.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
 # Redis connection for API key caching (used by data-pipeline auth)
 redis_client = redis.Redis(
@@ -33,21 +38,27 @@ def remove_api_key_from_redis(api_key: str):
 # api key endpoint for users
 @app.post("/agent")
 async def create_ai_agent(agent_name: str, user_id: str = Header(..., alias="X-User-ID")):
+    # Generate plaintext API key
     api_key = generate_key_with_string(agent_name)
+
+    # Hash the API key for database storage
+    hashed_key = hash_api_key(api_key)
+
     try:
-        res = db.insert_agent(user_id, agent_name, api_key)
+        res = db.insert_agent(user_id, agent_name, hashed_key)
         # res is a string message like "API Key insertion successful with api_key_id: 123"
         # Extract the id from the message
         agent_id = res.split(":")[-1].strip()
 
-        # Cache API key in Redis for fast auth lookup by data-pipeline
+        # Cache plaintext API key in Redis for fast auth lookup by data-pipeline
+        # Redis stores: api_key:{plaintext} -> user_id
         cache_api_key_in_redis(user_id, api_key)
 
         return {
             "agent_id": agent_id,
             "agent_name": agent_name,
-            "api_key": api_key,
-            "message": "API Key inserted successfully"
+            "api_key": api_key,  # Return plaintext to user (only time they see it)
+            "message": "API Key inserted successfully. Save this key - it cannot be retrieved again."
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

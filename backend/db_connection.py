@@ -478,7 +478,22 @@ class SupabaseDB:
                 return [dict(row) for row in results]
         finally:
             self.return_connection(conn)
-    
+
+    def get_all_agents_for_auth(self) -> List[Dict]:
+        """Get all agents with their hashed API keys for authentication verification"""
+        conn = self.get_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                sql = """
+                    SELECT agent_id, user_id, api_key FROM agents
+                    WHERE api_key IS NOT NULL
+                """
+                cur.execute(sql)
+                results = cur.fetchall()
+                return [dict(row) for row in results]
+        finally:
+            self.return_connection(conn)
+
     def delete_agent(self, agent_id: str, user_id: str):
         conn = self.get_connection()
         try:
