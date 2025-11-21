@@ -79,25 +79,26 @@ class OpenAIInstrumentor:
         
         try:
             import openai
+            from openai.resources.chat import completions
         except ImportError:
             print("OpenAI package not installed. Skipping OpenAI instrumentation.")
             return
 
-        # wrap the chat completions create method
+        # Wrap the completions.create method at class level
         try:
-            original_create = openai.chat.completions.create
+            original_create = completions.Completions.create
             
             @functools.wraps(original_create)
-            def wrapped_create(*args, **kwargs):
-                return self._trace_openai_call(original_create, *args, **kwargs)
+            def wrapped_create(self, *args, **kwargs):
+                return _openai_instrumentor._trace_openai_call(original_create, self, *args, **kwargs)
             
-            openai.chat.completions.create = wrapped_create
+            completions.Completions.create = wrapped_create  # ← This line, not openai.chat.completions.create
             self.original_create = original_create
             self.instrumented = True
 
             print("OpenAI instrumentation enabled")
         
-        except AttributeError as e:
+        except Exception as e:
             print(f"Could not instrument OpenAI: {e}")
     
     # remove instrumentation and restore original openai methods
@@ -107,8 +108,9 @@ class OpenAIInstrumentor:
 
         try:
             import openai
+            from openai.resources.chat import completions
             if self.original_create:
-                openai.chat.completions.create = self.original_create
+                completions.Completions.create = self.original_create
             
             self.instrumented = False
             print("OpenAI instrumentation disabled")

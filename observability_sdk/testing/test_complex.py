@@ -31,7 +31,24 @@ def clean_data(data):
 
 @observe("generate_response")
 def generate_response(data):
-    return f"final_response_from_{data}"
+    return f"generate_response{data}"
+
+@observe("data_response_from")
+def data_clean_response(data):
+    return f"data_response_from_{data}"
+
+@observe("mixed_response_from")
+def mxied_response(data):
+    return f"mixed_response_from_{data}"
+
+@observe("outline_response_from")
+def outline_response(data):
+    return f"outline_response_from_{data}"
+
+@observe("container_response_from")
+def container_response(data):
+    return f"container_response_from_{data}"
+
 
 if __name__ == "__main__":
     print("Running complex agent...")

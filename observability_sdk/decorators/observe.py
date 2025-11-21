@@ -32,12 +32,16 @@ def observe(name: Optional[str] = None, trace_id: Optional[str] = None, user_id:
             # get parent context
             parent_span = get_current_span()
             
+            # Capture input arguments
+            input_str = f"args={args}, kwargs={kwargs}" if args or kwargs else ""
+            
             # create the span
             span = Span(
                 name=span_name,
                 agent_id="af913dc2-732e-42a6-a113-a80c694d71bf",
                 user_id=user_id or "00000000-0000-0000-0000-000000000000",
-                trace_id=trace_id or (parent_span.trace_id if parent_span else Span.__dataclass_fields__['trace_id'].default_factory())  # ✅ Inherit from parent
+                trace_id=trace_id or (parent_span.trace_id if parent_span else Span.__dataclass_fields__['trace_id'].default_factory()),
+                prompt=input_str  # ← ADD THIS: Capture input
             )
 
             # if there's a parent, set parent relationship
@@ -51,6 +55,9 @@ def observe(name: Optional[str] = None, trace_id: Optional[str] = None, user_id:
             try:
                 # execute the actual function
                 result = func(*args, **kwargs)
+                
+                # Capture output
+                span.output = str(result) if result is not None else ""  # ← ADD THIS: Capture output
                 
                 # mark span as successful
                 span.complete(status="success")
