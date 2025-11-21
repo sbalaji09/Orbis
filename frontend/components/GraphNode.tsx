@@ -206,8 +206,9 @@ export default function GraphNode({
         {showTooltip && !isDragging && (
           <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 -translate-y-full whitespace-nowrap bg-black border-2 border-black px-2.5 py-1.5 shadow-[4px_4px_0_rgba(0,0,0,0.2)] pointer-events-none z-50">
             <div className="flex items-center gap-1.5 text-[9px] text-[#FFD600] font-mono">
-              <span className="opacity-60">ID</span>
-              <span className="font-semibold">{span.span_id}</span>
+              <span className="font-semibold">
+                {span.name || "Unnamed Span"}
+              </span>
             </div>
           </div>
         )}
@@ -244,10 +245,7 @@ export default function GraphNode({
                   <div className="flex items-start justify-between gap-4 px-6 py-4 border-b border-border bg-linear-to-r from-babyblue/5 to-transparent">
                     <div className="min-w-0 flex-1 space-y-1">
                       <DialogTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
-                        <span>Span Details</span>
-                        <span className="text-sm font-mono text-muted">
-                          #{span.span_id}
-                        </span>
+                        <span>{span.name || "Span Details"}</span>
                       </DialogTitle>
                       {span.llm_model !== null && (
                         <p className="text-xs text-muted font-medium">
@@ -461,34 +459,6 @@ export default function GraphNode({
                         </div>
                       </div>
                     )}
-
-                    {/* Metadata */}
-                    <div className="space-y-2 pt-2 border-t border-border">
-                      <h4 className="text-xs font-semibold text-muted uppercase tracking-wide">
-                        Metadata
-                      </h4>
-                      <div className="space-y-2 text-[11px]">
-                        <div className="flex items-center gap-2">
-                          <span className="text-muted font-medium w-24 shrink-0">
-                            Trace ID
-                          </span>
-                          <code className="flex-1 px-2 py-1 rounded bg-background border border-border font-mono text-foreground">
-                            {span.trace_id}
-                          </code>
-                        </div>
-                        {span.parent_span_ids !== null &&
-                          span.parent_span_ids.length > 0 && (
-                            <div className="flex items-start gap-2">
-                              <span className="text-muted font-medium w-24 shrink-0">
-                                Parent Spans
-                              </span>
-                              <code className="flex-1 px-2 py-1 rounded bg-background border border-border font-mono text-foreground">
-                                {span.parent_span_ids.join(", ")}
-                              </code>
-                            </div>
-                          )}
-                      </div>
-                    </div>
                   </div>
                 </DialogPanel>
               </TransitionChild>
