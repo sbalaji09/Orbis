@@ -252,22 +252,6 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
 
-    # gets all the agents that belong to a certain user
-    def get_agents(self, user_id: str) -> List[Dict]:
-        conn = self.get_connection()
-        try:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                sql = """
-                    SELECT * FROM agents
-                    WHERE user_id = %s
-                    ORDER BY created_at DESC
-                """
-                cur.execute(sql, (user_id,))
-                results = cur.fetchall()
-                return [dict(row) for row in results]
-        finally:
-            self.return_connection(conn)
-
     def get_traces_by_user(self, user_id: str, limit: int = 50, offset: int = 0) -> List[Dict]:
         """Get all traces for a user with pagination"""
         conn = self.get_connection()
@@ -444,17 +428,17 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
     
-    def insert_api_key(self, user_id: str, agent_name: str, api_key_str: str) -> str:
+    def insert_agent(self, user_id: str, agent_name: str, api_key_str: str) -> str:
         conn = self.get_connection()
         cur_time = datetime.now()
         try:
             with conn.cursor() as cur:
                 sql = """
-                    INSERT INTO api_keys (
+                    INSERT INTO agents (
                         user_id,
                         agent_name,
-                        api_key_str,
                         cur_time
+                        api_key_str,
                     ) VALUES (
                         %s,
                         %s,
@@ -470,20 +454,19 @@ class SupabaseDB:
                 ))
                 result = cur.fetchone()
                 conn.commit()
-                return f"API Key insertion successful with api_key_id: {result[0]}"
+                return f"AI agent creation successful with agent id: {result[0]}"
         except Exception as e:
             conn.rollback()
             raise Exception(f"Failed to insert api key: {e}")
         finally:
             self.return_connection(conn)
     
-    def get_api_keys_by_user(self, user_id: str, limit: int = 50, offset: int = 0) -> List[Dict]:
-        """Get all traces for a user with pagination"""
+    def get_agents_by_userid(self, user_id: str, limit: int = 50, offset: int = 0) -> List[Dict]:
         conn = self.get_connection()
         try:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 sql = """
-                    SELECT * FROM api_keys
+                    SELECT * FROM agents
                     WHERE user_id = %s
                     ORDER BY created_at DESC
                     LIMIT %s OFFSET %s
@@ -494,18 +477,18 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
     
-    def delete_api_key(self, api_key_id: str, user_id: str):
+    def delete_agent(self, agent_id: str, user_id: str):
         conn = self.get_connection()
         try:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 sql = """
-                    DELETE FROM api_keys
+                    DELETE FROM agents
                     WHERE user_id = %s
                     AND agent_id = %s
                 """
-                cur.execute(sql, (user_id, api_key_id))
+                cur.execute(sql, (user_id, agent_id))
                 conn.commit()
-                return "Successfully deleted API key"
+                return "Successfully deleted agent"
         finally:
             self.return_connection(conn)
 

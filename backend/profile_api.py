@@ -7,16 +7,17 @@ import secrets
 from db_connection import db
 
 # api key endpoint for users
-@app.post("/api-key")
-async def generate_api_key(agent_name: str, user_id: str = Header(..., alias="X-User-ID")):
+@app.post("/agent")
+async def create_ai_agent(agent_name: str, user_id: str = Header(..., alias="X-User-ID")):
     api_key = generate_key_with_string(agent_name)
     try:
-        res = db.insert_api_key(user_id, agent_name, api_key)
+        res = db.insert_agent(user_id, agent_name, api_key)
         # res is a string message like "API Key insertion successful with api_key_id: 123"
         # Extract the id from the message
-        api_key_id = res.split(":")[-1].strip()
+        agent_id = res.split(":")[-1].strip()
         return {
-            "api_key_id": api_key_id,
+            "agent_id": agent_id,
+            "agent_name": agent_name,
             "api_key": api_key,
             "message": "API Key inserted successfully"
         }
@@ -29,10 +30,10 @@ def generate_key_with_string(input_string: str) -> str:
     api_key = base64.urlsafe_b64encode(combined).decode('utf-8')
     return api_key
 
-@app.get("/api-keys")
-async def fetch_api_keys_user(user_id: str = Header(..., alias="X-User-ID")):
+@app.get("/agents")
+async def fetch_agents(user_id: str = Header(..., alias="X-User-ID")):
     try:
-        api_keys: List[Dict] = db.get_api_keys_by_user(user_id)
+        api_keys: List[Dict] = db.get_agents(user_id)
         return {
             "user_id": user_id,
             "api_keys": api_keys,
@@ -41,10 +42,10 @@ async def fetch_api_keys_user(user_id: str = Header(..., alias="X-User-ID")):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.delete("/api-key")
-async def delete_api_key(api_key_id: str, user_id: str = Header(..., alias="X-User-ID")):
+@app.delete("/agent")
+async def delete_agent(agent_id: str, user_id: str = Header(..., alias="X-User-ID")):
     try:
-        res = db.delete_api_key(api_key_id, user_id)
+        res = db.delete_agent(agent_id, user_id)
         return {
             "message": res
         }
