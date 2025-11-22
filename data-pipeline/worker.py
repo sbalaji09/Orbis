@@ -1,4 +1,6 @@
+import base64
 import os
+import secrets
 import sys
 import time
 from datetime import datetime, timezone
@@ -115,6 +117,7 @@ class SpanWorker:
                     "total_tokens": 0,
                     "status": "running",
                     "user_id": str(span.get('user_id')),  # Keep as UUID string
+                    "trace_hash_id": generate_hash_key(str(span.get('user_id')), str(span.get('agent_id')))
                 }
                 trace["trace_id"] = trace_id
 
@@ -251,6 +254,17 @@ class SpanWorker:
                 exc_info=True
             )
             raise
+        
+def generate_hash_key(user_id: str, agent_id: str) -> str:
+    # Combine user_id and agent_id into one string
+    combined_str = f"{user_id}:{agent_id}"
+    # Generate 16 random bytes for extra uniqueness
+    random_bytes = secrets.token_bytes(16)
+    # Encode combined string as bytes
+    combined_bytes = combined_str.encode('utf-8') + random_bytes
+    # Encode to URL-safe base64 string
+    api_key = base64.urlsafe_b64encode(combined_bytes).decode('utf-8')
+    return api_key
 
 
 # this is the entry point of the file to run the worker

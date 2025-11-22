@@ -1,3 +1,4 @@
+import datetime
 import os
 import psycopg2
 from psycopg2.extras import RealDictCursor, execute_values
@@ -57,15 +58,16 @@ class SupabaseDB:
                 if trace_data.get('agent_id') is not None:
                     sql = """
                         INSERT INTO traces (
-                            trace_id, user_id, agent_id, start_time, status,
+                            trace_id, trace_hash_id, user_id, agent_id, start_time, status,
                             total_cost, total_tokens
                         ) VALUES (
-                            %s, %s, %s, %s, %s, %s, %s
+                            %s, %s, %s, %s, %s, %s, %s, %s
                         )
                         RETURNING trace_id
                     """
                     cur.execute(sql, (
                         trace_data.get('trace_id'),
+                        trace_data.get('trace_hash_id'),
                         trace_data.get('user_id'),
                         trace_data.get('agent_id'),
                         trace_data.get('start_time'),
@@ -76,15 +78,16 @@ class SupabaseDB:
                 else:
                     sql = """
                         INSERT INTO traces (
-                            trace_id, user_id, start_time, status,
+                            trace_id, trace_hash_id, user_id, start_time, status,
                             total_cost, total_tokens
                         ) VALUES (
-                            %s, %s, %s, %s, %s, %s
+                            %s, %s, %s, %s, %s, %s, %s
                         )
                         RETURNING trace_id
                     """
                     cur.execute(sql, (
                         trace_data.get('trace_id'),
+                        trace_data.get('trace_hash_id'),
                         trace_data.get('user_id'),
                         trace_data.get('start_time'),
                         trace_data.get('status', 'running'),
@@ -246,22 +249,6 @@ class SupabaseDB:
                     ORDER BY start_time ASC
                 """
                 cur.execute(sql, (agent_id, user_id))
-                results = cur.fetchall()
-                return [dict(row) for row in results]
-        finally:
-            self.return_connection(conn)
-
-    # gets all the agents that belong to a certain user
-    def get_agents(self, user_id: str) -> List[Dict]:
-        conn = self.get_connection()
-        try:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                sql = """
-                    SELECT * FROM agents
-                    WHERE user_id = %s
-                    ORDER BY created_at DESC
-                """
-                cur.execute(sql, (user_id,))
                 results = cur.fetchall()
                 return [dict(row) for row in results]
         finally:
@@ -442,6 +429,95 @@ class SupabaseDB:
                 return [dict(row) for row in results]
         finally:
             self.return_connection(conn)
+    
+    def insert_agent(self, user_id: str, agent_name: str, api_key_str: str) -> str:
+        conn = self.get_connection()
+        cur_time = datetime.now()
+        try:
+            with conn.cursor() as cur:
+                sql = """
+                    INSERT INTO agents (
+                        user_id,
+                        agent_name,
+                        cur_time
+                        api_key_str,
+                    ) VALUES (
+                        %s,
+                        %s,
+                        %s
+                    )
+                    RETURNING agent_id
+                """
+                cur.execute(sql, (
+                    user_id,
+                    agent_name,
+                    api_key_str,
+                    cur_time
+                ))
+                result = cur.fetchone()
+                conn.commit()
+                return f"AI agent creation successful with agent id: {result[0]}"
+        except Exception as e:
+            conn.rollback()
+            raise Exception(f"Failed to insert api key: {e}")
+        finally:
+            self.return_connection(conn)
+    
+    def get_agents_by_userid(self, user_id: str, limit: int = 50, offset: int = 0) -> List[Dict]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                sql = """
+                    SELECT * FROM agents
+                    WHERE user_id = %s
+                    ORDER BY created_at DESC
+                    LIMIT %s OFFSET %s
+                """
+                cur.execute(sql, (user_id, limit, offset))
+                results = cur.fetchall()
+                return [dict(row) for row in results]
+        finally:
+            self.return_connection(conn)
+
+    def get_all_agents_for_auth(self) -> List[Dict]:
+        """Get all agents with their hashed API keys for authentication verification"""
+        conn = self.get_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                sql = """
+                    SELECT agent_id, user_id, api_key FROM agents
+                    WHERE api_key IS NOT NULL
+                """
+                cur.execute(sql)
+                results = cur.fetchall()
+                return [dict(row) for row in results]
+        finally:
+            self.return_connection(conn)
+
+    def delete_agent(self, agent_id: str, user_id: str):
+        conn = self.get_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # First get the API key before deleting
+                sql_get = """
+                    SELECT api_key FROM agents
+                    WHERE user_id = %s AND agent_id = %s
+                """
+                cur.execute(sql_get, (user_id, agent_id))
+                result = cur.fetchone()
+                api_key = result['api_key'] if result else None
+
+                sql = """
+                    DELETE FROM agents
+                    WHERE user_id = %s
+                    AND agent_id = %s
+                """
+                cur.execute(sql, (user_id, agent_id))
+                conn.commit()
+                return {"message": "Successfully deleted agent", "api_key": api_key}
+        finally:
+            self.return_connection(conn)
+
 
     # closes all the connections in the pool
     def close(self):

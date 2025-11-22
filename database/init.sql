@@ -11,12 +11,13 @@ CREATE TABLE agents (
     user_id UUID REFERENCES auth.users(id),
     agent_name VARCHAR(50),
     created_at TIMESTAMP DEFAULT NOW(),
-    api_key VARCHAR(280)
+    api_key TEXT
 );
 
 -- Create tables with UUID for trace_id and span_id
 CREATE TABLE traces (
     trace_id UUID PRIMARY KEY,
+    trace_hash_id TEXT,
     start_time TIMESTAMP,
     end_time TIMESTAMP,
     duration FLOAT DEFAULT 0,
@@ -48,7 +49,7 @@ CREATE TABLE spans (
 );
 
 CREATE TABLE prompt_versions (
-    prompt_version_id SERIAL PRIMARY KEY,
+    prompt_version_id UUID PRIMARY KEY,
     name VARCHAR(50),
     version_number INT,
     s3_url VARCHAR(200),
@@ -57,7 +58,7 @@ CREATE TABLE prompt_versions (
 );
 
 CREATE TABLE evaluations (
-    evaluation_id SERIAL PRIMARY KEY,
+    evaluation_id UUID PRIMARY KEY,
     trace_id UUID REFERENCES traces(trace_id),
     evaluator_llm VARCHAR(200),
     score INT
