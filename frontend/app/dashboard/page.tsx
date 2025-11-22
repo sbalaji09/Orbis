@@ -1,5 +1,6 @@
 import { getAgents, getTraces } from "@/lib/api-server";
 import { TraceRow } from "@/components/TraceRow";
+import { CreateAgent } from "@/components/CreateAgent";
 
 // Revalidate every 10 seconds
 export const revalidate = 10;
@@ -25,6 +26,11 @@ export default async function Dashboard() {
           <p className="text-foreground/60">
             View and analyze traces grouped by agent
           </p>
+        </div>
+
+        {/* Create Agent */}
+        <div className="mb-6">
+          <CreateAgent />
         </div>
 
         {/* Agent Groups */}
