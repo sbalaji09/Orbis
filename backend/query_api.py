@@ -45,6 +45,12 @@ async def list_traces(
         # Get traces with enhanced information from spans
         traces = db.get_traces_with_stats(user_id, limit=limit, offset=offset, status_filter=status)
 
+        # Convert ALL datetime objects to ISO strings for JSON serialization
+        for trace in traces:
+            for key, value in list(trace.items()):
+                if isinstance(value, datetime):
+                    trace[key] = value.isoformat()
+
         return {
             "traces": traces,
             "count": len(traces),

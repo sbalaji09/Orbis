@@ -313,6 +313,7 @@ class SupabaseDB:
                     agent_id,
                     trace_hash_id,
                     root_span_name,
+                    start_time,
                     start_time as created_at,
                     duration,
                     total_cost,
@@ -337,10 +338,15 @@ class SupabaseDB:
                 traces = []
                 for row in results:
                     trace = dict(row)
-                    if trace.get('created_at'):
-                        trace['created_at'] = trace['created_at'].isoformat()
+                    
+                    # Convert ALL datetime objects to ISO strings
+                    for key, value in list(trace.items()):  # Use list() to avoid dict size change during iteration
+                        if isinstance(value, datetime.datetime):
+                            trace[key] = value.isoformat()
+                    
                     traces.append(trace)
-                
+
+                print(f"DEBUG: Final trace[0] created_at type: {type(traces[0]['created_at'])}")
                 return traces
         except Exception as e:
             print(f"Error in get_traces_with_stats: {e}")
