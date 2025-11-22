@@ -42,12 +42,8 @@ async def list_traces(
     status: Optional[str] = Query(None, description="Filter by status")
 ):
     try:
-        # get all the traces
-        traces = db.get_traces_by_user(user_id, limit=limit, offset=offset)
-
-        # filter by the status
-        if status:
-            traces = [t for t in traces if t.get('status') == status]
+        # Get traces with enhanced information from spans
+        traces = db.get_traces_with_stats(user_id, limit=limit, offset=offset, status_filter=status)
 
         return {
             "traces": traces,

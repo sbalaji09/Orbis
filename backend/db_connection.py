@@ -270,6 +270,83 @@ class SupabaseDB:
                 return [dict(row) for row in results]
         finally:
             self.return_connection(conn)
+    
+    def get_traces_with_stats(self, user_id: str, limit: int = 50, offset: int = 0, status_filter: str = None) -> List[Dict]:
+        """
+        Get traces for a user with enhanced stats calculated from spans.
+        This provides accurate duration, cost, and status information.
+        """
+        conn = self.get_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                sql = """
+                WITH trace_stats AS (
+                    SELECT 
+                        t.trace_id,
+                        t.user_id,
+                        t.agent_id,
+                        t.trace_hash_id,
+                        t.start_time,
+                        t.end_time,
+                        COALESCE(
+                            EXTRACT(EPOCH FROM (MAX(s.end_time) - MIN(s.start_time))),
+                            EXTRACT(EPOCH FROM (t.end_time - t.start_time)),
+                            0
+                        ) as duration,
+                        COALESCE(SUM(s.cost), t.total_cost, 0) as total_cost,
+                        COUNT(s.span_id) as span_count,
+                        MAX(CASE WHEN s.parent_span_ids = '{}' THEN s.name ELSE NULL END) as root_span_name,
+                        CASE 
+                            WHEN t.status = 'error' THEN 'error'
+                            WHEN BOOL_OR(s.status = 'error') THEN 'error'
+                            WHEN t.status = 'completed' THEN 'success'
+                            ELSE t.status
+                        END as status
+                    FROM traces t
+                    LEFT JOIN spans s ON t.trace_id = s.trace_id
+                    WHERE t.user_id = %s
+                    GROUP BY t.trace_id, t.user_id, t.agent_id, t.trace_hash_id, t.start_time, t.end_time, t.total_cost, t.status
+                )
+                SELECT 
+                    trace_id,
+                    user_id,
+                    agent_id,
+                    trace_hash_id,
+                    root_span_name,
+                    start_time as created_at,
+                    duration,
+                    total_cost,
+                    span_count,
+                    status
+                FROM trace_stats
+                WHERE 1=1
+                """
+                
+                params = [user_id]
+                
+                if status_filter:
+                    sql += " AND status = %s"
+                    params.append(status_filter)
+                
+                sql += " ORDER BY start_time DESC LIMIT %s OFFSET %s"
+                params.extend([limit, offset])
+                
+                cur.execute(sql, params)
+                results = cur.fetchall()
+                
+                traces = []
+                for row in results:
+                    trace = dict(row)
+                    if trace.get('created_at'):
+                        trace['created_at'] = trace['created_at'].isoformat()
+                    traces.append(trace)
+                
+                return traces
+        except Exception as e:
+            print(f"Error in get_traces_with_stats: {e}")
+            raise
+        finally:
+            self.return_connection(conn)
 
     def get_user_metrics(self, user_id: str) -> Dict:
         """Get aggregate metrics for a user"""

@@ -169,6 +169,19 @@ class SpanWorker:
             # once the data has been converted into the proper format, the worker saves it to Supabase
             span_id = db.insert_span(span_db_data)
 
+            # NEW: If span has error status, mark the trace as failed
+            if span.get('status') == 'error':
+                update_data = {
+                    "status": "error"
+                }
+                db.update_trace(trace_id, update_data)
+                
+                self.logger.info("Trace marked as failed due to span error", extra={'extra_data': {
+                    'trace_id': trace_id,
+                    'span_id': span_id,
+                    'error_message': span.get('error_message', 'Unknown error')
+                }})
+
             # log successful completion with context for the span
             self.logger.info("Span processed successfully", extra={'extra_data': {
                 'trace_id': trace_id,
