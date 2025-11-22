@@ -12,7 +12,10 @@ export async function getAgents(
   userId: string = DEFAULT_USER_ID
 ): Promise<Agent[]> {
   try {
-    const response = await fetch(`${API_BASE_URL}/agents?user_id=${userId}`, {
+    const response = await fetch(`${API_BASE_URL}/agents`, {
+      headers: {
+        "X-User-ID": userId,
+      },
       cache: "no-store",
     });
 
@@ -21,7 +24,8 @@ export async function getAgents(
       return [];
     }
 
-    return response.json();
+    const data = await response.json();
+    return data.agents || [];
   } catch (error) {
     console.error("Error fetching agents:", error);
     return [];

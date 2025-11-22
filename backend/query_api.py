@@ -240,18 +240,16 @@ async def get_traces_by_agent(agent_id: str, user_id: str, limit: int = 5, offse
 
 # get all the agents belonging to a specific user
 @app.get("/agents")
-async def get_agents(user_id: str):
-    # try:
-    agents = db.get_agents(user_id)
+async def get_agents(user_id: str = Header(..., alias="X-User-ID")):
+    try:
+        agents = db.get_agents_by_userid(user_id)
 
-    if not agents:
-        raise HTTPException(status_code=404, detail="Agents not found")
-
-    return agents
-    # except HTTPException:
-    #     raise
-    # except Exception as e:
-    #     raise HTTPException(status_code=500, detail=str(e))
+        return {
+            "agents": agents if agents else [],
+            "count": len(agents) if agents else 0
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn
