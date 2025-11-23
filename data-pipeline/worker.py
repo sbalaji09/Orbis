@@ -29,6 +29,11 @@ class SpanWorker:
 
         self.queue = RedisQueue()
 
+        self.pending_spans = []
+        self.batch_start_time = None
+        self.BATCH_SIZE = 50
+        self.FLUSH_INTERVAL = 5
+
     # this function processes a single span task
     # instead of having the backend infra do it automatically, we have this worker do it because it saves time
     # this function will upload data to our blob storage (S3) and also save the span to the Supabase db
@@ -186,42 +191,22 @@ class SpanWorker:
                     # Get retry count (default to 0 for new tasks)
                     retry_count = task.get('retry_count', 0)
 
-                    # process the task
-                    success = self.process_span_task(task)
+                    # # process the task
+                    # success = self.process_span_task(task)
 
-                    if not success:
-                        # if the task did not succeed, we have to decide whether or not to send the task to the DLQ
-                        if retry_count < max_retries:
-                            # we can retry the task since it is less than the max_retries and so, we increment the retry count and enqueue the task
-                            task['retry_count'] = retry_count + 1
-                            task['last_error_at'] = datetime.now(timezone.utc).isoformat()
+                    # add the task to the pending spans
+                    self.pending_spans.append(task)
+                    if not self.batch_start_time:
+                        self.batch_start_time = time.time()
 
-                            self.logger.warning(
-                                f"Task failed, retry {retry_count + 1}/{max_retries}",
-                                extra={'extra_data': {
-                                    'retry_count': retry_count + 1,
-                                    'max_retries': max_retries,
-                                    'trace_id': task.get('span', {}).get('trace_id', 'unknown')
-                                }}
-                            )
+                    
+                    if len(self.pending_spans) >= self.BATCH_SIZE or (self.batch_start_time and time.time() - self.batch_start_time >= self.FLUSH_INTERVAL):
+                        self.flush_batch()
 
-                            self.queue.enqueue(task)
-                        else:
-                            # otherwise if we have already hit the max retries, move the task to the DLQ
-                            self.logger.error(
-                                f"Task failed after {max_retries} retries, moving to DLQ",
-                                extra={'extra_data': {
-                                    'retry_count': retry_count,
-                                    'trace_id': task.get('span', {}).get('trace_id', 'unknown')
-                                }}
-                            )
-
-                            self.queue.enqueue_to_dlq(
-                                task,
-                                f"Failed after {max_retries} retry attempts"
-                            )
                 else:
-                    pass
+                    if self.pending_spans and time.time() - self.batch_start_time >= self.FLUSH_INTERVAL:
+                        self.flush_batch()
+
 
         except KeyboardInterrupt:
             self.logger.info("Worker received shutdown signal (Ctrl+C)")
@@ -233,6 +218,49 @@ class SpanWorker:
                 exc_info=True
             )
             raise
+    
+    def flush_batch(self):
+        max_retries = int(os.getenv('MAX_RETRIES', 3))
+
+        for task in self.pending_spans:
+            retry_count = task.get('retry_count', 0)
+            success = self.process_span_task(task)
+
+            if not success:
+                # if the task did not succeed, we have to decide whether or not to send the task to the DLQ
+                if retry_count < max_retries:
+                    # we can retry the task since it is less than the max_retries and so, we increment the retry count and enqueue the task
+                    task['retry_count'] = retry_count + 1
+                    task['last_error_at'] = datetime.now(timezone.utc).isoformat()
+
+                    self.logger.warning(
+                        f"Task failed, retry {retry_count + 1}/{max_retries}",
+                        extra={'extra_data': {
+                            'retry_count': retry_count + 1,
+                            'max_retries': max_retries,
+                            'trace_id': task.get('span', {}).get('trace_id', 'unknown')
+                        }}
+                    )
+
+                    self.queue.enqueue(task)
+                else:
+                    # otherwise if we have already hit the max retries, move the task to the DLQ
+                    self.logger.error(
+                        f"Task failed after {max_retries} retries, moving to DLQ",
+                        extra={'extra_data': {
+                            'retry_count': retry_count,
+                            'trace_id': task.get('span', {}).get('trace_id', 'unknown')
+                        }}
+                    )
+
+                    self.queue.enqueue_to_dlq(
+                        task,
+                        f"Failed after {max_retries} retry attempts"
+                    )
+            
+        
+        self.pending_spans = []
+        self.batch_start_time = None
         
 def generate_hash_key(user_id: str, agent_id: str) -> str:
     # Combine user_id and agent_id into one string
