@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const DEFAULT_USER_ID = "00000000-0000-0000-0000-000000000000";
 
 export function CreateAgent() {
+  const router = useRouter();
   const [agentName, setAgentName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -62,6 +64,9 @@ export function CreateAgent() {
 
   const closeModal = () => {
     setShowModal(false);
+    setAgentName("");
+    // Refresh the page to show the new agent in the list
+    router.refresh();
   };
 
   const truncateKey = (key: string) => {
