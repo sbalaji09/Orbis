@@ -3,11 +3,13 @@ Auto-instrumentation for OpenAI API calls.
 Automatically wraps OpenAI calls to capture spans
 """
 
+import time
 from typing import Optional, Any
 import functools
 from ..core.span import Span
 from ..collector.collector import get_collector
 from ..core.context import get_current_span, set_current_span
+
 
 # openai pricing per 1M tokens (updated 11.12.25)
 OPENAI_PRICING = {
@@ -118,10 +120,63 @@ class OpenAIInstrumentor:
         except Exception as e:
             print(f"Error uninstrumenting OpenAI: {e}")
     
+    # wraps openai streaming response to capture metrics
+    def _wrap_openai_stream(self, stream_response, span):
+        
+        first_chunk_time = None
+        full_content = ""
+        chunk_count = 0
+        start_time = time.time()
+
+        try:
+            for chunk in stream_response:
+                if first_chunk_time is None:
+                    first_chunk_time = time.time()
+                    span.time_to_first_token = (first_chunk_time - start_time) * 1000
+
+                # extract content from chunck
+                if hasattr(chunk, "choices") and chunk.choices:
+                    delta = chunk.choices[0].delta
+                    if hasattr(delta, "content") and delta.content:
+                        full_content += delta.content
+                        chunk_count += 1
+                
+                # Yield chunk to user (pass-through)
+                yield chunk
+            
+            # After stream completes, finalize span
+            end_time = time.time()
+            
+            # Set output
+            span.output = full_content
+            
+            # Calculate tokens per second (approximate based on chunks)
+            if first_chunk_time:
+                stream_duration = end_time - first_chunk_time
+                if stream_duration > 0:
+                    span.tokens_per_second = chunk_count / stream_duration
+            
+            # Note: OpenAI streaming doesn't return token counts in chunks
+            # We'll estimate or leave it for the final response
+            
+            # Mark as successful
+            span.complete(status="success")
+        
+        except Exception as e:
+            span.set_error(e)
+            span.complete(status="error")
+            raise
+        
+        finally:
+            # Send span to collector after stream completes
+            collector = get_collector()
+            collector.collect(span)
+    
     # wrap an openai api call with span tracking
     def _trace_openai_call(self, original_func, *args, **kwargs):
         model = kwargs.get("model", "unknown")
         messages = kwargs.get("messages", [])
+        is_streaming = kwargs.get("stream", False)
 
         # get parent context
         parent_span = get_current_span()
@@ -133,6 +188,7 @@ class OpenAIInstrumentor:
             agent_id="af913dc2-732e-42a6-a113-a80c694d71bf",
             model=model,
             prompt=extract_prompt_from_messages(messages),
+            is_streaming=is_streaming,
         )
 
         # if there is a parent, inherit its trace_id and set parent relationship
@@ -147,6 +203,12 @@ class OpenAIInstrumentor:
         try:
             # call the actual openai api
             response = original_func(*args, **kwargs)
+
+            # handle streaming vs non-streaming
+            if is_streaming:
+                # wrap the streaming response
+                wrapped_response = self._wrap_openai_stream(response, span)
+                return wrapped_response
 
             # extract token usage from response
             if hasattr(response, "usage") and response.usage:
@@ -172,15 +234,16 @@ class OpenAIInstrumentor:
         except Exception as e:
             span.set_error(e)
             span.complete(status="error")
+
+            # send span to collector
+            collector = get_collector()
+            collector.collect(span)
+
             raise
 
         finally:
             # restore previous span context
             set_current_span(previous_span)
-
-            # send span to collector
-            collector = get_collector()
-            collector.collect(span)
 
 # global instrumentor instance
 _openai_instrumentor = OpenAIInstrumentor()

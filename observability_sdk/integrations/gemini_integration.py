@@ -5,6 +5,7 @@ Automatically wraps Gemini calls to capture spans
 
 from typing import Optional, Any
 import functools
+import time
 from ..core.span import Span
 from ..collector.collector import get_collector
 from ..core.context import get_current_span, set_current_span
@@ -20,6 +21,7 @@ GEMINI_PRICING = {
     # Gemini 2.0 family (FREE)
     "gemini-2.0-flash": {"input": 0.0, "output": 0.0},
     "gemini-2.0-flash-lite": {"input": 0.0, "output": 0.0},
+    "gemini-2.0-flash-exp": {"input": 0.0, "output": 0.0},
 }
 
 def calculate_gemini_cost(model: str, input_tokens: int, output_tokens: int) -> float:
@@ -34,6 +36,7 @@ def calculate_gemini_cost(model: str, input_tokens: int, output_tokens: int) -> 
 class GeminiInstrumentor:
     def __init__(self):
         self.original_generate = None
+        self.original_generate_stream = None
         self.instrumented = False
     
     def instrument(self):
@@ -48,17 +51,27 @@ class GeminiInstrumentor:
             return
         
         try:
-            # Patch the Models.generate_content method
+            # Patch BOTH generate_content (non-streaming) and generate_content_stream (streaming)
             original_generate = Models.generate_content
+            original_generate_stream = Models.generate_content_stream
             
             @functools.wraps(original_generate)
             def wrapped_generate(self, *args, **kwargs):
                 return _gemini_instrumentor._trace_gemini_call(
-                    original_generate, self, *args, **kwargs
+                    original_generate, self, *args, is_streaming=False, **kwargs
+                )
+            
+            @functools.wraps(original_generate_stream)
+            def wrapped_generate_stream(self, *args, **kwargs):
+                return _gemini_instrumentor._trace_gemini_call(
+                    original_generate_stream, self, *args, is_streaming=True, **kwargs
                 )
             
             Models.generate_content = wrapped_generate
+            Models.generate_content_stream = wrapped_generate_stream
+            
             self.original_generate = original_generate
+            self.original_generate_stream = original_generate_stream
             self.instrumented = True
             
             print("Gemini instrumentation enabled")
@@ -75,6 +88,8 @@ class GeminiInstrumentor:
             from google.genai.models import Models
             if self.original_generate:
                 Models.generate_content = self.original_generate
+            if self.original_generate_stream:
+                Models.generate_content_stream = self.original_generate_stream
             
             self.instrumented = False
             print("Gemini instrumentation disabled")
@@ -82,7 +97,7 @@ class GeminiInstrumentor:
         except Exception as e:
             print(f"Error uninstrumenting Gemini: {e}")
     
-    def _trace_gemini_call(self, original_func, models_self, *args, **kwargs):
+    def _trace_gemini_call(self, original_func, models_self, *args, is_streaming=False, **kwargs):
         """Wrap a Gemini API call with span tracking"""
         
         # Extract model name and content
@@ -105,6 +120,7 @@ class GeminiInstrumentor:
             agent_id="af913dc2-732e-42a6-a113-a80c694d71bf",
             model=model_name,
             prompt=prompt,
+            is_streaming=is_streaming,
         )
         
         # Inherit trace context if parent exists
@@ -120,25 +136,101 @@ class GeminiInstrumentor:
             # Call actual Gemini API
             response = original_func(models_self, *args, **kwargs)
             
-            # Extract token usage
-            if hasattr(response, 'usage_metadata'):
-                usage = response.usage_metadata
-                span.input_tokens = getattr(usage, 'prompt_token_count', 0)
-                span.output_tokens = getattr(usage, 'candidates_token_count', 0)
-                span.total_cost = calculate_gemini_cost(
-                    model_name,
-                    span.input_tokens or 0,
-                    span.output_tokens or 0
-                )
+            # Handle streaming vs non-streaming
+            if is_streaming:
+                # Wrap the streaming response
+                wrapped_response = self._wrap_gemini_stream(response, span, model_name)
+                return wrapped_response
+            else:
+                # Non-streaming: extract data immediately
+                if hasattr(response, 'usage_metadata'):
+                    usage = response.usage_metadata
+                    span.input_tokens = getattr(usage, 'prompt_token_count', 0)
+                    span.output_tokens = getattr(usage, 'candidates_token_count', 0)
+                    span.total_cost = calculate_gemini_cost(
+                        model_name,
+                        span.input_tokens or 0,
+                        span.output_tokens or 0
+                    )
+                
+                # Extract completion text
+                if hasattr(response, 'text'):
+                    span.output = response.text or ""
+                
+                # Mark as successful
+                span.complete(status="success")
+                
+                # Send to collector
+                collector = get_collector()
+                collector.collect(span)
+                
+                return response
+        
+        except Exception as e:
+            span.set_error(e)
+            span.complete(status="error")
             
-            # Extract completion text
-            if hasattr(response, 'text'):
-                span.output = response.text or ""
+            # Send to collector even on error
+            collector = get_collector()
+            collector.collect(span)
+            
+            raise
+        
+        finally:
+            # Restore previous span context
+            set_current_span(previous_span)
+    
+    def _wrap_gemini_stream(self, stream_response, span, model_name):
+        """Wraps Gemini streaming response to capture metrics"""
+        first_chunk_time = None
+        full_content = ""
+        chunk_count = 0
+        start_time = time.time()
+        total_input_tokens = 0
+        total_output_tokens = 0
+        
+        try:
+            for chunk in stream_response:
+                # Record time to first token
+                if first_chunk_time is None:
+                    first_chunk_time = time.time()
+                    span.time_to_first_token = (first_chunk_time - start_time) * 1000  # Convert to ms
+                
+                # Extract text content
+                if hasattr(chunk, 'text') and chunk.text:
+                    full_content += chunk.text
+                    chunk_count += 1
+                
+                # Extract token usage if available
+                if hasattr(chunk, 'usage_metadata'):
+                    usage = chunk.usage_metadata
+                    total_input_tokens = getattr(usage, 'prompt_token_count', 0)
+                    total_output_tokens = getattr(usage, 'candidates_token_count', 0)
+                
+                # Yield chunk to user (pass-through)
+                yield chunk
+            
+            # After stream completes, finalize span
+            end_time = time.time()
+            
+            # Set output
+            span.output = full_content
+            
+            # Set token counts
+            span.input_tokens = total_input_tokens
+            span.output_tokens = total_output_tokens
+            
+            # Calculate cost
+            span.total_cost = calculate_gemini_cost(model_name, total_input_tokens, total_output_tokens)
+            
+            # Calculate tokens per second
+            if first_chunk_time and total_output_tokens > 0:
+                stream_duration = end_time - first_chunk_time
+                if stream_duration > 0:
+                    span.tokens_per_second = total_output_tokens / stream_duration
             
             # Mark as successful
             span.complete(status="success")
-            
-            return response
         
         except Exception as e:
             span.set_error(e)
@@ -146,10 +238,7 @@ class GeminiInstrumentor:
             raise
         
         finally:
-            # Restore previous span context
-            set_current_span(previous_span)
-            
-            # Send span to collector
+            # Send span to collector after stream completes
             collector = get_collector()
             collector.collect(span)
 

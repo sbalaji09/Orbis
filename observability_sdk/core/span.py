@@ -7,7 +7,6 @@ import time
 @dataclass
 class Span:
     # tracks a single function execution
-
     name: str
     user_id: Optional[str] = None
     agent_id: Optional[str] = None
@@ -44,6 +43,11 @@ class Span:
     # internal timing (hidden from user)
     _start_perf: float = field(default_factory=time.perf_counter, init=False, repr=False)
 
+    # streaming metrics
+    is_streaming: bool = False
+    time_to_first_token: Optional[float] = None
+    tokens_per_second: Optional[float] = None
+
     # mark the span as complete
     def complete(self, status: str = "success") -> None:
         self.end_time = datetime.now(timezone.utc)
@@ -77,6 +81,9 @@ class Span:
             "agent_id": self.agent_id,
             "is_start_span": self.is_start_span,
             "is_end_span": self.is_end_span,
+            "is_streaming": self.is_streaming,
+            "time_to_first_token": self.time_to_first_token,
+            "tokens_per_second": self.tokens_per_second,
         }
 
     def __str__(self):

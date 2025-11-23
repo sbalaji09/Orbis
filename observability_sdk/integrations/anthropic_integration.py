@@ -8,6 +8,7 @@ import functools
 from ..core.span import Span
 from ..collector.collector import get_collector
 from ..core.context import get_current_span, set_current_span
+import time
 
 # anthropic pricing per 1M tokens (updated 11.16.25)
 ANTHROPIC_PRICING = {
@@ -107,10 +108,84 @@ class AnthropicInstrumentor:
         except Exception as e:
             print(f"Error uninstrumenting Anthropic: {e}")
     
+    # wraps anthropic streaming response to capture metrics. anthropic streams return events with different types.
+    
+    def _wrap_anthropic_stream(self, stream_response, span):
+
+        first_chunk_time = None
+        full_content = ""
+        chunk_count = 0
+        start_time = time.time()
+        input_tokens = 0
+        output_tokens = 0
+        
+        try:
+            for event in stream_response:
+                # Record time to first content
+                if first_chunk_time is None and hasattr(event, "type") and event.type == "content_block_delta":
+                    first_chunk_time = time.time()
+                    span.time_to_first_token = (first_chunk_time - start_time) * 1000
+                
+                # Extract content from delta events
+                if hasattr(event, "type"):
+                    if event.type == "content_block_delta":
+                        if hasattr(event, "delta") and hasattr(event.delta, "text"):
+                            full_content += event.delta.text
+                            chunk_count += 1
+                    
+                    # Anthropic provides usage in message_start and message_delta events
+                    elif event.type == "message_start":
+                        if hasattr(event, "message") and hasattr(event.message, "usage"):
+                            input_tokens = event.message.usage.input_tokens
+                    
+                    elif event.type == "message_delta":
+                        if hasattr(event, "usage"):
+                            output_tokens = event.usage.output_tokens
+                
+                # Yield event to user
+                yield event
+            
+            # After stream completes
+            end_time = time.time()
+            
+            # Set output
+            span.output = full_content
+            
+            # Set token counts
+            span.input_tokens = input_tokens
+            span.output_tokens = output_tokens
+            
+            # Calculate cost
+            span.total_cost = calculate_anthropic_cost(
+                span.model or "unknown",
+                input_tokens,
+                output_tokens
+            )
+            
+            # Calculate tokens per second
+            if first_chunk_time:
+                stream_duration = end_time - first_chunk_time
+                if stream_duration > 0 and output_tokens > 0:
+                    span.tokens_per_second = output_tokens / stream_duration
+            
+            # Mark as successful
+            span.complete(status="success")
+        
+        except Exception as e:
+            span.set_error(e)
+            span.complete(status="error")
+            raise
+        
+        finally:
+            # Send span to collector
+            collector = get_collector()
+            collector.collect(span)
+    
     # wrap an anthropic api call with span tracking
     def _trace_anthropic_call(self, original_func, client_self, *args, **kwargs):
         model = kwargs.get("model", "unknown")
         messages = kwargs.get("messages", [])
+        is_streaming = kwargs.get("stream", False)
 
         # Get parent context
         parent_span = get_current_span()
@@ -122,6 +197,7 @@ class AnthropicInstrumentor:
             agent_id="af913dc2-732e-42a6-a113-a80c694d71bf",
             model=model,
             prompt=extract_prompt_from_messages(messages),
+            is_streaming=is_streaming,
         )
 
         # If there's a parent, inherit its trace_id and set parent relationship
@@ -137,42 +213,52 @@ class AnthropicInstrumentor:
             # call the actual anthropic api
             response = original_func(client_self, *args, **kwargs)
 
-            # extract token usage from response
-            if hasattr(response, "usage") and response.usage:
-                span.input_tokens = response.usage.input_tokens
-                span.output_tokens = response.usage.output_tokens
-                span.total_cost = calculate_anthropic_cost(
-                    model,
-                    span.input_tokens or 0,
-                    span.output_tokens or 0
-                )
-            
-            # extract completion
-            if hasattr(response, "content") and response.content:
-                # Anthropic returns content as a list of blocks
-                content_text = ""
-                for block in response.content:
-                    if hasattr(block, "type") and block.type == "text" and hasattr(block, "text"):
-                        content_text += block.text
-                span.output = content_text
+            # Handle streaming vs non-streaming
+            if is_streaming:
+                # Wrap the streaming response
+                wrapped_response = self._wrap_anthropic_stream(response, span)
+                return wrapped_response
+            else:
+                # Non-streaming: extract tokens immediately
+                if hasattr(response, "usage") and response.usage:
+                    span.input_tokens = response.usage.input_tokens
+                    span.output_tokens = response.usage.output_tokens
+                    span.total_cost = calculate_anthropic_cost(
+                        model,
+                        span.input_tokens or 0,
+                        span.output_tokens or 0
+                    )
+                
+                # extract completion
+                if hasattr(response, "content") and response.content:
+                    content_text = ""
+                    for block in response.content:
+                        if hasattr(block, "type") and block.type == "text" and hasattr(block, "text"):
+                            content_text += block.text
+                    span.output = content_text
 
-            # mark as successful
-            span.complete(status="success")
+                # mark as successful
+                span.complete(status="success")
+                
+                # Send to collector
+                collector = get_collector()
+                collector.collect(span)
 
-            return response
+                return response
         
         except Exception as e:
             span.set_error(e)
             span.complete(status="error")
+            
+            # Send to collector even on error
+            collector = get_collector()
+            collector.collect(span)
+            
             raise
 
         finally:
             # Restore previous span context
             set_current_span(previous_span)
-            
-            # send span to collector
-            collector = get_collector()
-            collector.collect(span)
 
 # global instrumentor instance
 _anthropic_instrumentor = AnthropicInstrumentor()
