@@ -34,7 +34,7 @@ Text: {text}
 
 Respond with just a number."""
     )
-    return int(response.text.strip())
+    return (response.text or "").strip()
 
 @observe("check_spam")
 def check_spam(text):
@@ -45,7 +45,7 @@ def check_spam(text):
 
 Text: {text}"""
     )
-    return response.text.strip().lower()
+    return (response.text or "").strip()
 
 @observe("moderate_content")
 def moderate_content(content_id, text):
@@ -80,7 +80,7 @@ def detect_language(text):
 
 Text: {text}"""
     )
-    return response.text.strip()
+    return (response.text or "").strip()
 
 @observe("translate_text")
 def translate_text(text, target_language):
@@ -91,7 +91,7 @@ def translate_text(text, target_language):
 
 {text}"""
     )
-    return response.text.strip()
+    return (response.text or "").strip()
 
 @observe("translation_pipeline")
 def translation_pipeline(task_id, text, target_lang="Spanish"):
@@ -137,7 +137,7 @@ def generate_summary(text, key_points):
 
 {key_points}"""
     )
-    return response.text.strip()
+    return (response.text or "").strip()
 
 @observe("summarization_pipeline")
 def summarization_pipeline(doc_id, text):

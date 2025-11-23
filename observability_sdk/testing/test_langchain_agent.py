@@ -5,6 +5,7 @@ This validates that LangChain execution is automatically captured.
 
 from observability_sdk import configure, instrument_all, get_langchain_callbacks
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnableConfig
 from langchain_core.output_parsers import StrOutputParser
 from langchain_community.llms.fake import FakeListLLM
 
@@ -44,7 +45,7 @@ print("-"*60 + "\n")
 
 result = chain.invoke(
     {"input": "Explain AI observability"},
-    config={"callbacks": get_langchain_callbacks()}  # ← Enable instrumentation
+    config=RunnableConfig(callbacks=get_langchain_callbacks())  # ← Enable instrumentation
 )
 
 print("\n" + "="*60)
