@@ -1,5 +1,5 @@
 import { getAgents, getTraces } from "@/lib/api-server";
-import { TraceRow } from "@/components/TraceRow";
+import { AgentGroup } from "@/components/AgentGroup";
 import { CreateAgent } from "@/components/CreateAgent";
 
 // Revalidate every 10 seconds
@@ -36,53 +36,12 @@ export default async function Dashboard() {
         {/* Agent Groups */}
         <div className="space-y-5">
           {tracesByAgent.map(({ agent, traces }) => (
-            <div
+            <AgentGroup
               key={agent.agent_id}
-              className="border-2 border-black overflow-hidden shadow-[4px_4px_0_rgba(0,0,0,0.15)] bg-background"
-            >
-              {/* Agent Header */}
-              <div className="px-5 py-4 bg-mustard/10 border-b-2 border-black">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <h2 className="text-base font-semibold tracking-tight">
-                      {agent.agent_name}
-                    </h2>
-                    {agent.description && (
-                      <p className="text-xs text-black/60 mt-1">
-                        {`// ${agent.description}`}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 text-xs shrink-0">
-                    <div className="px-2.5 py-1 bg-black text-mustard border border-black">
-                      <span>Traces:</span>{" "}
-                      <span className="font-mono font-semibold">
-                        {traces.length}
-                      </span>
-                    </div>
-                    <div className="px-2.5 py-1 bg-white border-2 border-black">
-                      <span className="text-black/60">ID:</span>{" "}
-                      <span className="font-mono text-[10px] text-black/40">
-                        {agent.agent_id}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Traces List */}
-              <div>
-                {traces.length === 0 ? (
-                  <div className="px-5 py-8 text-center text-black/60 text-sm">
-                    {`// No traces found for this agent`}
-                  </div>
-                ) : (
-                  traces.map((trace) => (
-                    <TraceRow key={trace.trace_id} trace={trace} />
-                  ))
-                )}
-              </div>
-            </div>
+              agent={agent}
+              traces={traces}
+              defaultOpen={false}
+            />
           ))}
         </div>
       </div>
