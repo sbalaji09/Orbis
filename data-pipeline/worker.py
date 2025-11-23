@@ -176,12 +176,90 @@ class SpanWorker:
                 exc_info=True  # This includes the full stack trace
             )
             return False
+    
+    # prepare the span data for batch insert
+    def prepare_span_data(self, task_data: dict) -> dict:
+        span = task_data.get('span')
+        trace_id = str(span.get('trace_id', 'unknown'))
+
+        # s3 input upload
+        try:
+            input_blob_url = upload_input(
+                user_id=task_data.get('user_id'),
+                trace_id=trace_id,
+                span_id=str(span.get('span_id', 'unknown')),
+                content=span.get('input_data', '')
+            )
+        except Exception as e:
+            self.logger.warning(f"S3 upload failed for input, using placeholder: {e}")
+            input_blob_url = f"placeholder://input/{trace_id}/{span.get('span_id', 'unknown')}"
+        
+        # s3 output upload
+        try:
+            output_blob_url = upload_output(
+                user_id=task_data.get('user_id'),
+                trace_id=trace_id,
+                span_id=str(span.get('span_id', 'unknown')),
+                content=span.get('output_data', '')
+            )
+        except Exception as e:
+            self.logger.warning(f"S3 upload failed for output, using placeholder: {e}")
+            output_blob_url = f"placeholder://output/{trace_id}/{span.get('span_id', 'unknown')}"
+
+        # create the trace if it doesn't already exist
+        existing_trace = db.get_trace_by_id(trace_id)
+
+        if not existing_trace:
+            # create the new trace
+            trace = {
+                "start_time": str(span.get('start_time')),
+                "end_time": "",
+                "duration": 0,
+                "total_cost": 0,
+                "total_tokens": 0,
+                "status": "running",
+                "user_id": str(span.get('user_id')),
+                "trace_hash_id": generate_hash_key(str(span.get('user_id')), str(span.get('agent_id')))
+            }
+            trace["trace_id"] = trace_id
+
+            if span.get('agent_id') is not None:
+                trace["agent_id"] = str(span.get('agent_id'))
+
+            db.insert_trace(trace)
+
+            self.logger.info("Trace auto-created", extra={'extra_data': {
+                'trace_id': trace_id,
+                'user_id': trace['user_id'],
+                'agent_id': trace.get('agent_id', 'none'),
+                'reason': 'trace_did_not_exist'
+            }})
+
+        # build and return the span data
+        return {
+            "span_id": str(span.get('span_id', 'unknown')),
+            "trace_id": trace_id,
+            "parent_span_ids": span.get('parent_span_id', []),
+            "name": span.get('name'),
+            "start_time": span.get('start_time'),
+            "end_time": span.get('end_time'),
+            "duration": float(span.get('duration', 0)),
+            "input_preview": span.get('input_data', '')[:200],
+            "input_blob_url": input_blob_url,
+            "output_preview": span.get('output_data', '')[:200],
+            "output_blob_url": output_blob_url,
+            "llm_model": span.get('model'),
+            "prompt_tokens": span.get('input_tokens'),
+            "completion_tokens": span.get('output_tokens'),
+            "cost": span.get('total_cost'),
+            "status": span.get('status'),
+            "error_message": span.get('error_message')
+        }
 
     # this function is the main worker loop that pops from the queue and processes each popped task
     # note: this function will run forever unless forcefully stopped
     def run(self):
         self.logger.info("Worker started - waiting for tasks from queue")
-        max_retries = int(os.getenv('MAX_RETRIES', 3))
 
         try:
             while True:
