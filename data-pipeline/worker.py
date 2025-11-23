@@ -223,13 +223,41 @@ class SpanWorker:
     def flush_batch(self):
         max_retries = int(os.getenv('MAX_RETRIES', 3))
         try:
-            processed_spans = []
+            prepared_spans = []
+            failed_tasks = []
             for task in self.pending_spans:
-                retry_count = task.get('retry_count', 0)
-                success = self.process_span_task(task)
-                
+                # prepare all spans
+                try:
+                    span_data = self.prepare_span_data(task)  # NEW METHOD - extract from process_span_task
+                    prepared_spans.append((task, span_data))
+                except Exception as e:
+                    self.logger.error(f"Failed to prepare span: {e}")
+                    failed_tasks.append(task)
 
-                if not success:
+                # batch insert all prepared spans
+                if prepared_spans:
+                    span_dicts = [s[1] for s in prepared_spans]
+                    db.insert_spans_batch(span_dicts)  # NEW METHOD in db_connection
+                
+                # update trace aggregates
+                spans_by_trace = defaultdict(list)
+                for task, span_data in prepared_spans:
+                    spans_by_trace[span_data['trace_id']].append(span_data)
+                
+                for trace_id, trace_spans in spans_by_trace.items():
+                    total_tokens = sum(
+                        (s.get('prompt_tokens') or 0) + (s.get('completion_tokens') or 0)
+                        for s in trace_spans
+                    )
+                    total_cost = sum(s.get('cost') or 0 for s in trace_spans)
+                    
+                    # Use existing Redis accumulation
+                    self.queue.redis_client.incrbyfloat(f"trace:{trace_id}:total_tokens", total_tokens)
+                    self.queue.redis_client.incrbyfloat(f"trace:{trace_id}:total_cost", total_cost)
+
+                # handle failed preparation
+                for task in failed_tasks:
+                    retry_count = task.get('retry_count', 0)
                     # if the task did not succeed, we have to decide whether or not to send the task to the DLQ
                     if retry_count < max_retries:
                         # we can retry the task since it is less than the max_retries and so, we increment the retry count and enqueue the task
@@ -260,28 +288,9 @@ class SpanWorker:
                             task,
                             f"Failed after {max_retries} retry attempts"
                         )
-                else:
-                    processed_spans.append(task)
-
-            spans_by_trace = defaultdict(list)
-            for span_data in processed_spans:  # Your list of span dicts
-                spans_by_trace[span_data['trace_id']].append(span_data)
-
-            # Update each trace with aggregates
-            for trace_id, trace_spans in spans_by_trace.items():
-                total_tokens = sum(
-                    (s.get('prompt_tokens') or 0) + (s.get('completion_tokens') or 0) 
-                    for s in trace_spans
-                )
-                total_cost = sum(s.get('cost') or 0 for s in trace_spans)
-                
-                # Check if any span has error status
-                has_error = any(s.get('status') == 'error' for s in trace_spans)
-                
-                self.queue.redis_client.incr(trace_id, total_tokens, total_cost)
         except Exception as e:
+            # batch insert failed so reque all the tasks
             self.logger.error(f"Batch insert failed: {e}")
-            # Re-queue all spans for individual retry
             for task in self.pending_spans:
                 task['retry_count'] = task.get('retry_count', 0) + 1
                 self.queue.enqueue(task)
