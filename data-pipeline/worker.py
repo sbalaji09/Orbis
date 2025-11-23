@@ -235,59 +235,59 @@ class SpanWorker:
                     failed_tasks.append(task)
 
                 # batch insert all prepared spans
-                if prepared_spans:
-                    span_dicts = [s[1] for s in prepared_spans]
-                    db.insert_spans_batch(span_dicts)  # NEW METHOD in db_connection
+            if prepared_spans:
+                span_dicts = [s[1] for s in prepared_spans]
+                db.insert_spans_batch(span_dicts)  # NEW METHOD in db_connection
+            
+            # update trace aggregates
+            spans_by_trace = defaultdict(list)
+            for task, span_data in prepared_spans:
+                spans_by_trace[span_data['trace_id']].append(span_data)
+            
+            for trace_id, trace_spans in spans_by_trace.items():
+                total_tokens = sum(
+                    (s.get('prompt_tokens') or 0) + (s.get('completion_tokens') or 0)
+                    for s in trace_spans
+                )
+                total_cost = sum(s.get('cost') or 0 for s in trace_spans)
                 
-                # update trace aggregates
-                spans_by_trace = defaultdict(list)
-                for task, span_data in prepared_spans:
-                    spans_by_trace[span_data['trace_id']].append(span_data)
-                
-                for trace_id, trace_spans in spans_by_trace.items():
-                    total_tokens = sum(
-                        (s.get('prompt_tokens') or 0) + (s.get('completion_tokens') or 0)
-                        for s in trace_spans
+                # Use existing Redis accumulation
+                self.queue.redis_client.incrbyfloat(f"trace:{trace_id}:total_tokens", total_tokens)
+                self.queue.redis_client.incrbyfloat(f"trace:{trace_id}:total_cost", total_cost)
+
+            # handle failed preparation
+            for task in failed_tasks:
+                retry_count = task.get('retry_count', 0)
+                # if the task did not succeed, we have to decide whether or not to send the task to the DLQ
+                if retry_count < max_retries:
+                    # we can retry the task since it is less than the max_retries and so, we increment the retry count and enqueue the task
+                    task['retry_count'] = retry_count + 1
+                    task['last_error_at'] = datetime.now(timezone.utc).isoformat()
+
+                    self.logger.warning(
+                        f"Task failed, retry {retry_count + 1}/{max_retries}",
+                        extra={'extra_data': {
+                            'retry_count': retry_count + 1,
+                            'max_retries': max_retries,
+                            'trace_id': task.get('span', {}).get('trace_id', 'unknown')
+                        }}
                     )
-                    total_cost = sum(s.get('cost') or 0 for s in trace_spans)
-                    
-                    # Use existing Redis accumulation
-                    self.queue.redis_client.incrbyfloat(f"trace:{trace_id}:total_tokens", total_tokens)
-                    self.queue.redis_client.incrbyfloat(f"trace:{trace_id}:total_cost", total_cost)
 
-                # handle failed preparation
-                for task in failed_tasks:
-                    retry_count = task.get('retry_count', 0)
-                    # if the task did not succeed, we have to decide whether or not to send the task to the DLQ
-                    if retry_count < max_retries:
-                        # we can retry the task since it is less than the max_retries and so, we increment the retry count and enqueue the task
-                        task['retry_count'] = retry_count + 1
-                        task['last_error_at'] = datetime.now(timezone.utc).isoformat()
+                    self.queue.enqueue(task)
+                else:
+                    # otherwise if we have already hit the max retries, move the task to the DLQ
+                    self.logger.error(
+                        f"Task failed after {max_retries} retries, moving to DLQ",
+                        extra={'extra_data': {
+                            'retry_count': retry_count,
+                            'trace_id': task.get('span', {}).get('trace_id', 'unknown')
+                        }}
+                    )
 
-                        self.logger.warning(
-                            f"Task failed, retry {retry_count + 1}/{max_retries}",
-                            extra={'extra_data': {
-                                'retry_count': retry_count + 1,
-                                'max_retries': max_retries,
-                                'trace_id': task.get('span', {}).get('trace_id', 'unknown')
-                            }}
-                        )
-
-                        self.queue.enqueue(task)
-                    else:
-                        # otherwise if we have already hit the max retries, move the task to the DLQ
-                        self.logger.error(
-                            f"Task failed after {max_retries} retries, moving to DLQ",
-                            extra={'extra_data': {
-                                'retry_count': retry_count,
-                                'trace_id': task.get('span', {}).get('trace_id', 'unknown')
-                            }}
-                        )
-
-                        self.queue.enqueue_to_dlq(
-                            task,
-                            f"Failed after {max_retries} retry attempts"
-                        )
+                    self.queue.enqueue_to_dlq(
+                        task,
+                        f"Failed after {max_retries} retry attempts"
+                    )
         except Exception as e:
             # batch insert failed so reque all the tasks
             self.logger.error(f"Batch insert failed: {e}")
