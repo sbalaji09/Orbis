@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from data_processing.prompt_upload import upload_input, upload_output
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from backend.db_connection import db
+from collections import defaultdict
 
 
 # add the application logging layer to the path
@@ -221,46 +222,75 @@ class SpanWorker:
     
     def flush_batch(self):
         max_retries = int(os.getenv('MAX_RETRIES', 3))
+        try:
+            processed_spans = []
+            for task in self.pending_spans:
+                retry_count = task.get('retry_count', 0)
+                success = self.process_span_task(task)
+                
 
-        for task in self.pending_spans:
-            retry_count = task.get('retry_count', 0)
-            success = self.process_span_task(task)
+                if not success:
+                    # if the task did not succeed, we have to decide whether or not to send the task to the DLQ
+                    if retry_count < max_retries:
+                        # we can retry the task since it is less than the max_retries and so, we increment the retry count and enqueue the task
+                        task['retry_count'] = retry_count + 1
+                        task['last_error_at'] = datetime.now(timezone.utc).isoformat()
 
-            if not success:
-                # if the task did not succeed, we have to decide whether or not to send the task to the DLQ
-                if retry_count < max_retries:
-                    # we can retry the task since it is less than the max_retries and so, we increment the retry count and enqueue the task
-                    task['retry_count'] = retry_count + 1
-                    task['last_error_at'] = datetime.now(timezone.utc).isoformat()
+                        self.logger.warning(
+                            f"Task failed, retry {retry_count + 1}/{max_retries}",
+                            extra={'extra_data': {
+                                'retry_count': retry_count + 1,
+                                'max_retries': max_retries,
+                                'trace_id': task.get('span', {}).get('trace_id', 'unknown')
+                            }}
+                        )
 
-                    self.logger.warning(
-                        f"Task failed, retry {retry_count + 1}/{max_retries}",
-                        extra={'extra_data': {
-                            'retry_count': retry_count + 1,
-                            'max_retries': max_retries,
-                            'trace_id': task.get('span', {}).get('trace_id', 'unknown')
-                        }}
-                    )
+                        self.queue.enqueue(task)
+                    else:
+                        # otherwise if we have already hit the max retries, move the task to the DLQ
+                        self.logger.error(
+                            f"Task failed after {max_retries} retries, moving to DLQ",
+                            extra={'extra_data': {
+                                'retry_count': retry_count,
+                                'trace_id': task.get('span', {}).get('trace_id', 'unknown')
+                            }}
+                        )
 
-                    self.queue.enqueue(task)
+                        self.queue.enqueue_to_dlq(
+                            task,
+                            f"Failed after {max_retries} retry attempts"
+                        )
                 else:
-                    # otherwise if we have already hit the max retries, move the task to the DLQ
-                    self.logger.error(
-                        f"Task failed after {max_retries} retries, moving to DLQ",
-                        extra={'extra_data': {
-                            'retry_count': retry_count,
-                            'trace_id': task.get('span', {}).get('trace_id', 'unknown')
-                        }}
-                    )
+                    processed_spans.append(task)
 
-                    self.queue.enqueue_to_dlq(
-                        task,
-                        f"Failed after {max_retries} retry attempts"
-                    )
-            
-        
+            spans_by_trace = defaultdict(list)
+            for span_data in processed_spans:  # Your list of span dicts
+                spans_by_trace[span_data['trace_id']].append(span_data)
+
+            # Update each trace with aggregates
+            for trace_id, trace_spans in spans_by_trace.items():
+                total_tokens = sum(
+                    (s.get('prompt_tokens') or 0) + (s.get('completion_tokens') or 0) 
+                    for s in trace_spans
+                )
+                total_cost = sum(s.get('cost') or 0 for s in trace_spans)
+                
+                # Check if any span has error status
+                has_error = any(s.get('status') == 'error' for s in trace_spans)
+                
+                self.queue.redis_client.incr(trace_id, total_tokens, total_cost)
+        except Exception as e:
+            self.logger.error(f"Batch insert failed: {e}")
+            # Re-queue all spans for individual retry
+            for task in self.pending_spans:
+                task['retry_count'] = task.get('retry_count', 0) + 1
+                self.queue.enqueue(task)
+
+                
+                
         self.pending_spans = []
         self.batch_start_time = None
+
         
 def generate_hash_key(user_id: str, agent_id: str) -> str:
     # Combine user_id and agent_id into one string

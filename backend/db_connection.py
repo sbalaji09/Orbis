@@ -6,6 +6,7 @@ from psycopg2.pool import SimpleConnectionPool
 from dotenv import load_dotenv
 from typing import Dict, List, Optional
 from uuid import UUID
+from psycopg2.extras import execute_values
 
 load_dotenv()
 
@@ -598,6 +599,39 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
 
+    def insert_spans_batch(self, spans: list) -> list:
+        if not spans:
+            return []
+
+        query = """
+            INSERT INTO spans (
+                span_id, trace_id, parent_span_ids, name, start_time, end_time,
+                duration, input_preview, input_blob_url, output_preview, 
+                output_blob_url, llm_model, prompt_tokens, completion_tokens,
+                cost, status, error_message
+            ) VALUES %s
+            RETURNING span_id
+        """
+
+        # convert the list of dicts into a list of tuples
+        values = [
+            (
+                span['span_id'], span['trace_id'], span['parent_span_ids'],
+                span['name'], span['start_time'], span['end_time'],
+                span['duration'], span['input_preview'], span['input_blob_url'],
+                span['output_preview'], span['output_blob_url'], span['llm_model'],
+                span['prompt_tokens'], span['completion_tokens'], span['cost'],
+                span['status'], span['error_message']
+            )
+            for span in spans
+        ]
+    
+        with self.get_connection() as conn:
+            with conn.cursor() as cur:
+                execute_values(cur, query, values)
+                results = cur.fetchall()
+                conn.commit()
+                return [r[0] for r in results]
 
     # closes all the connections in the pool
     def close(self):
