@@ -31,9 +31,13 @@ class SpanIn(BaseModel):
     status: str
     error_message: Optional[str] = None
     user_id: str
-    agent_id: Optional[str] = None  # Changed to str (UUID)
-    is_start_span: bool
-    is_end_span: bool
+    agent_id: Optional[str] = None
+
+
+class EndTraceIn(BaseModel):
+    trace_id: str
+    end_time: str
+    status: str = "completed"  # or "failed"
 
 app = FastAPI()
 
@@ -82,6 +86,54 @@ async def post_span(request: Request, span: SpanIn):
         "status": "accepted",
         "message": "Span queued for processing"
     }
+
+
+# endpoint to signal that a trace is complete
+@app.post("/trace/end", status_code=200)
+async def end_trace(request: Request, end_trace: EndTraceIn):
+    check_api_key(request)
+
+    trace_id = end_trace.trace_id
+
+    # validate trace id
+    if not is_valid_uuid(trace_id):
+        raise HTTPException(status_code=400, detail="Invalid trace_id")
+
+    # get accumulated stats from Redis to update the trace
+    total_tokens = int(queue.redis_client.get(f"trace:{trace_id}:total_tokens") or 0)
+    total_cost = float(queue.redis_client.get(f"trace:{trace_id}:total_cost") or 0)
+    total_duration = float(queue.redis_client.get(f"trace:{trace_id}:total_duration") or 0)
+
+    # updated trace data
+    update_data = {
+        "end_time": end_trace.end_time,
+        "duration": total_duration,
+        "total_cost": total_cost,
+        "total_tokens": total_tokens,
+        "status": end_trace.status,
+    }
+
+    # update the trace if there are no errors
+    try:
+        db.update_trace(trace_id, update_data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update trace: {e}")
+
+    # clean up the Redis keys since we finished execution the trace
+    queue.redis_client.delete(
+        f"trace:{trace_id}:total_tokens",
+        f"trace:{trace_id}:total_cost",
+        f"trace:{trace_id}:total_duration"
+    )
+
+    return {
+        "status": "completed",
+        "trace_id": trace_id,
+        "total_tokens": total_tokens,
+        "total_cost": total_cost,
+        "duration": total_duration
+    }
+
 
 # health check endpoint for kubernetes / docker liveness probes
 @app.get("/health")

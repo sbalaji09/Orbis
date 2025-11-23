@@ -93,13 +93,11 @@ class SpanWorker:
                 "error_message": span.get('error_message')
             }
             
-            # we add the current token amount and cost to a redis in session variable for final registering
-            self.queue.redis_client.incrbyfloat("trace:" + trace_id + ":total_tokens", span.get('input_tokens') + span.get('output_tokens'))
-            self.queue.redis_client.incrbyfloat("trace:" + trace_id + ":total_cost", span.get('total_cost'))
-            if span.get('is_end_span'):
-                self.queue.redis_client.set("trace:" + trace_id + ":end_time", span.get('end_time'))
-                
-            self.queue.redis_client.incrbyfloat("trace:" + trace_id + ":total_duration", span.get('duration'))
+            # Accumulate token/cost/duration in Redis for trace-level aggregation
+            # These will be read when the SDK calls /trace/end
+            self.queue.redis_client.incrbyfloat(f"trace:{trace_id}:total_tokens", span.get('input_tokens', 0) + span.get('output_tokens', 0))
+            self.queue.redis_client.incrbyfloat(f"trace:{trace_id}:total_cost", span.get('total_cost', 0))
+            self.queue.redis_client.incrbyfloat(f"trace:{trace_id}:total_duration", span.get('duration', 0))
 
             # Check if trace exists, if not create it
             # This handles SDK sending spans out of order or without explicit start span
@@ -130,40 +128,8 @@ class SpanWorker:
                     'agent_id': trace.get('agent_id', 'none'),
                     'reason': 'trace_did_not_exist'
                 }})
-            
-            # if this span is the end of a trace, then update the trace object with the token count and duration
-            if span.get('is_end_span'):
-                # Data to patch - only update the fields you want
-                total_tokens = int(self.queue.redis_client.get("trace:" + trace_id + ":total_tokens") or 0)
-                total_cost = float(self.queue.redis_client.get("trace:" + trace_id + ":total_cost") or 0)
-                end_time = self.queue.redis_client.get("trace:" + trace_id + ":end_time") or ""
-                total_duration = float(self.queue.redis_client.get("trace:" + trace_id + ":total_duration") or 0)
 
-                update_data = {
-                    "end_time": end_time,
-                    "duration": total_duration,
-                    "total_cost": total_cost,
-                    "total_tokens": total_tokens,
-                    "status": "completed",
-                }
-                
-                db.update_trace(trace_id, update_data)
-
-                self.queue.redis_client.delete(
-                    f"trace:{trace_id}:total_tokens",
-                    f"trace:{trace_id}:total_cost",
-                    f"trace:{trace_id}:end_time",
-                    f"trace:{trace_id}:total_duration"
-                )
-
-                self.logger.info("Trace completed", extra={'extra_data': {
-                    'trace_id': trace_id,
-                    'total_cost': total_cost,
-                    'total_tokens': total_tokens,
-                    'duration': total_duration
-                }})
-
-            # once the data has been converted into the proper format, the worker saves it to Supabase
+            # Save span to database
             span_id = db.insert_span(span_db_data)
 
             # log successful completion with context for the span
