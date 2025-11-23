@@ -600,6 +600,7 @@ class SupabaseDB:
             self.return_connection(conn)
 
     # insert multiple spans in a single query for batch processing
+    # includes streaming metrics: is_streaming, time_to_first_token, tokens_per_second
     def insert_spans_batch(self, spans: list) -> list:
         if not spans:
             return []
@@ -613,7 +614,8 @@ class SupabaseDB:
                         span_id, trace_id, parent_span_ids, name, start_time, end_time,
                         duration, input_preview, input_blob_url, output_preview,
                         output_blob_url, llm_model, prompt_tokens, completion_tokens,
-                        cost, status, error_message
+                        cost, status, error_message,
+                        is_streaming, time_to_first_token, tokens_per_second
                     ) VALUES %s
                     RETURNING span_id
                 """
@@ -626,15 +628,20 @@ class SupabaseDB:
                         span['duration'], span['input_preview'], span['input_blob_url'],
                         span['output_preview'], span['output_blob_url'], span['llm_model'],
                         span['prompt_tokens'], span['completion_tokens'], span['cost'],
-                        span['status'], span['error_message']
+                        span['status'], span['error_message'],
+                        span.get('is_streaming', False),
+                        span.get('time_to_first_token'),
+                        span.get('tokens_per_second')
                     )
                     for span in spans
                 ]
 
-                execute_values(cur, query, values)
-                results = cur.fetchall()
+                # Use explicit UUID casting in template
+                template = "(%s, %s, %s::uuid[], %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                execute_values(cur, query, values, template=template, fetch=True)
+
                 conn.commit()
-                return [r[0] for r in results]
+                return [span['span_id'] for span in spans]  # Return the span IDs from input, not from DB
         except Exception as e:
             conn.rollback()
             raise Exception(f"Failed to batch insert spans: {e}")

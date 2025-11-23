@@ -98,7 +98,10 @@ class SpanWorker:
                 "completion_tokens": span.get('output_tokens'),
                 "cost": span.get('total_cost'),
                 "status": span.get('status'),
-                "error_message": span.get('error_message')
+                "error_message": span.get('error_message'),
+                "is_streaming": span.get('is_streaming', False), 
+                "time_to_first_token": span.get('time_to_first_token'),
+                "tokens_per_second": span.get('tokens_per_second')
             }
             
             # Accumulate token/cost/duration in Redis for trace-level aggregation
@@ -234,9 +237,9 @@ class SpanWorker:
                 'agent_id': trace.get('agent_id', 'none'),
                 'reason': 'trace_did_not_exist'
             }})
-
-        # build and return the span data
-        return {
+        
+        # DEBUG: Print what we're about to return
+        prepared_data = {
             "span_id": str(span.get('span_id', 'unknown')),
             "trace_id": trace_id,
             "parent_span_ids": span.get('parent_span_id', []),
@@ -253,8 +256,13 @@ class SpanWorker:
             "completion_tokens": span.get('output_tokens'),
             "cost": span.get('total_cost'),
             "status": span.get('status'),
-            "error_message": span.get('error_message')
+            "error_message": span.get('error_message'),
+            "is_streaming": span.get('is_streaming', False),
+            "time_to_first_token": span.get('time_to_first_token'),
+            "tokens_per_second": span.get('tokens_per_second')
         }
+        
+        return prepared_data
 
     # this function is the main worker loop that pops from the queue and processes each popped task
     # note: this function will run forever unless forcefully stopped

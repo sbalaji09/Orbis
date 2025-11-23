@@ -22,16 +22,20 @@ class SpanIn(BaseModel):
     start_time: str
     end_time: str
     duration: float
-    input_data: str
-    output_data: str
-    model: str
-    input_tokens: int
-    output_tokens: int
-    total_cost: float
+    input_data: str = ""  
+    output_data: str = ""  
+    model: str = ""  
+    input_tokens: int = 0  
+    output_tokens: int = 0 
+    total_cost: float = 0.0  
     status: str
     error_message: Optional[str] = None
     user_id: str
     agent_id: Optional[str] = None
+    # Streaming fields
+    is_streaming: Optional[bool] = False
+    time_to_first_token: Optional[float] = None
+    tokens_per_second: Optional[float] = None
 
 
 class EndTraceIn(BaseModel):
@@ -166,24 +170,33 @@ def validate_span(span: SpanIn) -> bool:
     for attr_name in vars(span):
         attr_value = getattr(span, attr_name)
 
-        # error_message and agent_id can be None (optional fields)
-        if attr_name in ('error_message', 'agent_id'):
+        # These fields can be None or empty
+        if attr_name in ('error_message', 'agent_id', 'model', 'input_data', 'output_data'):
+            continue
+        
+        # Numeric fields can be 0
+        if attr_name in ('input_tokens', 'output_tokens', 'total_cost', 'duration'):
+            continue
+        
+        # Streaming fields are optional
+        if attr_name in ('is_streaming', 'time_to_first_token', 'tokens_per_second'):
             continue
 
         if attr_value is None:
             return False
 
-        # this validates the uuid id using the function above
+        # Validate UUIDs
         if attr_name in ('trace_id', 'span_id') and not is_valid_uuid(str(attr_value)):
             return False
 
-        # if any of the parent span UUIDs are not valid, then return False
+        # Validate parent_span_id list
         if attr_name == 'parent_span_id':
             if not isinstance(attr_value, list):
                 return False
             # Allow empty list for root spans
             if len(attr_value) > 0 and not all(is_valid_uuid(str(v)) for v in attr_value):
                 return False
+            
     return True
 
 # health check endpoint that verifies all critical services are operational
