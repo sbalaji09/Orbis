@@ -513,17 +513,15 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
     
-    def insert_agent(self, user_id: str, agent_name: str, api_key_str: str) -> str:
+    def insert_agent(self, user_id: str, agent_name: str, api_key: str) -> str:
         conn = self.get_connection()
-        cur_time = datetime.now()
         try:
             with conn.cursor() as cur:
                 sql = """
                     INSERT INTO agents (
                         user_id,
                         agent_name,
-                        cur_time
-                        api_key_str,
+                        api_key
                     ) VALUES (
                         %s,
                         %s,
@@ -534,15 +532,14 @@ class SupabaseDB:
                 cur.execute(sql, (
                     user_id,
                     agent_name,
-                    api_key_str,
-                    cur_time
+                    api_key
                 ))
                 result = cur.fetchone()
                 conn.commit()
                 return f"AI agent creation successful with agent id: {result[0]}"
         except Exception as e:
             conn.rollback()
-            raise Exception(f"Failed to insert api key: {e}")
+            raise Exception(f"Failed to insert agent: {e}")
         finally:
             self.return_connection(conn)
     

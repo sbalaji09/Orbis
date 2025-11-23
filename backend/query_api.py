@@ -253,6 +253,9 @@ async def get_agents(user_id: str = Header(..., alias="X-User-ID")):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# Import profile_api to register agent creation endpoints
+import profile_api  # noqa: F401
+
 if __name__ == "__main__":
     import uvicorn
     print("Starting Query API on http://localhost:8000")
