@@ -1,3 +1,4 @@
+from db_connection import db
 from fastapi import FastAPI, HTTPException, Query, Header
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
@@ -7,7 +8,6 @@ import os
 
 # add parent directory to path
 sys.path.append(os.path.dirname(__file__))
-from db_connection import db
 
 app = FastAPI(
     title="Orbis Query API",
@@ -36,18 +36,20 @@ async def health_check():
 # list all traces for a user with pagination
 @app.get("/traces")
 async def list_traces(
-    user_id: int = Header(..., alias="X-User-ID"),
+    user_id: str = Header(..., alias="X-User-ID"),
     limit: int = Query(50, ge=1, le=100, description="Max traces to return"),
     offset: int = Query(0, ge=0, description="Number to skip for pagination"),
     status: Optional[str] = Query(None, description="Filter by status")
 ):
     try:
-        # get all the traces
-        traces = db.get_traces_by_user(user_id, limit=limit, offset=offset)
+        # Get traces with enhanced information from spans
+        traces = db.get_traces_with_stats(user_id, limit=limit, offset=offset, status_filter=status)
 
-        # filter by the status
-        if status:
-            traces = [t for t in traces if t.get('status') == status]
+        # Convert ALL datetime objects to ISO strings for JSON serialization
+        for trace in traces:
+            for key, value in list(trace.items()):
+                if isinstance(value, datetime):
+                    trace[key] = value.isoformat()
 
         return {
             "traces": traces,
@@ -61,7 +63,7 @@ async def list_traces(
 # get the most recent traces for a user
 @app.get("/traces/recent")
 async def get_recent_traces(
-    user_id: int = Header(..., alias="X-User-ID"),
+    user_id: str = Header(..., alias="X-User-ID"),
     limit: int = Query(10, ge=1, le=50, description="Number of recent traces")
 ):
     try:
@@ -77,29 +79,29 @@ async def get_recent_traces(
 @app.get("/traces/{trace_id}")
 async def get_trace(
     trace_id: str,
-    user_id: int = Header(..., alias="X-User-ID")
+    user_id: str = Header(..., alias="X-User-ID")
 ):
-    try:
-        trace = db.get_trace_by_id(trace_id)
+    # try:
+    trace = db.get_trace_by_id(trace_id)
 
-        if not trace:
-            raise HTTPException(status_code=404, detail="Trace not found")
+    if not trace:
+        raise HTTPException(status_code=404, detail="Trace not found")
 
-        # check if the user has access to this trace
-        if trace.get('user_id') != user_id:
-            raise HTTPException(status_code=403, detail="Access denied")
+    # check if the user has access to this trace
+    if trace.get('user_id') != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
 
-        return trace
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return trace
+    # except HTTPException:
+    #     raise
+    # except Exception as e:
+    #     raise HTTPException(status_code=500, detail=str(e))
 
 # get all the spans for a specific trace
 @app.get("/traces/{trace_id}/spans")
 async def get_trace_spans(
     trace_id: str,
-    user_id: int = Header(..., alias="X-User-ID")
+    user_id: str = Header(..., alias="X-User-ID")
 ):
     try:
         # check if the trace exists and the user has access
@@ -111,7 +113,6 @@ async def get_trace_spans(
 
         # get spans
         spans = db.get_spans_by_trace(trace_id)
-
         return {
             "trace_id": trace_id,
             "span_count": len(spans),
@@ -126,7 +127,7 @@ async def get_trace_spans(
 @app.get("/traces/{trace_id}/summary")
 async def get_trace_summary(
     trace_id: str,
-    user_id: int = Header(..., alias="X-User-ID")
+    user_id: str = Header(..., alias="X-User-ID")
 ):
     try:
         summary = db.get_trace_summary(trace_id)
@@ -134,7 +135,7 @@ async def get_trace_summary(
         if not summary:
             raise HTTPException(status_code=404, detail="Trace not found")
 
-        # check access for the user id 
+        # check access for the user id
         if summary.get('user_id') != user_id:
             raise HTTPException(status_code=403, detail="Access denied")
 
@@ -148,7 +149,7 @@ async def get_trace_summary(
 @app.get("/spans/{span_id}")
 async def get_span(
     span_id: str,
-    user_id: int = Header(..., alias="X-User-ID")
+    user_id: str = Header(..., alias="X-User-ID")
 ):
     try:
         span = db.get_span_by_id(span_id)
@@ -171,7 +172,7 @@ async def get_span(
 # returns: total_traces, total_spans, total_cost, total_tokens, avg_cost_per_trace, total_duration
 @app.get("/metrics/user")
 async def get_user_metrics(
-    user_id: int = Header(..., alias="X-User-ID")
+    user_id: str = Header(..., alias="X-User-ID")
 ):
     try:
         metrics = db.get_user_metrics(user_id)
@@ -182,13 +183,15 @@ async def get_user_metrics(
 # search and filter traces
 @app.get("/search/traces")
 async def search_traces(
-    user_id: int = Header(..., alias="X-User-ID"),
+    user_id: str = Header(..., alias="X-User-ID"),
     status: Optional[str] = Query(None, description="Filter by status"),
     model: Optional[str] = Query(None, description="Filter by LLM model"),
     min_cost: Optional[float] = Query(None, description="Minimum cost"),
     max_cost: Optional[float] = Query(None, description="Maximum cost"),
-    start_date: Optional[str] = Query(None, description="Created after (ISO format)"),
-    end_date: Optional[str] = Query(None, description="Created before (ISO format)")
+    start_date: Optional[str] = Query(
+        None, description="Created after (ISO format)"),
+    end_date: Optional[str] = Query(
+        None, description="Created before (ISO format)")
 ):
     try:
         # build the filters dictionary
@@ -219,7 +222,7 @@ async def search_traces(
 
 # get traces based on the specific agent
 @app.get("/traces/{agent_id}")
-async def get_traces_by_agent(agent_id: int, user_id: int, limit: int = 5, offset: int = 0):
+async def get_traces_by_agent(agent_id: str, user_id: str, limit: int = 5, offset: int = 0):
     try:
         span = db.get_traces_by_agentid(agent_id, user_id)
 
@@ -239,18 +242,19 @@ async def get_traces_by_agent(agent_id: int, user_id: int, limit: int = 5, offse
 
 # get all the agents belonging to a specific user
 @app.get("/agents")
-async def get_agents(user_id: int):
+async def get_agents(user_id: str = Header(..., alias="X-User-ID")):
     try:
-        agents = db.get_agents(user_id)
+        agents = db.get_agents_by_userid(user_id)
 
-        if not agents:
-            raise HTTPException(status_code=404, detail="Agents not found")
-
-        return agents
-    except HTTPException:
-        raise
+        return {
+            "agents": agents if agents else [],
+            "count": len(agents) if agents else 0
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# Import profile_api to register agent creation endpoints
+import profile_api  # noqa: F401
 
 if __name__ == "__main__":
     import uvicorn

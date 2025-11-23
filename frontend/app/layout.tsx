@@ -1,15 +1,22 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Geist_Mono, Source_Serif_4, Zalando_Sans } from "next/font/google";
 import "./globals.css";
-import NavMenu from "@/components/NavMenu";
 
-const inter = Inter({
-  variable: "--font-inter",
+const zalandoSans = Zalando_Sans({
+  variable: "--font-zalando-sans",
+  weight: "variable",
   subsets: ["latin"],
 });
 
-const jetbrainsMono = JetBrains_Mono({
-  variable: "--font-jetbrains-mono",
+const sourceserif = Source_Serif_4({
+  variable: "--font-source-serif-4",
+  weight: "variable",
+  subsets: ["latin"],
+});
+
+const geistmono = Geist_Mono({
+  variable: "--font-geist-mono",
+  weight: "variable",
   subsets: ["latin"],
 });
 
@@ -26,7 +33,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}
+        className={`${zalandoSans.variable} ${geistmono.variable} ${sourceserif.variable} antialiased`}
       >
         {/* <NavMenu /> */}
         {children}

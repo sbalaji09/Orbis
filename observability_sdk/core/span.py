@@ -7,8 +7,9 @@ import time
 @dataclass
 class Span:
     # tracks a single function execution
-
     name: str
+    user_id: Optional[str] = None
+    agent_id: Optional[str] = None
     trace_id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
     span_id: str = field(default_factory=lambda: str(uuid.uuid4()))
@@ -42,6 +43,11 @@ class Span:
     # internal timing (hidden from user)
     _start_perf: float = field(default_factory=time.perf_counter, init=False, repr=False)
 
+    # streaming metrics
+    is_streaming: bool = False
+    time_to_first_token: Optional[float] = None
+    tokens_per_second: Optional[float] = None
+
     # mark the span as complete
     def complete(self, status: str = "success") -> None:
         self.end_time = datetime.now(timezone.utc)
@@ -56,29 +62,28 @@ class Span:
     # convert to dict for JSON serialization
     def to_dict(self) -> dict:
         return {
-            "trace_id": self.trace_id, 
+            "trace_id": self.trace_id,
             "span_id": self.span_id,
+            "parent_span_id": self.parent_span_id,
             "name": self.name,
-            "prompt": self.prompt or "",  # Backend expects string, not None
+            "start_time": self.start_time.isoformat(),
+            "end_time": self.end_time.isoformat() if self.end_time else self.start_time.isoformat(),
+            "duration": self.duration_ms or 0.0,
+            "input_data": self.prompt or self.input_data or "",
+            "output_data": self.output or self.output_data or "",
             "model": self.model or "",
             "input_tokens": self.input_tokens or 0,
             "output_tokens": self.output_tokens or 0,
             "total_cost": self.total_cost or 0.0,
-            "start_time": self.start_time.isoformat(),
-            "end_time": self.end_time.isoformat() if self.end_time else self.start_time.isoformat(),
-            "duration": self.duration_ms or 0.0,
-            "input_data": self.input_data or "",
-            "output_data": self.output_data or "",
-            "context": self.context or "",
-            "output": self.output or "",
             "status": self.status,
-            "error_message": self.error_message or "",  # Can't be None!
-            "parent_span_id": self.parent_span_id,  # Already a list
+            "error_message": self.error_message,  # Can be None
+            "user_id": self.user_id,
+            "agent_id": self.agent_id,
             "is_start_span": self.is_start_span,
             "is_end_span": self.is_end_span,
-            # Don't send these - backend doesn't expect them:
-            # "span_id": self.span_id,
-            # "trace_id": self.trace_id,
+            "is_streaming": self.is_streaming,
+            "time_to_first_token": self.time_to_first_token,
+            "tokens_per_second": self.tokens_per_second,
         }
 
     def __str__(self):

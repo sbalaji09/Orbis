@@ -1,16 +1,15 @@
 "use client";
 import { useState, useEffect } from "react";
-import { dummySpans } from "@/lib/dummy";
 import { Span } from "@/lib/types";
 import GraphNode from "@/components/GraphNode";
 
 function calculateDAGLayout(spans: Span[]): NodePosition[] {
   const spanMap = new Map(spans.map((span) => [span.span_id, span]));
   const positions: NodePosition[] = [];
-  const levels = new Map<number, number>();
+  const levels = new Map<string, number>();
 
   // Calculate depth level for each node
-  function getLevel(spanId: number): number {
+  function getLevel(spanId: string): number {
     if (levels.has(spanId)) return levels.get(spanId)!;
 
     const span = spanMap.get(spanId);
@@ -18,7 +17,6 @@ function calculateDAGLayout(spans: Span[]): NodePosition[] {
       levels.set(spanId, 0);
       return 0;
     }
-
     const maxParentLevel = Math.max(
       ...span.parent_span_ids.map((parentId) => getLevel(parentId))
     );
@@ -40,11 +38,11 @@ function calculateDAGLayout(spans: Span[]): NodePosition[] {
     levelGroups.get(level)!.push(span);
   });
 
-  // Position nodes
-  const horizontalSpacing = 200;
-  const verticalSpacing = 180;
-  const startX = 100;
-  const startY = 100;
+  // Position nodes with generous spacing for clean layout
+  const horizontalSpacing = 260;
+  const verticalSpacing = 200;
+  const startX = 130;
+  const startY = 120;
 
   levelGroups.forEach((spansInLevel, level) => {
     const levelWidth = (spansInLevel.length - 1) * horizontalSpacing;
@@ -89,17 +87,17 @@ function calculateEdges(positions: NodePosition[]): Edge[] {
 function ArrowMarker() {
   return (
     <defs>
-      {/* Sleek triangular arrowhead */}
+      {/* Arrowhead marker */}
       <marker
         id="arrowhead"
-        markerWidth="10"
-        markerHeight="10"
-        refX="8"
-        refY="5"
+        markerWidth="6"
+        markerHeight="6"
+        refX="6"
+        refY="3"
         orient="auto"
         markerUnits="strokeWidth"
       >
-        <polygon points="0,0 0,10 10,5" fill="#1a1d1a" stroke="none" />
+        <polygon points="0,0 0,6 6,3" fill="#000000" stroke="none" />
       </marker>
     </defs>
   );
@@ -118,41 +116,53 @@ interface Edge {
 
 // Edge component to draw connections between spans
 function Edge({ from, to }: Edge) {
-  // Offset to account for node radius
-  const nodeRadius = 40;
+  // Node dimensions updated to match spacious GraphNode
+  const nodeWidth = 200; // w-[200px]
+  const nodeHeight = 95; // approximate height with status stripe + content
+  const halfW = nodeWidth / 2;
+  const halfH = nodeHeight / 2;
+  const gap = 12;
 
-  // Calculate angle and adjust start/end points
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   const angle = Math.atan2(dy, dx);
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
 
-  const fromX = from.x + Math.cos(angle) * nodeRadius;
-  const fromY = from.y + Math.sin(angle) * nodeRadius;
-  const toX = to.x - Math.cos(angle) * nodeRadius;
-  const toY = to.y - Math.sin(angle) * nodeRadius;
+  // Calculate rectangle intersection
+  const tx = Math.abs(cos) < 1e-6 ? Infinity : halfW / Math.abs(cos);
+  const ty = Math.abs(sin) < 1e-6 ? Infinity : halfH / Math.abs(sin);
+  const fromT = Math.min(tx, ty);
+  const toT = Math.min(tx, ty);
 
-  // Completely straight line - no curves
+  const arrowheadSize = 8;
+
+  const fromX = Math.round((from.x + cos * (fromT + gap)) * 100) / 100;
+  const fromY = Math.round((from.y + sin * (fromT + gap)) * 100) / 100;
+  const toX =
+    Math.round((to.x - cos * (toT + gap + arrowheadSize)) * 100) / 100;
+  const toY =
+    Math.round((to.y - sin * (toT + gap + arrowheadSize)) * 100) / 100;
+
   const path = `M ${fromX} ${fromY} L ${toX} ${toY}`;
 
   return (
     <g>
-      {/* Clean arrow line */}
       <path
         d={path}
-        stroke="#2a2d2a"
-        strokeWidth="1.5"
+        stroke="#000000"
+        strokeWidth="2.5"
         fill="none"
         markerEnd="url(#arrowhead)"
-        strokeLinecap="butt"
+        strokeLinecap="round"
+        opacity="0.8"
       />
     </g>
   );
 }
 
-export default function TraceGraph(props: { traceId: number }) {
-  const initialPositions = calculateDAGLayout(
-    dummySpans.filter((span) => span.trace_id === props.traceId)
-  );
+export default function TraceGraphClient({ spans }: { spans: Span[] }) {
+  const initialPositions = calculateDAGLayout(spans);
 
   // Calculate container dimensions based on node positions
   const allX = initialPositions.map((p) => p.x);
@@ -173,7 +183,7 @@ export default function TraceGraph(props: { traceId: number }) {
 
   // State to track absolute positions (committed after drag ends)
   const [nodePositions, setNodePositions] = useState<
-    Map<number, { x: number; y: number }>
+    Map<string, { x: number; y: number }>
   >(
     () =>
       new Map(
@@ -186,7 +196,7 @@ export default function TraceGraph(props: { traceId: number }) {
 
   // Temporary drag state (during active drag)
   const [activeDrag, setActiveDrag] = useState<{
-    spanId: number;
+    spanId: string;
     deltaX: number;
     deltaY: number;
   } | null>(null);
@@ -215,7 +225,7 @@ export default function TraceGraph(props: { traceId: number }) {
 
   // Handle drag events
   const handleDrag = (
-    spanId: number,
+    spanId: string,
     deltaX: number,
     deltaY: number,
     commit: boolean

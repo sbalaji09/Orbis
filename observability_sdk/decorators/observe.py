@@ -2,9 +2,10 @@ from functools import wraps
 from typing import Optional, Callable
 from ..core.span import Span
 from ..collector.collector import get_collector
+from ..core.context import get_current_span, set_current_span
 
 
-def observe(name: Optional[str] = None, trace_id: Optional[str] = None):
+def observe(name: Optional[str] = None, trace_id: Optional[str] = None, user_id: Optional[str]= None):
     """
     Decorator to automatically track function execution as a span.
     
@@ -27,16 +28,36 @@ def observe(name: Optional[str] = None, trace_id: Optional[str] = None):
         def wrapper(*args, **kwargs):
             # create span with custom name or use function name
             span_name = name or func.__name__
+
+            # get parent context
+            parent_span = get_current_span()
+            
+            # Capture input arguments
+            input_str = f"args={args}, kwargs={kwargs}" if args or kwargs else ""
             
             # create the span
             span = Span(
                 name=span_name,
-                trace_id=trace_id or Span.__dataclass_fields__['trace_id'].default_factory()
+                agent_id="af913dc2-732e-42a6-a113-a80c694d71bf",
+                user_id=user_id or "00000000-0000-0000-0000-000000000000",
+                trace_id=trace_id or (parent_span.trace_id if parent_span else Span.__dataclass_fields__['trace_id'].default_factory()),
+                prompt=input_str  # ← ADD THIS: Capture input
             )
+
+            # if there's a parent, set parent relationship
+            if parent_span:
+                span.parent_span_id = [parent_span.span_id]
+            
+            # set this span as the active span
+            previous_span = get_current_span()
+            set_current_span(span)
             
             try:
                 # execute the actual function
                 result = func(*args, **kwargs)
+                
+                # Capture output
+                span.output = str(result) if result is not None else ""  # ← ADD THIS: Capture output
                 
                 # mark span as successful
                 span.complete(status="success")
@@ -52,6 +73,8 @@ def observe(name: Optional[str] = None, trace_id: Optional[str] = None):
                 raise
                 
             finally:
+                # restore previous span context
+                set_current_span(previous_span)
                 # send span to collector (replaces print)
                 collector = get_collector()
                 collector.collect(span)

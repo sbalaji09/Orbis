@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ReactElement } from "react";
+import { Logo } from "./Logo";
 
 interface NavItem {
   icon: ReactElement;
@@ -81,45 +82,41 @@ export default function NavMenu() {
   return (
     <nav className="flex items-center justify-between w-full">
       {/* Logo */}
-      <Link href="/dashboard" className="flex items-center gap-3 group">
-        <div className="w-9 h-9 bg-linear-to-br from-mustard to-mustard/80 rounded-xl flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow">
-          <span className="text-white font-bold text-base">O</span>
-        </div>
-        <div className="flex flex-col">
-          <span className="text-lg font-bold text-foreground leading-none">
-            Orbis
+      <Link href="/dashboard" className="flex items-center group">
+        {/* <div className="w-8 h-8 bg-mustard border-2 border-black flex items-center justify-center group-hover:shadow-[2px_2px_0_rgba(0,0,0,0.2)] transition-all">
+          <span className="text-white font-bold text-lg">O</span>
+        </div> */}
+        <Logo className="w-12 h-12" />
+        <div className="flex flex-col gap-0">
+          <span className="text-base font-semibold tracking-tight leading-none">
+            $ orbis.ai
           </span>
-          <span className="text-[10px] text-foreground/40 font-medium uppercase tracking-wider">
-            Observability
+          <span className="text-[9px] text-black/40 font-medium uppercase tracking-wider">
+            {`// observability`}
           </span>
         </div>
       </Link>
 
       {/* Navigation Links */}
-      <ul className="flex items-center gap-2">
+      <ul className="flex items-center gap-1">
         {navItems.map((item) => {
           const active = isActive(item.link);
           return (
             <li key={item.name}>
               <Link
                 href={item.link}
-                className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2.5 text-sm font-medium relative group ${
+                className={`relative px-4 py-2 transition-all duration-200 flex items-center gap-2 text-sm font-medium border-2 ${
                   active
-                    ? "bg-babyblue/30 text-foreground shadow-sm"
-                    : "text-foreground/60 hover:text-foreground hover:bg-foreground/5"
+                    ? "bg-black text-mustard border-black"
+                    : "bg-transparent text-black/60 border-transparent hover:text-foreground hover:bg-black/5"
                 }`}
               >
-                <span className={`w-4 h-4 ${active ? "" : "opacity-70"}`}>
-                  {item.icon}
-                </span>
+                <span className="w-4 h-4">{item.icon}</span>
                 <span>{item.name}</span>
                 {item.badge && (
-                  <span className="px-1.5 py-0.5 text-[9px] font-bold bg-mustard/20 text-mustard rounded uppercase tracking-wider">
+                  <span className="px-1.5 py-0.5 text-[9px] font-semibold bg-babyblue/10 text-babyblue border border-babyblue uppercase tracking-wide">
                     {item.badge}
                   </span>
-                )}
-                {active && (
-                  <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1/2 h-0.5 bg-mustard rounded-full" />
                 )}
               </Link>
             </li>

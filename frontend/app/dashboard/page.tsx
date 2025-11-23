@@ -1,59 +1,68 @@
-"use client";
-import { useRouter } from "next/navigation";
-import { dummyAgents, dummyTraces } from "@/lib/dummy";
+import { getAgents, getTraces } from "@/lib/api-server";
+import { TraceRow } from "@/components/TraceRow";
+import { CreateAgent } from "@/components/CreateAgent";
 
-export default function Dashboard() {
-  const router = useRouter();
+// Revalidate every 10 seconds
+export const revalidate = 10;
+
+export default async function Dashboard() {
+  // Fetch data on server
+  const [agents, traces] = await Promise.all([getAgents(), getTraces()]);
 
   // Group traces by agent
-  const tracesByAgent = dummyAgents.map((agent) => ({
+  const tracesByAgent = agents.map((agent) => ({
     agent,
-    traces: dummyTraces.filter((trace) => trace.agent_id === agent.agent_id),
+    traces: traces.filter((trace) => trace.agent_id === agent.agent_id),
   }));
 
   return (
-    <div className="h-full overflow-y-auto p-8">
-      <div className="max-w-6xl mx-auto">
+    <div className="h-full overflow-y-auto bg-background">
+      <div className="max-w-7xl mx-auto p-6">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">
-            Agent Traces
+        <div className="mb-6">
+          <h1 className="text-2xl font-semibold tracking-tight mb-1">
+            <span className="text-black/40">{`> `}</span>Agent Traces
           </h1>
-          <p className="text-foreground/60">
-            View and analyze traces grouped by agent
+          <p className="text-sm text-black/60">
+            {`// View and analyze traces grouped by agent`}
           </p>
         </div>
 
+        {/* Create Agent */}
+        <div className="mb-6">
+          <CreateAgent />
+        </div>
+
         {/* Agent Groups */}
-        <div className="space-y-6">
+        <div className="space-y-5">
           {tracesByAgent.map(({ agent, traces }) => (
             <div
               key={agent.agent_id}
-              className="bg-white rounded-lg border border-foreground/10 overflow-hidden"
+              className="border-2 border-black overflow-hidden shadow-[4px_4px_0_rgba(0,0,0,0.15)] bg-background"
             >
               {/* Agent Header */}
-              <div className="px-6 py-4 bg-linear-to-br from-babyblue/10 to-babyblue/5 border-b border-foreground/10">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-lg font-semibold text-foreground">
-                      {agent.name}
+              <div className="px-5 py-4 bg-mustard/10 border-b-2 border-black">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <h2 className="text-base font-semibold tracking-tight">
+                      {agent.agent_name}
                     </h2>
                     {agent.description && (
-                      <p className="text-sm text-foreground/60 mt-1">
-                        {agent.description}
+                      <p className="text-xs text-black/60 mt-1">
+                        {`// ${agent.description}`}
                       </p>
                     )}
                   </div>
-                  <div className="flex items-center gap-3 text-sm">
-                    <div className="px-3 py-1 bg-white rounded-full border border-foreground/10">
-                      <span className="text-foreground/50">Traces:</span>{" "}
-                      <span className="font-mono font-semibold text-foreground">
+                  <div className="flex items-center gap-2 text-xs shrink-0">
+                    <div className="px-2.5 py-1 bg-black text-mustard border border-black">
+                      <span>Traces:</span>{" "}
+                      <span className="font-mono font-semibold">
                         {traces.length}
                       </span>
                     </div>
-                    <div className="px-3 py-1 bg-white rounded-full border border-foreground/10">
-                      <span className="text-foreground/50">ID:</span>{" "}
-                      <span className="font-mono text-xs text-foreground/70">
+                    <div className="px-2.5 py-1 bg-white border-2 border-black">
+                      <span className="text-black/60">ID:</span>{" "}
+                      <span className="font-mono text-[10px] text-black/40">
                         {agent.agent_id}
                       </span>
                     </div>
@@ -62,100 +71,15 @@ export default function Dashboard() {
               </div>
 
               {/* Traces List */}
-              <div className="divide-y divide-foreground/5">
+              <div>
                 {traces.length === 0 ? (
-                  <div className="px-6 py-8 text-center text-foreground/40 text-sm">
-                    No traces found for this agent
+                  <div className="px-5 py-8 text-center text-black/60 text-sm">
+                    {`// No traces found for this agent`}
                   </div>
                 ) : (
-                  traces.map((trace) => {
-                    const hasErrors = trace.status === "failed";
-                    return (
-                      <button
-                        key={trace.trace_id}
-                        onClick={() =>
-                          router.push(`/dashboard/trace/${trace.trace_id}`)
-                        }
-                        className="w-full px-6 py-4 text-left transition-all hover:bg-babyblue/15 group"
-                      >
-                        <div className="flex items-center justify-between gap-4">
-                          {/* Left: ID and Status */}
-                          <div className="flex items-center gap-3">
-                            <span className="font-mono text-base font-semibold text-foreground">
-                              #{trace.trace_id}
-                            </span>
-                            {hasErrors && (
-                              <span className="px-2 py-0.5 text-xs font-semibold bg-red-100 text-red-700 rounded">
-                                ERROR
-                              </span>
-                            )}
-                            {!hasErrors && (
-                              <span className="px-2 py-0.5 text-xs font-semibold bg-green-100 text-green-700 rounded">
-                                SUCCESS
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Right: Metrics */}
-                          <div className="flex items-center gap-6 text-sm">
-                            <div className="flex items-center gap-2 text-foreground/60">
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                                />
-                              </svg>
-                              <span>{trace.duration.toFixed(1)}s</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-foreground/60">
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                                />
-                              </svg>
-                              <span>${(trace.total_cost || 0).toFixed(4)}</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-foreground/60">
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M13 10V3L4 14h7v7l9-11h-7z"
-                                />
-                              </svg>
-                              <span className="font-mono">
-                                {trace.total_tokens || 0}
-                              </span>
-                            </div>
-                            <div className="text-xs text-foreground/40">
-                              {trace.start_time.toLocaleTimeString()}
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })
+                  traces.map((trace) => (
+                    <TraceRow key={trace.trace_id} trace={trace} />
+                  ))
                 )}
               </div>
             </div>

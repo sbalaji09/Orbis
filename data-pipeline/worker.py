@@ -1,4 +1,6 @@
+import base64
 import os
+import secrets
 import sys
 import time
 from datetime import datetime, timezone
@@ -76,7 +78,7 @@ class SpanWorker:
             span_db_data = {
                 "span_id": str(span.get('span_id', 'unknown')),
                 "trace_id": trace_id,
-                "parent_span_ids": [uuid.UUID(id) for id in span.get('parent_span_id', [])],
+                "parent_span_ids": span.get('parent_span_id', []),
                 "name": span.get('name'),
                 "start_time": span.get('start_time'),
                 "end_time": span.get('end_time'),
@@ -113,6 +115,7 @@ class SpanWorker:
                     "total_tokens": 0,
                     "status": "running",
                     "user_id": str(span.get('user_id')),  # Keep as UUID string
+                    "trace_hash_id": generate_hash_key(str(span.get('user_id')), str(span.get('agent_id')))
                 }
                 trace["trace_id"] = trace_id
 
@@ -131,6 +134,19 @@ class SpanWorker:
 
             # Save span to database
             span_id = db.insert_span(span_db_data)
+
+            # NEW: If span has error status, mark the trace as failed
+            if span.get('status') == 'error':
+                update_data = {
+                    "status": "error"
+                }
+                db.update_trace(trace_id, update_data)
+                
+                self.logger.info("Trace marked as failed due to span error", extra={'extra_data': {
+                    'trace_id': trace_id,
+                    'span_id': span_id,
+                    'error_message': span.get('error_message', 'Unknown error')
+                }})
 
             # log successful completion with context for the span
             self.logger.info("Span processed successfully", extra={'extra_data': {
@@ -217,6 +233,17 @@ class SpanWorker:
                 exc_info=True
             )
             raise
+        
+def generate_hash_key(user_id: str, agent_id: str) -> str:
+    # Combine user_id and agent_id into one string
+    combined_str = f"{user_id}:{agent_id}"
+    # Generate 16 random bytes for extra uniqueness
+    random_bytes = secrets.token_bytes(16)
+    # Encode combined string as bytes
+    combined_bytes = combined_str.encode('utf-8') + random_bytes
+    # Encode to URL-safe base64 string
+    api_key = base64.urlsafe_b64encode(combined_bytes).decode('utf-8')
+    return api_key
 
 
 # this is the entry point of the file to run the worker

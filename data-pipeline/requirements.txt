@@ -12,6 +12,9 @@ psycopg2-binary==2.9.9
 # Cloud storage (if using AWS S3)
 boto3==1.29.7
 
+# Security
+bcrypt==4.1.2
+
 # Utilities
 requests==2.31.0
 python-dotenv==1.0.0

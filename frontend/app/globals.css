@@ -1,31 +1,85 @@
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 
 :root {
-  --background: #eff1f3;
+  --background: #f5f3f0;
   --foreground: #0c0f0a;
-  --babyblue: #cbdceb;
-  --mustard: #de9e36;
+  --babyblue: #5b5fff;
+  --babyblue-light: #e8f2f8;
+  --mustard: #ffd600;
+  --slate: #475569;
+  --border: #0c0f0a;
+  --card: #ffffff;
+  --muted: #64748b;
+  --success: #4caf50;
+  --error: #dc2626;
+  --warning: #f59e0b;
+  --accent-purple: #8b5cf6;
+  --accent-teal: #14b8a6;
+  --green: #10b981;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-babyblue: var(--babyblue);
+  --color-babyblue-light: var(--babyblue-light);
   --color-mustard: var(--mustard);
-  --font-sans: var(--font-inter);
-  --font-mono: var(--font-jetbrains-mono);
+  --color-slate: var(--slate);
+  --color-border: var(--border);
+  --color-card: var(--card);
+  --color-muted: var(--muted);
+  --color-success: var(--success);
+  --color-error: var(--error);
+  --color-warning: var(--warning);
+  --color-accent-purple: var(--accent-purple);
+  --color-accent-teal: var(--accent-teal);
+  --color-green: var(--green);
+  --color-black: var(--foreground);
+  --font-mono: "JetBrains Mono", "Fira Code", "Consolas", "Monaco",
+    "Courier New", monospace;
+  --font-sans: "Zalando Sans", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
 }
-/* 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0c0f0a;
-    --foreground: #eff1f3;
-  }
-} */
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
-  position: relative;
+  font-family: var(--font-mono);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
+
+/* Typography refinements */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Custom scrollbar
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+} */

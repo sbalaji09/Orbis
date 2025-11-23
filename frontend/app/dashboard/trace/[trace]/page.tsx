@@ -1,9 +1,9 @@
 import { notFound } from "next/navigation";
-import TraceGraph from "@/components/TraceGraph";
-import { isValidTraceId } from "@/lib/traceUtils";
+import TraceGraphServer from "@/components/TraceGraphServer";
+import { getTrace } from "@/lib/api-server";
 
-// Force dynamic rendering - no static generation
-export const dynamic = "force-dynamic";
+// Revalidate every 10 seconds
+export const revalidate = 10;
 
 export default async function TraceOverview({
   params,
@@ -11,17 +11,13 @@ export default async function TraceOverview({
   params: Promise<{ trace: string }>;
 }) {
   const resolvedParams = await params;
-  const traceId = parseInt(resolvedParams.trace, 10);
+  const traceId = resolvedParams.trace;
 
-  // Check if trace ID is a valid number
-  if (isNaN(traceId)) {
+  // Check if trace exists in database
+  const trace = await getTrace(traceId.toString());
+  if (!trace) {
     notFound();
   }
 
-  // Check if trace ID exists in our data (will query DB in production)
-  if (!isValidTraceId(traceId)) {
-    notFound();
-  }
-
-  return <TraceGraph traceId={traceId} />;
+  return <TraceGraphServer traceId={traceId} />;
 }
