@@ -5,7 +5,7 @@ Uses LangChain's callback system to automatically capture agent execution.
 
 from typing import Any, Dict, List, Optional
 from uuid import UUID
-from langchain_core.callbacks import BaseCallbackHandler
+from langchain_core.callbacks import BaseCallbackHandler as LangChainBaseCallBack
 from langchain_core.outputs import LLMResult
 from ..core.span import Span
 from ..collector.collector import get_collector
@@ -13,7 +13,7 @@ from ..core.context import get_current_span, set_current_span
 import time
 
 # langchain callback handler that creates spans for chains, LLMs, and tools
-class OrbisCallbackHandler(BaseCallbackHandler):
+class OrbisCallbackHandler(LangChainBaseCallBack):
     
     def __init__(self):
         super().__init__()

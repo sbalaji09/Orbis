@@ -149,6 +149,18 @@ class OpenAIInstrumentor:
             
             # Set output
             span.output = full_content
+
+            # try to extract token usage from last chunk (if available)
+            # Note: OpenAI's latest streaming API may include usage in final chunk
+
+            if hasattr(chunk, 'usage') and chunk.usage:
+                span.input_tokens = chunk.usage.prompt_tokens
+                span.output_tokens = chunk.usage.completion_tokens
+                span.total_cost = calculate_openai_cost(
+                    span.model or "unknown",
+                    span.input_tokens or 0,
+                    span.output_tokens or 0
+                )
             
             # Calculate tokens per second (approximate based on chunks)
             if first_chunk_time:
@@ -242,6 +254,10 @@ class OpenAIInstrumentor:
             raise
 
         finally:
+            # send span to collector (always executes)
+            collector = get_collector()
+            collector.collect(span)
+
             # restore previous span context
             set_current_span(previous_span)
 

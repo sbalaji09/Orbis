@@ -3,7 +3,7 @@ Auto-instrumentation for Anthropic API calls.
 Automatically wraps Anthropic calls to capture spans
 """
 
-from typing import Optional, Any
+from typing import * # type: ignore
 import functools
 from ..core.span import Span
 from ..collector.collector import get_collector
@@ -239,24 +239,19 @@ class AnthropicInstrumentor:
 
                 # mark as successful
                 span.complete(status="success")
-                
-                # Send to collector
-                collector = get_collector()
-                collector.collect(span)
 
                 return response
         
         except Exception as e:
             span.set_error(e)
             span.complete(status="error")
-            
-            # Send to collector even on error
-            collector = get_collector()
-            collector.collect(span)
-            
             raise
 
         finally:
+            # Send to collector
+            collector = get_collector()
+            collector.collect(span)
+
             # Restore previous span context
             set_current_span(previous_span)
 
