@@ -43,8 +43,10 @@ class SpanWorker:
 
         self.shutdown_requested = False
 
-        self.last_task_time = time.time
+        self.last_task_time = time.time()
         self.tasks_processed = 0
+        self.last_heartbeat_time = time.time()
+        self.HEARTBEAT_INTERVAL = 30  # Send heartbeat every 30 seconds
 
     # this function processes a single span task
     # instead of having the backend infra do it automatically, we have this worker do it because it saves time
@@ -300,6 +302,7 @@ class SpanWorker:
         
         def handle_shutdown(signum, frame):
             self.queue.redis_client.hdel("workers:active", self.worker_id)
+            self.queue.redis_client.hdel("workers:heartbeat", self.worker_id)
             self.shutdown_requested = True
         
         signal.signal(signal.SIGTERM, handle_shutdown)
@@ -308,6 +311,15 @@ class SpanWorker:
 
         try:
             while not self.shutdown_requested:
+                # Send heartbeat periodically
+                if time.time() - self.last_heartbeat_time >= self.HEARTBEAT_INTERVAL:
+                    self.queue.redis_client.hset(
+                        "workers:heartbeat",
+                        self.worker_id,
+                        time.time()
+                    )
+                    self.last_heartbeat_time = time.time()
+
                 # dequeues a task and waits 5 seconds before checking the queue again
                 task = self.queue.dequeue(timeout=5)
 
