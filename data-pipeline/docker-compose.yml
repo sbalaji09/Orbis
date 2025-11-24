@@ -1,0 +1,7 @@
+worker:
+  build: ./data-pipeline
+  command: python worker.py
+  deploy:
+    replicas: 3
+  environment:
+    - REDIS_HOST=redis
