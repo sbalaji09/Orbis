@@ -11,6 +11,7 @@ from data_processing.prompt_upload import upload_input, upload_output
 from backend.db_connection import db
 from collections import defaultdict
 import socket
+import signal
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
@@ -38,6 +39,8 @@ class SpanWorker:
         self.FLUSH_INTERVAL = 5
 
         self.worker_id = f"{socket.gethostname()}-{os.getpid()}"
+
+        self.shutdown_requested = False
 
     # this function processes a single span task
     # instead of having the backend infra do it automatically, we have this worker do it because it saves time
@@ -278,9 +281,15 @@ class SpanWorker:
     # note: this function will run forever unless forcefully stopped
     def run(self):
         self.logger.info("Worker started - waiting for tasks from queue")
+        def handle_shutdown(signum, frame):
+            self.shutdown_requested = True
+        
+        signal.signal(signal.SIGTERM, handle_shutdown)
+        signal.signal(signal.SIGINT, handle_shutdown)
+
 
         try:
-            while True:
+            while not self.shutdown_requested:
                 # dequeues a task and waits 5 seconds before checking the queue again
                 task = self.queue.dequeue(timeout=5)
 
@@ -303,6 +312,10 @@ class SpanWorker:
                 else:
                     if self.pending_spans and time.time() - self.batch_start_time >= self.FLUSH_INTERVAL:
                         self.flush_batch()
+            
+            if self.pending_spans:
+                self.logger.info(f"Flushing {len(self.pending_spans)} remaining spans before shutdown")
+                self.flush_batch()
 
 
         except KeyboardInterrupt:
