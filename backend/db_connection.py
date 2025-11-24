@@ -64,6 +64,7 @@ class SupabaseDB:
                         ) VALUES (
                             %s, %s, %s, %s, %s, %s, %s, %s
                         )
+                        ON CONFLICT (trace_id) DO NOTHING
                         RETURNING trace_id
                     """
                     cur.execute(sql, (
@@ -84,6 +85,7 @@ class SupabaseDB:
                         ) VALUES (
                             %s, %s, %s, %s, %s, %s, %s
                         )
+                        ON CONFLICT (trace_id) DO NOTHING
                         RETURNING trace_id
                     """
                     cur.execute(sql, (

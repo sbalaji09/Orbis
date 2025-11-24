@@ -245,7 +245,13 @@ class SpanWorker:
             if span.get('agent_id') is not None:
                 trace["agent_id"] = str(span.get('agent_id'))
 
-            db.insert_trace(trace)
+            try:
+                db.insert_trace(trace)
+            except Exception as e:
+                if "duplicate key" in str(e).lower():
+                    pass
+                else:
+                    raise
 
             self.logger.info("Trace auto-created", extra={'extra_data': {
                 'trace_id': trace_id,
