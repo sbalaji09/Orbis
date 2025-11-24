@@ -1,4 +1,5 @@
 import base64
+import json
 import os
 import secrets
 import sys
@@ -41,6 +42,9 @@ class SpanWorker:
         self.worker_id = f"{socket.gethostname()}-{os.getpid()}"
 
         self.shutdown_requested = False
+
+        self.last_task_time = time.time
+        self.tasks_processed = 0
 
     # this function processes a single span task
     # instead of having the backend infra do it automatically, we have this worker do it because it saves time
@@ -280,8 +284,16 @@ class SpanWorker:
     # this function is the main worker loop that pops from the queue and processes each popped task
     # note: this function will run forever unless forcefully stopped
     def run(self):
+        self.queue.redis_client.hset(
+            "workers:active",
+            self.worker_id,
+            json.dumps({"started": time.time(), "pid": os.getpid()})
+        )
+
         self.logger.info("Worker started - waiting for tasks from queue")
+        
         def handle_shutdown(signum, frame):
+            self.queue.redis_client.hdel("workers:active", self.worker_id)
             self.shutdown_requested = True
         
         signal.signal(signal.SIGTERM, handle_shutdown)
@@ -347,6 +359,8 @@ class SpanWorker:
             if prepared_spans:
                 span_dicts = [s[1] for s in prepared_spans]
                 db.insert_spans_batch(span_dicts)  # NEW METHOD in db_connection
+                self.tasks_processed += len(prepared_spans)
+                self.last_task_time = time.time
             
             # update trace aggregates
             spans_by_trace = defaultdict(list)
