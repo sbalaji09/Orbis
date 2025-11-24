@@ -50,6 +50,14 @@ export default function GraphNode({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
 
+  // Debug: log modal state changes
+  console.log(
+    "GraphNode render - isModalOpen:",
+    isModalOpen,
+    "span:",
+    span.name
+  );
+
   const statusConfig = {
     success: { bg: "bg-emerald-50", text: "text-success", dot: "bg-success" },
     failed: { bg: "bg-red-50", text: "text-error", dot: "bg-error" },
@@ -64,7 +72,19 @@ export default function GraphNode({
     dot: "bg-muted",
   };
 
+  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    // If no onDrag (React Flow handles dragging), just open modal on click
+    if (!onDrag) {
+      e.stopPropagation();
+      e.preventDefault();
+      console.log("GraphNode clicked, opening modal for:", span.name);
+      setIsModalOpen(true);
+      return;
+    }
+  };
+
   const handleMouseDown = (e: React.MouseEvent<HTMLButtonElement>) => {
+    // Only use mouse tracking if onDrag is provided (not in React Flow)
     if (!onDrag) return;
 
     e.preventDefault();
@@ -109,25 +129,26 @@ export default function GraphNode({
             focus:outline-none focus:ring-2 focus:ring-[#FFD600] focus:ring-offset-2
             ${
               isDragging
-                ? "cursor-grabbing shadow-[8px_8px_0_rgba(0,0,0,0.2)] scale-[1.02]"
-                : "cursor-grab hover:shadow-[6px_6px_0_rgba(0,0,0,0.2)] shadow-[4px_4px_0_rgba(0,0,0,0.15)]"
+                ? "shadow-[8px_8px_0_rgba(0,0,0,0.2)] scale-[1.02]"
+                : "hover:shadow-[6px_6px_0_rgba(0,0,0,0.2)] shadow-[4px_4px_0_rgba(0,0,0,0.15)]"
             }
             transition-all duration-300 ease-in-out`}
+          onClick={handleClick}
           onMouseDown={handleMouseDown}
           onMouseEnter={() => setShowTooltip(true)}
           onMouseLeave={() => setShowTooltip(false)}
         >
-          {/* Terminal-style colored top bar */}
+          {/* Terminal-style colored top bar - draggable handle (remove nodrag from this) */}
           <div
-            className={`h-6 ${status.dot} border-b-2 border-black flex items-center px-2 gap-1`}
+            className={`h-6 ${status.dot} border-b-2 border-black flex items-center px-2 gap-1 cursor-grab active:cursor-grabbing`}
           >
             <div className="w-2 h-2 rounded-full bg-white/30"></div>
             <div className="w-2 h-2 rounded-full bg-white/30"></div>
             <div className="w-2 h-2 rounded-full bg-white/30"></div>
           </div>
 
-          {/* Content */}
-          <div className="p-3">
+          {/* Content - prevent dragging on content area */}
+          <div className="p-3 nodrag">
             {/* Header: Name + Status */}
             <div className="flex items-start justify-between gap-2 mb-2">
               <h3 className="text-xs font-semibold tracking-tight leading-tight truncate flex-1 transition-colors duration-200">
@@ -216,7 +237,11 @@ export default function GraphNode({
 
       {/* Modal */}
       <Transition show={isModalOpen} as={Fragment}>
-        <Dialog onClose={() => setIsModalOpen(false)} className="relative z-50">
+        <Dialog
+          onClose={() => setIsModalOpen(false)}
+          className="fixed inset-0"
+          style={{ zIndex: 99999 }}
+        >
           <TransitionChild
             as={Fragment}
             enter="ease-out duration-300"
