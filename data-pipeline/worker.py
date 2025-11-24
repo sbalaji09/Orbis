@@ -8,9 +8,11 @@ import uuid
 from queues.redis_queue import RedisQueue
 from dotenv import load_dotenv
 from data_processing.prompt_upload import upload_input, upload_output
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from backend.db_connection import db
 from collections import defaultdict
+import socket
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 
 # add the application logging layer to the path
@@ -35,6 +37,8 @@ class SpanWorker:
         self.BATCH_SIZE = 50
         self.FLUSH_INTERVAL = 5
 
+        self.worker_id = f"{socket.gethostname()}-{os.getpid()}"
+
     # this function processes a single span task
     # instead of having the backend infra do it automatically, we have this worker do it because it saves time
     # this function will upload data to our blob storage (S3) and also save the span to the Supabase db
@@ -52,7 +56,8 @@ class SpanWorker:
             self.logger.info("Starting to process span task", extra={'extra_data': {
                 'trace_id': trace_id,
                 'model': model,
-                'received_at': received_at
+                'received_at': received_at,
+                'worker_id': self.worker_id
             }})
 
             # this are links for the S3 buckets
@@ -138,7 +143,8 @@ class SpanWorker:
                     'trace_id': trace_id,
                     'user_id': trace['user_id'],
                     'agent_id': trace.get('agent_id', 'none'),
-                    'reason': 'trace_did_not_exist'
+                    'reason': 'trace_did_not_exist',
+                    'worker_id': self.worker_id
                 }})
 
             # Save span to database
@@ -154,7 +160,8 @@ class SpanWorker:
                 self.logger.info("Trace marked as failed due to span error", extra={'extra_data': {
                     'trace_id': trace_id,
                     'span_id': span_id,
-                    'error_message': span.get('error_message', 'Unknown error')
+                    'error_message': span.get('error_message', 'Unknown error'),
+                    'worker_id': self.worker_id
                 }})
 
             # log successful completion with context for the span
@@ -162,7 +169,8 @@ class SpanWorker:
                 'trace_id': trace_id,
                 'model': model,
                 'span_id': span_id,
-                'cost': span.get('total_cost')
+                'cost': span.get('total_cost'),
+                'worker_id': self.worker_id
             }})
 
             return True
@@ -174,6 +182,7 @@ class SpanWorker:
                 extra={'extra_data': {
                     'trace_id': trace_id if 'trace_id' in locals() else 'unknown',
                     'model': model if 'model' in locals() else 'unknown',
+                    'worker_id': self.worker_id,
                     'error': str(e)
                 }},
                 exc_info=True  # This includes the full stack trace
@@ -235,7 +244,8 @@ class SpanWorker:
                 'trace_id': trace_id,
                 'user_id': trace['user_id'],
                 'agent_id': trace.get('agent_id', 'none'),
-                'reason': 'trace_did_not_exist'
+                'reason': 'trace_did_not_exist',
+                'worker_id': self.worker_id
             }})
         
         # DEBUG: Print what we're about to return
@@ -355,7 +365,8 @@ class SpanWorker:
                         extra={'extra_data': {
                             'retry_count': retry_count + 1,
                             'max_retries': max_retries,
-                            'trace_id': task.get('span', {}).get('trace_id', 'unknown')
+                            'trace_id': task.get('span', {}).get('trace_id', 'unknown'),
+                            'worker_id': self.worker_id
                         }}
                     )
 
@@ -366,7 +377,8 @@ class SpanWorker:
                         f"Task failed after {max_retries} retries, moving to DLQ",
                         extra={'extra_data': {
                             'retry_count': retry_count,
-                            'trace_id': task.get('span', {}).get('trace_id', 'unknown')
+                            'trace_id': task.get('span', {}).get('trace_id', 'unknown'),
+                            'worker_id': self.worker_id
                         }}
                     )
 
