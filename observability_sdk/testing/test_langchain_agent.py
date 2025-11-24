@@ -45,7 +45,7 @@ print("-"*60 + "\n")
 
 result = chain.invoke(
     {"input": "Explain AI observability"},
-    config=RunnableConfig(callbacks=get_langchain_callbacks())  # ← Enable instrumentation
+    config=RunnableConfig(callbacks=get_langchain_callbacks())  # type: ignore
 )
 
 print("\n" + "="*60)
