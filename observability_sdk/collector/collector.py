@@ -20,7 +20,7 @@ class SpanCollector:
         self.lock = threading.Lock()
         
         # background thread
-        self.worker_thread: threading.Thread = None
+        self.worker_thread: threading.Thread = None # type: ignore
         self.running = False
         
         # start the worker if enabled
