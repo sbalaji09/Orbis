@@ -109,7 +109,6 @@ class AnthropicInstrumentor:
             print(f"Error uninstrumenting Anthropic: {e}")
     
     # wraps anthropic streaming response to capture metrics. anthropic streams return events with different types.
-    
     def _wrap_anthropic_stream(self, stream_response, span):
 
         first_chunk_time = None
@@ -144,8 +143,13 @@ class AnthropicInstrumentor:
                 
                 # Yield event to user
                 yield event
-            
-            # After stream completes
+        
+        except Exception as e:
+            span.set_error(e)
+            raise
+        
+        finally:
+            # This ALWAYS runs, even if generator not fully consumed
             end_time = time.time()
             
             # Set output
@@ -163,20 +167,17 @@ class AnthropicInstrumentor:
             )
             
             # Calculate tokens per second
-            if first_chunk_time:
+            if first_chunk_time and output_tokens > 0:
                 stream_duration = end_time - first_chunk_time
-                if stream_duration > 0 and output_tokens > 0:
+                if stream_duration > 0:
                     span.tokens_per_second = output_tokens / stream_duration
             
-            # Mark as successful
-            span.complete(status="success")
-        
-        except Exception as e:
-            span.set_error(e)
-            span.complete(status="error")
-            raise
-        
-        finally:
+            # Mark as successful (unless error was already set)
+            if span.status == "running":
+                span.complete(status="success")
+            elif span.status == "error":
+                span.complete(status="error")
+            
             # Send span to collector
             collector = get_collector()
             collector.collect(span)

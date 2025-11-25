@@ -209,8 +209,13 @@ class GeminiInstrumentor:
                 
                 # Yield chunk to user (pass-through)
                 yield chunk
-            
-            # After stream completes, finalize span
+        
+        except Exception as e:
+            span.set_error(e)
+            raise
+        
+        finally:
+            # This ALWAYS runs, even if generator not fully consumed
             end_time = time.time()
             
             # Set output
@@ -229,15 +234,12 @@ class GeminiInstrumentor:
                 if stream_duration > 0:
                     span.tokens_per_second = total_output_tokens / stream_duration
             
-            # Mark as successful
-            span.complete(status="success")
-        
-        except Exception as e:
-            span.set_error(e)
-            span.complete(status="error")
-            raise
-        
-        finally:
+            # Mark as successful (unless error was already set)
+            if span.status == "running":
+                span.complete(status="success")
+            elif span.status == "error":
+                span.complete(status="error")
+            
             # Send span to collector after stream completes
             collector = get_collector()
             collector.collect(span)

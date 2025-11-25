@@ -122,7 +122,7 @@ class OpenAIInstrumentor:
     
     # wraps openai streaming response to capture metrics
     def _wrap_openai_stream(self, stream_response, span):
-        
+    
         first_chunk_time = None
         full_content = ""
         chunk_count = 0
@@ -134,7 +134,7 @@ class OpenAIInstrumentor:
                     first_chunk_time = time.time()
                     span.time_to_first_token = (first_chunk_time - start_time) * 1000
 
-                # extract content from chunck
+                # extract content from chunk
                 if hasattr(chunk, "choices") and chunk.choices:
                     delta = chunk.choices[0].delta
                     if hasattr(delta, "content") and delta.content:
@@ -143,16 +143,20 @@ class OpenAIInstrumentor:
                 
                 # Yield chunk to user (pass-through)
                 yield chunk
-            
-            # After stream completes, finalize span
+        
+        except Exception as e:
+            span.set_error(e)
+            raise
+        
+        finally:
+            # This ALWAYS runs, even if generator not fully consumed
             end_time = time.time()
             
             # Set output
             span.output = full_content
 
-            # try to extract token usage from last chunk (if available)
+            # Try to extract token usage from last chunk (if available)
             # Note: OpenAI's latest streaming API may include usage in final chunk
-
             if hasattr(chunk, 'usage') and chunk.usage:
                 span.input_tokens = chunk.usage.prompt_tokens
                 span.output_tokens = chunk.usage.completion_tokens
@@ -162,24 +166,18 @@ class OpenAIInstrumentor:
                     span.output_tokens or 0
                 )
             
-            # Calculate tokens per second (approximate based on chunks)
-            if first_chunk_time:
+            # Calculate tokens per second
+            if first_chunk_time and span.output_tokens and span.output_tokens > 0:
                 stream_duration = end_time - first_chunk_time
                 if stream_duration > 0:
-                    span.tokens_per_second = chunk_count / stream_duration
+                    span.tokens_per_second = span.output_tokens / stream_duration
             
-            # Note: OpenAI streaming doesn't return token counts in chunks
-            # We'll estimate or leave it for the final response
+            # Mark as successful (unless error was already set)
+            if span.status == "running":
+                span.complete(status="success")
+            elif span.status == "error":
+                span.complete(status="error")
             
-            # Mark as successful
-            span.complete(status="success")
-        
-        except Exception as e:
-            span.set_error(e)
-            span.complete(status="error")
-            raise
-        
-        finally:
             # Send span to collector after stream completes
             collector = get_collector()
             collector.collect(span)
