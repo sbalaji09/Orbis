@@ -394,6 +394,12 @@ class SpanWorker:
                 self.queue.redis_client.incrbyfloat(f"trace:{trace_id}:total_tokens", total_tokens)
                 self.queue.redis_client.incrbyfloat(f"trace:{trace_id}:total_cost", total_cost)
 
+                # add a last activity timestamp to Redis to track the last active span
+                self.queue.redis_client.set(
+                    f"trace:{trace_id}:last_activity",
+                    time.time(),
+                    ex=3600
+                )
             # handle failed preparation
             for task in failed_tasks:
                 retry_count = task.get('retry_count', 0)
@@ -434,12 +440,35 @@ class SpanWorker:
             self.logger.error(f"Batch insert failed: {e}")
             for task in self.pending_spans:
                 task['retry_count'] = task.get('retry_count', 0) + 1
-                self.queue.enqueue(task)
-
-                
+                self.queue.enqueue(task)          
                 
         self.pending_spans = []
         self.batch_start_time = None
+    
+    # find traces with no activity and mark them as completed
+    def finalize_stale_traces(self):
+        TRACE_TIMEOUT = 60
+
+        cursor = 0
+        while True:
+            cursor, keys = self.queue.redis_client.scan(
+                cursor=cursor,
+                match="trace:*:last_activity",
+                count=100
+            )
+
+            for key in keys:
+                trace_id = key.split(":")[1]
+
+                last_activity = self.queue.redis_client.get(key)
+                if last_activity:
+                    idle_time = time.time() - float(last_activity)
+
+                    if idle_time > TRACE_TIMEOUT:
+                        self.finalize_trace(trace_id)
+            
+            if cursor == 0:
+                break
 
         
 def generate_hash_key(user_id: str, agent_id: str) -> str:
