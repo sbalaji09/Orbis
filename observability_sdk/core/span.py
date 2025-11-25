@@ -48,6 +48,11 @@ class Span:
     time_to_first_token: Optional[float] = None
     tokens_per_second: Optional[float] = None
 
+    # prompt versioning
+    prompt_id: Optional[str] = None
+    prompt_version: Optional[str] = None
+    prompt_hash: Optional[str] = None
+
     # mark the span as complete
     def complete(self, status: str = "success") -> None:
         self.end_time = datetime.now(timezone.utc)
@@ -84,6 +89,9 @@ class Span:
             "is_streaming": self.is_streaming,
             "time_to_first_token": self.time_to_first_token,
             "tokens_per_second": self.tokens_per_second,
+            "prompt_id": self.prompt_id,
+            "prompt_version": self.prompt_version,
+            "prompt_hash": self.prompt_hash,
         }
 
     def __str__(self):

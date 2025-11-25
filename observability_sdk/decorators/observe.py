@@ -1,11 +1,19 @@
 from functools import wraps
-from typing import Optional, Callable
+from typing import Optional, Callable, Dict, Any
 from ..core.span import Span
 from ..collector.collector import get_collector
 from ..core.context import get_current_span, set_current_span
+from ..core.prompt_versioning import get_prompt_registry
 
 
-def observe(name: Optional[str] = None, trace_id: Optional[str] = None, user_id: Optional[str]= None):
+def observe(
+        name: Optional[str] = None, 
+        trace_id: Optional[str] = None, 
+        user_id: Optional[str]= None,
+        prompt_id: Optional[str] = None,
+        prompt_version: Optional[str] = None,
+        prompt_template: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None):
     """
     Decorator to automatically track function execution as a span.
     
@@ -41,8 +49,24 @@ def observe(name: Optional[str] = None, trace_id: Optional[str] = None, user_id:
                 agent_id="af913dc2-732e-42a6-a113-a80c694d71bf",
                 user_id=user_id or "00000000-0000-0000-0000-000000000000",
                 trace_id=trace_id or (parent_span.trace_id if parent_span else Span.__dataclass_fields__['trace_id'].default_factory()),
-                prompt=input_str  # ← ADD THIS: Capture input
+                prompt=input_str
             )
+
+            # add prompt versioning metadata
+            if prompt_id:
+                span.prompt_id = prompt_id
+                span.prompt_version = prompt_version or "v1.0"
+
+                # register prompt if template provided
+                if prompt_template:
+                    registry = get_prompt_registry()
+                    registered_prompt = registry.register_prompt(
+                        prompt_id=prompt_id,
+                        version=prompt_version or "v1.0",
+                        prompt_text=prompt_template,
+                        metadata=metadata or {}
+                    )
+                    span.prompt_hash = registered_prompt.prompt_hash
 
             # if there's a parent, set parent relationship
             if parent_span:

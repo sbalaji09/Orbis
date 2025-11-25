@@ -1,13 +1,8 @@
-"""
-Observability SDK for AI Agents
-"""
-
-__version__ = "0.1.0"
-
 from .core.span import Span
 from .decorators.observe import observe
 from .collector.config import configure, get_config
 from .collector.collector import get_collector
+from .core.prompt_versioning import PromptVersion, PromptRegistry, get_prompt_registry
 from .integrations import (
     instrument_openai,
     instrument_anthropic,
@@ -24,6 +19,9 @@ __all__ = [
     "configure", 
     "get_config", 
     "get_collector",
+    "PromptVersion",
+    "PromptRegistry", 
+    "get_prompt_registry",
     "instrument_openai",
     "instrument_anthropic",
     "instrument_gemini",
