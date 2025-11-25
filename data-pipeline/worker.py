@@ -470,6 +470,54 @@ class SpanWorker:
             if cursor == 0:
                 break
 
+    def finalize_trace(self, trace_id: str):
+        try:
+            total_tokens = self.queue.redis_client.get(f"trace:{trace_id}:total_tokens")
+            total_cost = self.queue.redis_client.get(f"trace:{trace_id}:total_cost")
+
+            trace = db.get_trace_by_id(trace_id)
+
+            # in this case, the trace does not exist or has finalized
+            if not trace or trace.get('status') != 'running':
+                return
+
+            # calculate the duration of the span by using the min start time of a span and the max end time of a span
+            spans = db.get_spans_by_trace(trace_id)
+            if spans:
+                start_time = min(s['start_time'] for s in spans)
+                end_time = max(s['end_time'] for s in spans if s['end_time'])
+                duration = (end_time - start_time).total_seconds() if end_time else 0
+            else:
+                duration = 0
+            
+            # update the trace in the database
+            update_data = {
+                "status": "completed",
+                "end_time": datetime.now(timezone.utc).isoformat(),
+                "duration": duration,
+                "total_tokens": int(float(total_tokens or 0)),
+                "total_cost": float(total_cost or 0)
+            }
+            db.update_trace(trace_id, update_data)
+
+            # cleanup Redis keys
+            self.queue.redis_client.delete(
+                f"trace:{trace_id}:total_tokens",
+                f"trace:{trace_id}:total_cost",
+                f"trace:{trace_id}:total_duration",
+                f"trace:{trace_id}:last_activity"
+            )
+
+            # log the final result
+            self.logger.info("Trace finalized", extra={'extra_data': {
+                'trace_id': trace_id,
+                'total_tokens': total_tokens,
+                'total_cost': total_cost,
+                'worker_id': self.worker_id
+            }})
+        except Exception as e:
+            self.logger.error(f"Failed to finalize trace {trace_id}: {e}")
+
         
 def generate_hash_key(user_id: str, agent_id: str) -> str:
     # Combine user_id and agent_id into one string
