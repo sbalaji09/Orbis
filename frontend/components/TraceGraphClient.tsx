@@ -166,6 +166,8 @@ export default function TraceGraphClient({
       fallbackData: initialSpans,
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
+      dedupingInterval: 2000, // Prevent duplicate requests within 2s
+      keepPreviousData: true, // Smooth transitions between updates
     }
   );
 
@@ -175,7 +177,8 @@ export default function TraceGraphClient({
   // Calculate layout when spans change
   const initialLayout = useMemo(
     () => calculateDAGLayout(spans),
-    [spanIds, spans]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [spanIds, spans] // spanIds needed to detect span additions/removals
   );
 
   // Convert to React Flow nodes

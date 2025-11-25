@@ -287,8 +287,8 @@ async def stream_span(
                         yield f"event: complete\ndata: {json.dumps({'message': 'Streaming complete'})}\n\n"
                         break
 
-                    # Poll every 500ms for updates
-                    await asyncio.sleep(0.5)
+                    # Poll every 1 second for updates (reduced from 500ms to limit DB load)
+                    await asyncio.sleep(1.0)
 
                 except Exception as e:
                     yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
