@@ -216,14 +216,14 @@ export default function GraphNode({
     <>
       <div className="relative inline-block">
         {/* Streaming indicator - pulsing dot outside top-right corner */}
-        {currentSpan.is_streaming && (
+        {/* {currentSpan.is_streaming && (
           <div className="absolute -top-1.5 -right-1.5 z-50 pointer-events-none">
             <div className="relative">
               <div className="w-2 h-2 rounded-full bg-success"></div>
               <div className="absolute inset-0 w-2 h-2 rounded-full bg-success animate-ping opacity-75"></div>
             </div>
           </div>
-        )}
+        )} */}
         <button
           className={`group relative w-60 border-2 border-foreground bg-white text-left overflow-hidden
             focus:outline-none focus:ring-2 focus:ring-mustard focus:ring-offset-2
