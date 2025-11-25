@@ -376,7 +376,7 @@ class SpanWorker:
                 span_dicts = [s[1] for s in prepared_spans]
                 db.insert_spans_batch(span_dicts)  # NEW METHOD in db_connection
                 self.tasks_processed += len(prepared_spans)
-                self.last_task_time = time.time
+                self.last_task_time = time.time()
             
             # update trace aggregates
             spans_by_trace = defaultdict(list)
