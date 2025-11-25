@@ -45,7 +45,10 @@ CREATE TABLE spans (
     completion_tokens INT,
     cost FLOAT,
     status VARCHAR(50),
-    error_message VARCHAR(200)
+    error_message VARCHAR(200),
+    is_streaming BOOLEAN DEFAULT FALSE,
+    time_to_first_token FLOAT,
+    tokens_per_second FLOAT
 );
 
 CREATE TABLE prompt_versions (

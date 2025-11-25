@@ -622,13 +622,13 @@ export default function GraphNode({
                       <div className="flex gap-4">
                         {span.time_to_first_token && (
                           <div>
-                            <span className="text-black/60">TTFT:</span>
+                            <span className="text-black/60">TTFT: </span>
                             <span className="font-mono">{span.time_to_first_token.toFixed(0)}ms</span>
                           </div>
                         )}
                         {span.tokens_per_second && (
                           <div>
-                            <span className="text-black/60">Speed:</span>
+                            <span className="text-black/60">Speed: </span>
                             <span className="font-mono">{span.tokens_per_second.toFixed(1)} tok/s</span>
                           </div>
                         )}
