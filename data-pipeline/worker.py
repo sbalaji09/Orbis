@@ -318,16 +318,12 @@ class SpanWorker:
                     )
                     self.last_heartbeat_time = time.time()
 
+                    self.finalize_stale_traces()
+
                 # dequeues a task and waits 5 seconds before checking the queue again
                 task = self.queue.dequeue(timeout=5)
 
                 if task:
-                    # Get retry count (default to 0 for new tasks)
-                    retry_count = task.get('retry_count', 0)
-
-                    # # process the task
-                    # success = self.process_span_task(task)
-
                     # add the task to the pending spans
                     self.pending_spans.append(task)
                     if not self.batch_start_time:
@@ -384,6 +380,11 @@ class SpanWorker:
                 spans_by_trace[span_data['trace_id']].append(span_data)
             
             for trace_id, trace_spans in spans_by_trace.items():
+                has_error = any(s.get('status') == 'error' for s in trace_spans)
+                if has_error:
+                    db.update_trace(trace_id, {"status": "error"})
+                    self.logger.info(f"Trace {trace_id} marked as error due to span failure")
+                
                 total_tokens = sum(
                     (s.get('prompt_tokens') or 0) + (s.get('completion_tokens') or 0)
                     for s in trace_spans
