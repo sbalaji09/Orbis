@@ -101,22 +101,11 @@ export default function GraphNode({
       const apiUrl = `${
         process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
       }${key}?user_id=${DEFAULT_USER_ID}`;
-      // console.log(
-      //   "Opening SSE connection for span:",
-      //   span.span_id,
-      //   "URL:",
-      //   apiUrl
-      // );
       const eventSource = new EventSource(apiUrl);
 
       eventSource.onmessage = (event) => {
         try {
           const updatedSpan = JSON.parse(event.data);
-          console.log("SSE data received for span:", updatedSpan.span_id, {
-            tokens_per_second: updatedSpan.tokens_per_second,
-            time_to_first_token: updatedSpan.time_to_first_token,
-            is_streaming: updatedSpan.is_streaming,
-          });
           next(null, updatedSpan);
         } catch (error) {
           console.error("Failed to parse streaming data:", error);
@@ -124,12 +113,10 @@ export default function GraphNode({
       };
 
       eventSource.addEventListener("complete", () => {
-        console.log("Stream completed for span:", span.span_id);
         eventSource.close();
       });
 
-      eventSource.addEventListener("error", (event: Event) => {
-        console.error("SSE error:", event);
+      eventSource.addEventListener("error", () => {
         eventSource.close();
         next(new Error("Stream error"));
       });

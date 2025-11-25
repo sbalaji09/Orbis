@@ -137,6 +137,47 @@ async def get_trace_spans(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# lightweight endpoint to check if trace has new spans
+
+
+@app.get("/traces/{trace_id}/span-count")
+async def get_trace_span_count(
+    trace_id: str,
+    user_id: str = Header(None, alias="X-User-ID"),
+    user_id_query: str = Query(None, alias="user_id")
+):
+    """
+    Lightweight endpoint for polling to detect new spans.
+    Returns just the span count and streaming status.
+    """
+    try:
+        effective_user_id = user_id or user_id_query
+        if not effective_user_id:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "user_id required"}
+            )
+
+        trace = db.get_trace_by_id(trace_id)
+        if not trace:
+            raise HTTPException(status_code=404, detail="Trace not found")
+
+        if trace.get('user_id') != effective_user_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        spans = db.get_spans_by_trace(trace_id)
+
+        return {
+            "trace_id": trace_id,
+            "span_count": len(spans),
+            "has_streaming_spans": any(s.get('is_streaming', False) for s in spans)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # get trace summary with aggregated span information
 
 
@@ -237,10 +278,6 @@ async def stream_span(
                         # Span was deleted
                         yield f"event: close\ndata: {json.dumps({'reason': 'Span deleted'})}\n\n"
                         break
-
-                    # Debug: Log streaming metrics
-                    # print(
-                    #     f"SSE sending span {span_id}: tokens_per_second={span.get('tokens_per_second')}, is_streaming={span.get('is_streaming')}")
 
                     # Send current span data
                     yield f"data: {json.dumps(span, default=str)}\n\n"
