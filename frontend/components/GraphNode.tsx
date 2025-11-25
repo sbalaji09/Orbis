@@ -62,7 +62,7 @@ const getHeaderColor = (traceId: string, spanId: string) => {
 
   const colors = [
     "bg-[#e8c302]",
-    "bg-[#4CAF50]",
+    "bg-[#10B981]",
     "bg-[#D1437C]",
     "bg-[#5B5FFF]",
   ];

@@ -54,7 +54,7 @@ export function AnimatedDAG() {
       y: 180,
       label: "generate_response",
       duration: "2ms",
-      color: "#5B5FFF",
+      color: "#D1437C",
     },
     {
       id: "clean",
@@ -267,7 +267,7 @@ export function AnimatedDAG() {
                         }}
                       >
                         <motion.div
-                          className="w-1.5 h-1.5 bg-[#4CAF50]"
+                          className="w-1.5 h-1.5 bg-success"
                           animate={{
                             opacity: [1, 0.5, 1],
                           }}

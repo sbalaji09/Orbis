@@ -64,8 +64,8 @@ export default function Home() {
       {/* Hero Section */}
       <section className="max-w-7xl mx-auto px-6 pt-12 pb-16">
         <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 mb-8 px-3 py-1.5 bg-transparent text-[#4CAF50] border border-transparent">
-            <div className="w-2 h-2 bg-[#4CAF50] rounded-full animate-pulse"></div>
+          <div className="inline-flex items-center gap-2 mb-8 px-3 py-1.5 bg-transparent text-success border border-transparent">
+            <div className="w-2 h-2 bg-success rounded-full animate-pulse"></div>
             <span className="text-xs tracking-wider uppercase">{`// PRODUCTION_READY`}</span>
           </div>
 
@@ -257,7 +257,7 @@ def my_agent(query: str):
                   <div className="grid grid-cols-2 gap-8">
                     <div>
                       <div className="text-sm text-black/50 mb-2">status:</div>
-                      <div className="text-lg bg-[#f5f5f5] text-[#4CAF50] px-3 py-1 inline-block">
+                      <div className="text-lg bg-[#f5f5f5] text-success px-3 py-1 inline-block">
                         SUCCESS
                       </div>
                     </div>
@@ -427,7 +427,7 @@ def my_agent(query: str):
           </div>
 
           <div className="text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-[#4CAF50] border-2 border-black mb-6 shadow-[4px_4px_0_rgba(0,0,0,0.2)]">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-success border-2 border-black mb-6 shadow-[4px_4px_0_rgba(0,0,0,0.2)]">
               <Database className="w-7 h-7 text-white" />
             </div>
             <div className="text-xs text-black/40 mb-3 tracking-wide uppercase">{`// Storage`}</div>
