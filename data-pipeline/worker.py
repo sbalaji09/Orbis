@@ -318,16 +318,12 @@ class SpanWorker:
                     )
                     self.last_heartbeat_time = time.time()
 
+                    self.finalize_stale_traces()
+
                 # dequeues a task and waits 5 seconds before checking the queue again
                 task = self.queue.dequeue(timeout=5)
 
                 if task:
-                    # Get retry count (default to 0 for new tasks)
-                    retry_count = task.get('retry_count', 0)
-
-                    # # process the task
-                    # success = self.process_span_task(task)
-
                     # add the task to the pending spans
                     self.pending_spans.append(task)
                     if not self.batch_start_time:
@@ -376,7 +372,7 @@ class SpanWorker:
                 span_dicts = [s[1] for s in prepared_spans]
                 db.insert_spans_batch(span_dicts)  # NEW METHOD in db_connection
                 self.tasks_processed += len(prepared_spans)
-                self.last_task_time = time.time
+                self.last_task_time = time.time()
             
             # update trace aggregates
             spans_by_trace = defaultdict(list)
@@ -384,6 +380,11 @@ class SpanWorker:
                 spans_by_trace[span_data['trace_id']].append(span_data)
             
             for trace_id, trace_spans in spans_by_trace.items():
+                has_error = any(s.get('status') == 'error' for s in trace_spans)
+                if has_error:
+                    db.update_trace(trace_id, {"status": "error"})
+                    self.logger.info(f"Trace {trace_id} marked as error due to span failure")
+                
                 total_tokens = sum(
                     (s.get('prompt_tokens') or 0) + (s.get('completion_tokens') or 0)
                     for s in trace_spans
@@ -394,6 +395,12 @@ class SpanWorker:
                 self.queue.redis_client.incrbyfloat(f"trace:{trace_id}:total_tokens", total_tokens)
                 self.queue.redis_client.incrbyfloat(f"trace:{trace_id}:total_cost", total_cost)
 
+                # add a last activity timestamp to Redis to track the last active span
+                self.queue.redis_client.set(
+                    f"trace:{trace_id}:last_activity",
+                    time.time(),
+                    ex=3600
+                )
             # handle failed preparation
             for task in failed_tasks:
                 retry_count = task.get('retry_count', 0)
@@ -434,12 +441,83 @@ class SpanWorker:
             self.logger.error(f"Batch insert failed: {e}")
             for task in self.pending_spans:
                 task['retry_count'] = task.get('retry_count', 0) + 1
-                self.queue.enqueue(task)
-
-                
+                self.queue.enqueue(task)          
                 
         self.pending_spans = []
         self.batch_start_time = None
+    
+    # find traces with no activity and mark them as completed
+    def finalize_stale_traces(self):
+        TRACE_TIMEOUT = 60
+
+        cursor = 0
+        while True:
+            cursor, keys = self.queue.redis_client.scan(
+                cursor=cursor,
+                match="trace:*:last_activity",
+                count=100
+            )
+
+            for key in keys:
+                trace_id = key.split(":")[1]
+
+                last_activity = self.queue.redis_client.get(key)
+                if last_activity:
+                    idle_time = time.time() - float(last_activity)
+
+                    if idle_time > TRACE_TIMEOUT:
+                        self.finalize_trace(trace_id)
+            
+            if cursor == 0:
+                break
+
+    def finalize_trace(self, trace_id: str):
+        try:
+            total_tokens = self.queue.redis_client.get(f"trace:{trace_id}:total_tokens")
+            total_cost = self.queue.redis_client.get(f"trace:{trace_id}:total_cost")
+
+            trace = db.get_trace_by_id(trace_id)
+
+            # in this case, the trace does not exist or has finalized
+            if not trace or trace.get('status') != 'running':
+                return
+
+            # calculate the duration of the span by using the min start time of a span and the max end time of a span
+            spans = db.get_spans_by_trace(trace_id)
+            if spans:
+                start_time = min(s['start_time'] for s in spans)
+                end_time = max(s['end_time'] for s in spans if s['end_time'])
+                duration = (end_time - start_time).total_seconds() if end_time else 0
+            else:
+                duration = 0
+            
+            # update the trace in the database
+            update_data = {
+                "status": "completed",
+                "end_time": datetime.now(timezone.utc).isoformat(),
+                "duration": duration,
+                "total_tokens": int(float(total_tokens or 0)),
+                "total_cost": float(total_cost or 0)
+            }
+            db.update_trace(trace_id, update_data)
+
+            # cleanup Redis keys
+            self.queue.redis_client.delete(
+                f"trace:{trace_id}:total_tokens",
+                f"trace:{trace_id}:total_cost",
+                f"trace:{trace_id}:total_duration",
+                f"trace:{trace_id}:last_activity"
+            )
+
+            # log the final result
+            self.logger.info("Trace finalized", extra={'extra_data': {
+                'trace_id': trace_id,
+                'total_tokens': total_tokens,
+                'total_cost': total_cost,
+                'worker_id': self.worker_id
+            }})
+        except Exception as e:
+            self.logger.error(f"Failed to finalize trace {trace_id}: {e}")
 
         
 def generate_hash_key(user_id: str, agent_id: str) -> str:
