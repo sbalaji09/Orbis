@@ -1,10 +1,13 @@
 from db_connection import db
 from fastapi import FastAPI, HTTPException, Query, Header
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse, JSONResponse
 from typing import Optional
 from datetime import datetime
 import sys
 import os
+import json
+import asyncio
 
 # add parent directory to path
 sys.path.append(os.path.dirname(__file__))
@@ -25,6 +28,8 @@ app.add_middleware(
 )
 
 # health check endpoint
+
+
 @app.get("/health")
 async def health_check():
     return {
@@ -34,6 +39,8 @@ async def health_check():
     }
 
 # list all traces for a user with pagination
+
+
 @app.get("/traces")
 async def list_traces(
     user_id: str = Header(..., alias="X-User-ID"),
@@ -43,7 +50,8 @@ async def list_traces(
 ):
     try:
         # Get traces with enhanced information from spans
-        traces = db.get_traces_with_stats(user_id, limit=limit, offset=offset, status_filter=status)
+        traces = db.get_traces_with_stats(
+            user_id, limit=limit, offset=offset, status_filter=status)
 
         # Convert ALL datetime objects to ISO strings for JSON serialization
         for trace in traces:
@@ -61,6 +69,8 @@ async def list_traces(
         raise HTTPException(status_code=500, detail=str(e))
 
 # get the most recent traces for a user
+
+
 @app.get("/traces/recent")
 async def get_recent_traces(
     user_id: str = Header(..., alias="X-User-ID"),
@@ -76,6 +86,8 @@ async def get_recent_traces(
         raise HTTPException(status_code=500, detail=str(e))
 
 # get a specific trace by the trace id
+
+
 @app.get("/traces/{trace_id}")
 async def get_trace(
     trace_id: str,
@@ -98,6 +110,8 @@ async def get_trace(
     #     raise HTTPException(status_code=500, detail=str(e))
 
 # get all the spans for a specific trace
+
+
 @app.get("/traces/{trace_id}/spans")
 async def get_trace_spans(
     trace_id: str,
@@ -124,6 +138,8 @@ async def get_trace_spans(
         raise HTTPException(status_code=500, detail=str(e))
 
 # get trace summary with aggregated span information
+
+
 @app.get("/traces/{trace_id}/summary")
 async def get_trace_summary(
     trace_id: str,
@@ -146,6 +162,8 @@ async def get_trace_summary(
         raise HTTPException(status_code=500, detail=str(e))
 
 # get a specific span by ID
+
+
 @app.get("/spans/{span_id}")
 async def get_span(
     span_id: str,
@@ -168,8 +186,94 @@ async def get_span(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# stream a specific span by ID (Server-Sent Events)
+
+
+@app.get("/spans/{span_id}/stream")
+async def stream_span(
+    span_id: str,
+    user_id: str = Header(None, alias="X-User-ID"),
+    user_id_query: str = Query(None, alias="user_id")
+):
+    """
+    Stream real-time updates for a specific span using Server-Sent Events (SSE).
+
+    This endpoint:
+    - Polls the database every 500ms for span updates
+    - Automatically stops streaming when is_streaming becomes false
+    - Validates user access on initial connection
+    - Returns updates as JSON in SSE format
+    - Accepts user_id via header (preferred) or query param (for EventSource compatibility)
+    """
+    # Use header if available, otherwise query param
+    effective_user_id = user_id or user_id_query
+    if not effective_user_id:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "error": "user_id required via X-User-ID header or user_id query parameter"}
+        )
+
+    async def event_generator():
+        try:
+            # Initial authorization check
+            initial_span = db.get_span_by_id(span_id)
+            if not initial_span:
+                yield f"event: error\ndata: {json.dumps({'error': 'Span not found'})}\n\n"
+                return
+
+            # Check user access via trace
+            trace = db.get_trace_by_id(initial_span['trace_id'])
+            if not trace or trace.get('user_id') != effective_user_id:
+                yield f"event: error\ndata: {json.dumps({'error': 'Access denied'})}\n\n"
+                return
+
+            # Stream updates while span is active
+            while True:
+                try:
+                    span = db.get_span_by_id(span_id)
+
+                    if not span:
+                        # Span was deleted
+                        yield f"event: close\ndata: {json.dumps({'reason': 'Span deleted'})}\n\n"
+                        break
+
+                    # Debug: Log streaming metrics
+                    # print(
+                    #     f"SSE sending span {span_id}: tokens_per_second={span.get('tokens_per_second')}, is_streaming={span.get('is_streaming')}")
+
+                    # Send current span data
+                    yield f"data: {json.dumps(span, default=str)}\n\n"
+
+                    # Stop streaming if span is no longer actively streaming
+                    if not span.get('is_streaming', False):
+                        yield f"event: complete\ndata: {json.dumps({'message': 'Streaming complete'})}\n\n"
+                        break
+
+                    # Poll every 500ms for updates
+                    await asyncio.sleep(0.5)
+
+                except Exception as e:
+                    yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
+                    break
+
+        except Exception as e:
+            yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # Disable nginx buffering
+        }
+    )
+
 # get aggregate matrics for a user
 # returns: total_traces, total_spans, total_cost, total_tokens, avg_cost_per_trace, total_duration
+
+
 @app.get("/metrics/user")
 async def get_user_metrics(
     user_id: str = Header(..., alias="X-User-ID")
@@ -181,6 +285,8 @@ async def get_user_metrics(
         raise HTTPException(status_code=500, detail=str(e))
 
 # search and filter traces
+
+
 @app.get("/search/traces")
 async def search_traces(
     user_id: str = Header(..., alias="X-User-ID"),
@@ -221,6 +327,8 @@ async def search_traces(
         raise HTTPException(status_code=500, detail=str(e))
 
 # get traces based on the specific agent
+
+
 @app.get("/traces/{agent_id}")
 async def get_traces_by_agent(agent_id: str, user_id: str, limit: int = 5, offset: int = 0):
     try:
@@ -241,6 +349,8 @@ async def get_traces_by_agent(agent_id: str, user_id: str, limit: int = 5, offse
         raise HTTPException(status_code=500, detail=str(e))
 
 # get all the agents belonging to a specific user
+
+
 @app.get("/agents")
 async def get_agents(user_id: str = Header(..., alias="X-User-ID")):
     try:

@@ -14,6 +14,7 @@ specifiers:
   react: 19.2.0
   react-dom: 19.2.0
   reactflow: ^11.11.4
+  swr: ^2.3.6
   tailwindcss: ^4
   typescript: ^5
 
@@ -25,6 +26,7 @@ dependencies:
   react: 19.2.0
   react-dom: 19.2.0_react@19.2.0
   reactflow: 11.11.4_swvhbcox4y42tn5tczbrz5tk7y
+  swr: 2.3.6_react@19.2.0
 
 devDependencies:
   '@tailwindcss/postcss': 4.1.17
@@ -2063,6 +2065,11 @@ packages:
       object-keys: 1.1.1
     dev: true
 
+  /dequal/2.0.3:
+    resolution: {integrity: sha512-0je+qPKHEMohvfRTCEo3CrPG6cAzAYgmzKyxRiYSSDkS6eGJdyVJm7WaYA5ECaAD9wLB2T4EEeymA5aFVcYXCA==}
+    engines: {node: '>=6'}
+    dev: false
+
   /detect-libc/2.1.2:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
     engines: {node: '>=8'}
@@ -3982,6 +3989,16 @@ packages:
     resolution: {integrity: sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w==}
     engines: {node: '>= 0.4'}
     dev: true
+
+  /swr/2.3.6_react@19.2.0:
+    resolution: {integrity: sha512-wfHRmHWk/isGNMwlLGlZX5Gzz/uTgo0o2IRuTMcf4CPuPFJZlq0rDaKUx+ozB5nBOReNV1kiOyzMfj+MBMikLw==}
+    peerDependencies:
+      react: ^16.11.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+    dependencies:
+      dequal: 2.0.3
+      react: 19.2.0
+      use-sync-external-store: 1.6.0_react@19.2.0
+    dev: false
 
   /tabbable/6.3.0:
     resolution: {integrity: sha512-EIHvdY5bPLuWForiR/AN2Bxngzpuwn1is4asboytXtpTgsArc+WmSJKVLlhdh71u7jFcryDqB2A8lQvj78MkyQ==}
