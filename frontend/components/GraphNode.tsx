@@ -8,6 +8,7 @@ import {
   TransitionChild,
 } from "@headlessui/react";
 import { Fragment, useState } from "react";
+import useSWRSubscription from "swr/subscription";
 import { Span } from "@/lib/types";
 
 interface GraphNodeProps {
@@ -28,8 +29,22 @@ function formatCost(cost: number | null): string {
   return `$${cost.toFixed(4)}`;
 }
 
-function formatDate(date: Date): string {
+function formatDate(date: Date | null): string | null {
+  if (!date) return null;
   return new Date(date.toString() + "Z").toLocaleString();
+}
+
+// Skeleton component for loading states
+function Skeleton({
+  width = "w-20",
+  height = "h-4",
+}: {
+  width?: string;
+  height?: string;
+}) {
+  return (
+    <div className={`${width} ${height} bg-gray-200 animate-pulse rounded`} />
+  );
 }
 
 interface DraggableGraphNodeProps extends GraphNodeProps {
@@ -42,6 +57,34 @@ interface DraggableGraphNodeProps extends GraphNodeProps {
   isDragging?: boolean;
 }
 
+const getHeaderColor = (traceId: string, spanId: string) => {
+  const combined = `${traceId}-${spanId}`;
+  let hash = 50001;
+
+  for (let i = 0; i < combined.length; i++) {
+    const char = combined.charCodeAt(i);
+    hash = ((hash << 5) + hash) ^ char; // hash * 33 XOR char
+  }
+
+  // Additional mixing to improve distribution
+  hash = hash ^ (hash >>> 16);
+  hash = Math.imul(hash, 0x85ebca6b);
+  hash = hash ^ (hash >>> 13);
+  hash = Math.imul(hash, 0xc2b2ae35);
+  hash = hash ^ (hash >>> 16);
+
+  const colorIndex = Math.abs(hash) % 4;
+
+  const colors = [
+    "bg-[#e8c302]",
+    "bg-[#10B981]",
+    "bg-[#D1437C]",
+    "bg-[#5B5FFF]",
+  ];
+
+  return colors[colorIndex];
+};
+
 export default function GraphNode({
   span,
   onDrag,
@@ -50,13 +93,46 @@ export default function GraphNode({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
 
-  // Debug: log modal state changes
-  console.log(
-    "GraphNode render - isModalOpen:",
-    isModalOpen,
-    "span:",
-    span.name
+  // SSE streaming for spans that are actively streaming
+  const { data: streamData } = useSWRSubscription(
+    span.is_streaming ? `/spans/${span.span_id}/stream` : null,
+    (key, { next }) => {
+      const DEFAULT_USER_ID = "00000000-0000-0000-0000-000000000000";
+      const apiUrl = `${
+        process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+      }${key}?user_id=${DEFAULT_USER_ID}`;
+      const eventSource = new EventSource(apiUrl);
+
+      eventSource.onmessage = (event) => {
+        try {
+          const updatedSpan = JSON.parse(event.data);
+          next(null, updatedSpan);
+        } catch (error) {
+          console.error("Failed to parse streaming data:", error);
+        }
+      };
+
+      eventSource.addEventListener("complete", () => {
+        eventSource.close();
+      });
+
+      eventSource.addEventListener("error", () => {
+        eventSource.close();
+        next(new Error("Stream error"));
+      });
+
+      eventSource.onerror = () => {
+        eventSource.close();
+      };
+
+      return () => {
+        eventSource.close();
+      };
+    }
   );
+
+  // Use streamed data if available, otherwise use prop
+  const currentSpan = streamData || span;
 
   const statusConfig = {
     success: { bg: "bg-emerald-50", text: "text-success", dot: "bg-success" },
@@ -66,7 +142,9 @@ export default function GraphNode({
     cancelled: { bg: "bg-gray-50", text: "text-muted", dot: "bg-muted" },
   };
 
-  const status = statusConfig[span.status as keyof typeof statusConfig] || {
+  const status = statusConfig[
+    currentSpan.status as keyof typeof statusConfig
+  ] || {
     bg: "bg-gray-50",
     text: "text-muted",
     dot: "bg-muted",
@@ -77,7 +155,7 @@ export default function GraphNode({
     if (!onDrag) {
       e.stopPropagation();
       e.preventDefault();
-      console.log("GraphNode clicked, opening modal for:", span.name);
+      console.log("GraphNode clicked, opening modal for:", currentSpan.name);
       setIsModalOpen(true);
       return;
     }
@@ -124,9 +202,18 @@ export default function GraphNode({
   return (
     <>
       <div className="relative inline-block">
+        {/* Streaming indicator - pulsing dot outside top-right corner */}
+        {/* {currentSpan.is_streaming && (
+          <div className="absolute -top-1.5 -right-1.5 z-50 pointer-events-none">
+            <div className="relative">
+              <div className="w-2 h-2 rounded-full bg-success"></div>
+              <div className="absolute inset-0 w-2 h-2 rounded-full bg-success animate-ping opacity-75"></div>
+            </div>
+          </div>
+        )} */}
         <button
-          className={`group relative w-[200px] border-2 border-black bg-white text-left overflow-hidden
-            focus:outline-none focus:ring-2 focus:ring-[#FFD600] focus:ring-offset-2
+          className={`group relative w-60 border-2 border-foreground bg-white text-left overflow-hidden
+            focus:outline-none focus:ring-2 focus:ring-mustard focus:ring-offset-2
             ${
               isDragging
                 ? "shadow-[8px_8px_0_rgba(0,0,0,0.2)] scale-[1.02]"
@@ -140,7 +227,10 @@ export default function GraphNode({
         >
           {/* Terminal-style colored top bar - draggable handle (remove nodrag from this) */}
           <div
-            className={`h-6 ${status.dot} border-b-2 border-black flex items-center px-2 gap-1 cursor-grab active:cursor-grabbing`}
+            className={`h-6 ${getHeaderColor(
+              span.trace_id,
+              span.span_id
+            )} border-b-2 border-black flex items-center px-2 gap-1 cursor-grab active:cursor-grabbing`}
           >
             <div className="w-2 h-2 rounded-full bg-white/30"></div>
             <div className="w-2 h-2 rounded-full bg-white/30"></div>
@@ -148,11 +238,11 @@ export default function GraphNode({
           </div>
 
           {/* Content - prevent dragging on content area */}
-          <div className="p-3 nodrag">
+          <div className="p-3 nodrag hover:cursor-pointer">
             {/* Header: Name + Status */}
             <div className="flex items-start justify-between gap-2 mb-2">
               <h3 className="text-xs font-semibold tracking-tight leading-tight truncate flex-1 transition-colors duration-200">
-                {span.name}
+                {currentSpan.name}
               </h3>
               <div
                 className={`flex items-center gap-1 px-1.5 py-0.5 border ${
@@ -166,43 +256,24 @@ export default function GraphNode({
                 <span
                   className={`text-[8px] font-bold uppercase tracking-wide ${status.text}`}
                 >
-                  {span.status}
+                  {currentSpan.status}
                 </span>
               </div>
             </div>
 
             {/* Model - only show if exists */}
-            {span.llm_model && (
-              <div className="text-[9px] text-black/60 font-medium mb-2 truncate">
-                {`// ${span.llm_model}`}
+            {currentSpan.llm_model && (
+              <div className="text-[10px] text-black/60 font-medium mb-2 truncate">
+                {`// ${currentSpan.llm_model}`}
               </div>
             )}
 
             {/* Metrics - clean inline layout */}
-            <div className="flex items-center gap-3 text-[9px] pt-2 border-t-2 border-black/10">
-              <div className="flex items-center gap-1 text-black/60">
-                <svg
-                  className="w-3 h-3 opacity-50 transition-opacity duration-200 group-hover:opacity-70"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                <span className="font-mono font-semibold">
-                  {formatDuration(span.duration)}
-                </span>
-              </div>
-
-              {span.cost !== null && (
-                <div className="flex items-center gap-1 text-[#FFD600] ml-auto">
+            {!currentSpan.is_streaming ? (
+              <div className="flex items-center gap-3 text-[10px] pt-2 border-t-2 border-black/10">
+                <div className="flex items-center gap-1 text-black/60">
                   <svg
-                    className="w-3 h-3 opacity-70 transition-opacity duration-200 group-hover:opacity-90"
+                    className="w-3.5 h-3.5 opacity-50 transition-opacity duration-200 group-hover:opacity-70"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -211,24 +282,75 @@ export default function GraphNode({
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth={2}
-                      d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                     />
                   </svg>
                   <span className="font-mono font-semibold">
-                    {formatCost(span.cost)}
+                    {formatDuration(currentSpan.duration)}
                   </span>
                 </div>
-              )}
-            </div>
+
+                {currentSpan.cost !== null && (
+                  <div className="flex items-center gap-1 text-mustard ml-auto">
+                    <svg
+                      className="w-3.5 h-3.5 opacity-70 transition-opacity duration-200 group-hover:opacity-90"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    <span className="font-mono font-semibold">
+                      {formatCost(currentSpan.cost)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center justify-between text-[8px] pt-2 mt-2 border-t-2 border-success/20">
+                <div className="flex items-center gap-1 px-1.5 py-0.5 bg-success border border-success/30 text-background">
+                  <div className="w-1.5 h-1.5 rounded-full bg-background animate-pulse"></div>
+                  <span className="uppercase font-bold tracking-wide">
+                    streaming
+                  </span>
+                </div>
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-1 text-black/60">
+                    <span className="">TTFT:</span>
+                    <span className="font-mono">
+                      {currentSpan.time_to_first_token !== null ? (
+                        `${currentSpan.time_to_first_token.toFixed(0)}ms`
+                      ) : (
+                        <Skeleton width="w-10" height="h-3" />
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 text-black/60">
+                    <span className="font-mono">
+                      {currentSpan.tokens_per_second !== null ? (
+                        `${currentSpan.tokens_per_second.toFixed(1)} tok/s`
+                      ) : (
+                        <Skeleton width="w-12" height="h-3" />
+                      )}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </button>
 
         {/* Tooltip */}
         {showTooltip && !isDragging && (
           <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 -translate-y-full whitespace-nowrap bg-black border-2 border-black px-2.5 py-1.5 shadow-[4px_4px_0_rgba(0,0,0,0.2)] pointer-events-none z-50">
-            <div className="flex items-center gap-1.5 text-[9px] text-[#FFD600] font-mono">
+            <div className="flex items-center gap-1.5 text-[9px] text-mustard font-mono">
               <span className="font-semibold">
-                {span.name || "Unnamed Span"}
+                {currentSpan.name || "Unnamed Span"}
               </span>
             </div>
           </div>
@@ -270,11 +392,11 @@ export default function GraphNode({
                   <div className="flex items-start justify-between gap-4 px-6 py-4 border-b border-border bg-linear-to-r from-babyblue/5 to-transparent">
                     <div className="min-w-0 flex-1 space-y-1">
                       <DialogTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
-                        <span>{span.name || "Span Details"}</span>
+                        <span>{currentSpan.name || "Span Details"}</span>
                       </DialogTitle>
-                      {span.llm_model !== null && (
+                      {currentSpan.llm_model !== null && (
                         <p className="text-xs text-muted font-medium">
-                          {span.llm_model}
+                          {currentSpan.llm_model}
                         </p>
                       )}
                     </div>
@@ -286,7 +408,7 @@ export default function GraphNode({
                         <span
                           className={`text-xs font-semibold ${status.text}`}
                         >
-                          {span.status || "unknown"}
+                          {currentSpan.status || "unknown"}
                         </span>
                       </div>
                       <button
@@ -322,37 +444,49 @@ export default function GraphNode({
                             Duration
                           </span>
                           <span className="text-lg font-mono">
-                            {formatDuration(span.duration)}
+                            {currentSpan.duration !== null ? (
+                              formatDuration(currentSpan.duration)
+                            ) : (
+                              <Skeleton width="w-16" height="h-6" />
+                            )}
                           </span>
                         </div>
-                        <div className="flex flex-col gap-1 p-3 bg-[#FFD600]/10 border-2 border-[#FFD600] shadow-[2px_2px_0_rgba(0,0,0,0.1)]">
+                        <div className="flex flex-col gap-1 p-3 bg-mustard/10 border-2 border-mustard shadow-[2px_2px_0_rgba(0,0,0,0.1)]">
                           <span className="text-[10px] font-medium text-black/60 uppercase tracking-wide">
                             Cost
                           </span>
-                          <span className="text-lg text-[#FFD600] font-mono">
-                            {formatCost(span.cost)}
+                          <span className="text-lg text-mustard font-mono">
+                            {currentSpan.cost !== null ? (
+                              formatCost(currentSpan.cost)
+                            ) : (
+                              <Skeleton width="w-16" height="h-6" />
+                            )}
                           </span>
                         </div>
                       </div>
                       <div className="text-[11px] text-black/60 space-y-1 pt-2 border-t-2 border-black/10">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium w-12">{`// Start`}</span>
+                          <span className="font-medium w-14">{`// Start`}</span>
                           <span className="font-mono">
-                            {formatDate(span.start_time)}
+                            {formatDate(currentSpan.start_time)}
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="font-medium w-12">{`// End`}</span>
+                          <span className="font-medium w-14">{`// End`}</span>
                           <span className="font-mono">
-                            {formatDate(span.end_time)}
+                            {currentSpan.end_time ? (
+                              formatDate(currentSpan.end_time)
+                            ) : (
+                              <Skeleton width="w-32" height="h-4" />
+                            )}
                           </span>
                         </div>
                       </div>
                     </div>
 
                     {/* Token Information */}
-                    {(span.prompt_tokens !== null ||
-                      span.completion_tokens !== null) && (
+                    {(currentSpan.prompt_tokens !== null ||
+                      currentSpan.completion_tokens !== null) && (
                       <div className="space-y-3">
                         <h4 className="text-xs font-semibold text-black/40 uppercase tracking-wide">
                           {`/* Token Usage */`}
@@ -364,7 +498,11 @@ export default function GraphNode({
                                 Prompt
                               </span>
                               <span className="text-base font-mono">
-                                {span.prompt_tokens?.toLocaleString() || 0}
+                                {currentSpan.prompt_tokens !== null ? (
+                                  currentSpan.prompt_tokens.toLocaleString()
+                                ) : (
+                                  <Skeleton width="w-12" height="h-5" />
+                                )}
                               </span>
                             </div>
                           </div>
@@ -375,7 +513,11 @@ export default function GraphNode({
                                 Completion
                               </span>
                               <span className="text-base font-mono">
-                                {span.completion_tokens?.toLocaleString() || 0}
+                                {currentSpan.completion_tokens !== null ? (
+                                  currentSpan.completion_tokens.toLocaleString()
+                                ) : (
+                                  <Skeleton width="w-12" height="h-5" />
+                                )}
                               </span>
                             </div>
                           </div>
@@ -386,10 +528,15 @@ export default function GraphNode({
                                 Total
                               </span>
                               <span className="text-base text-foreground font-mono">
-                                {(
-                                  (span.prompt_tokens || 0) +
-                                  (span.completion_tokens || 0)
-                                ).toLocaleString()}
+                                {currentSpan.prompt_tokens !== null &&
+                                currentSpan.completion_tokens !== null ? (
+                                  (
+                                    currentSpan.prompt_tokens +
+                                    currentSpan.completion_tokens
+                                  ).toLocaleString()
+                                ) : (
+                                  <Skeleton width="w-12" height="h-5" />
+                                )}
                               </span>
                             </div>
                           </div>
@@ -398,19 +545,19 @@ export default function GraphNode({
                     )}
 
                     {/* Input Preview */}
-                    {span.input_preview !== null && (
+                    {currentSpan.input_preview !== null && (
                       <div className="space-y-2">
                         <h4 className="text-xs font-semibold text-muted uppercase tracking-wide">
                           Input
                         </h4>
                         <div className="p-4 rounded-lg bg-background border border-border">
                           <p className="text-xs text-foreground/80 leading-relaxed line-clamp-6 whitespace-pre-wrap wrap-break-word font-mono">
-                            {span.input_preview}
+                            {currentSpan.input_preview}
                           </p>
                         </div>
-                        {span.input_blob_url !== null && (
+                        {currentSpan.input_blob_url !== null && (
                           <a
-                            href={span.input_blob_url}
+                            href={currentSpan.input_blob_url}
                             className="inline-flex items-center gap-1.5 text-xs text-babyblue hover:text-foreground font-medium transition group"
                             target="_blank"
                             rel="noopener noreferrer"
@@ -435,19 +582,19 @@ export default function GraphNode({
                     )}
 
                     {/* Output Preview */}
-                    {span.output_preview !== null && (
+                    {currentSpan.output_preview !== null && (
                       <div className="space-y-2">
                         <h4 className="text-xs font-semibold text-muted uppercase tracking-wide">
                           Output
                         </h4>
                         <div className="p-4 rounded-lg bg-background border border-border">
                           <p className="text-xs text-foreground/80 leading-relaxed line-clamp-6 whitespace-pre-wrap wrap-break-word font-mono">
-                            {span.output_preview}
+                            {currentSpan.output_preview}
                           </p>
                         </div>
-                        {span.output_blob_url !== null && (
+                        {currentSpan.output_blob_url !== null && (
                           <a
-                            href={span.output_blob_url}
+                            href={currentSpan.output_blob_url}
                             className="inline-flex items-center gap-1.5 text-xs text-babyblue hover:text-foreground font-medium transition group"
                             target="_blank"
                             rel="noopener noreferrer"
@@ -472,14 +619,14 @@ export default function GraphNode({
                     )}
 
                     {/* Error Message */}
-                    {span.error_message !== null && (
+                    {currentSpan.error_message !== null && (
                       <div className="space-y-2">
                         <h4 className="text-xs font-semibold text-error uppercase tracking-wide">
                           Error
                         </h4>
                         <div className="p-4 rounded-lg bg-red-50 border border-error/30">
                           <p className="text-xs text-error/90 leading-relaxed wrap-break-word font-mono">
-                            {span.error_message}
+                            {currentSpan.error_message}
                           </p>
                         </div>
                       </div>

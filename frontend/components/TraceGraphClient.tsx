@@ -1,5 +1,6 @@
 "use client";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useEffect } from "react";
+import useSWR from "swr";
 import ReactFlow, {
   Node,
   Edge,
@@ -133,9 +134,49 @@ const nodeTypes: NodeTypes = {
   custom: CustomNode,
 };
 
-export default function TraceGraphClient({ spans }: { spans: Span[] }) {
-  // Calculate initial layout
-  const initialLayout = useMemo(() => calculateDAGLayout(spans), [spans]);
+export default function TraceGraphClient({
+  spans: initialSpans,
+}: {
+  spans: Span[];
+}) {
+  // Get trace_id from first span
+  const traceId = initialSpans.length > 0 ? initialSpans[0].trace_id : null;
+  const DEFAULT_USER_ID = "00000000-0000-0000-0000-000000000000";
+
+  // Fetch spans with SWR for real-time updates (polls every 2 seconds)
+  const { data: fetchedSpans } = useSWR(
+    traceId ? `/traces/${traceId}/spans` : null,
+    async (url) => {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}${url}`,
+        {
+          headers: {
+            "X-User-ID": DEFAULT_USER_ID,
+          },
+        }
+      );
+      if (!response.ok) {
+        throw new Error("Failed to fetch spans");
+      }
+      const data = await response.json();
+      return data.spans as Span[];
+    },
+    {
+      refreshInterval: 2000,
+      fallbackData: initialSpans,
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+    }
+  );
+
+  const spans = fetchedSpans || initialSpans;
+  const spanIds = spans.map((s) => s.span_id).join(",");
+
+  // Calculate layout when spans change
+  const initialLayout = useMemo(
+    () => calculateDAGLayout(spans),
+    [spanIds, spans]
+  );
 
   // Convert to React Flow nodes
   const initialNodes: Node[] = useMemo(
@@ -179,8 +220,14 @@ export default function TraceGraphClient({ spans }: { spans: Span[] }) {
     return edges;
   }, [initialLayout]);
 
-  const [nodes, , onNodesChange] = useNodesState(initialNodes);
-  const [edges, , onEdgesChange] = useEdgesState(initialEdges);
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+  // Update nodes and edges when spans change
+  useEffect(() => {
+    setNodes(initialNodes);
+    setEdges(initialEdges);
+  }, [initialNodes, initialEdges, setNodes, setEdges]);
 
   const onInit = useCallback(() => {
     // React Flow will handle fitView automatically
@@ -189,6 +236,7 @@ export default function TraceGraphClient({ spans }: { spans: Span[] }) {
   return (
     <div className="w-full h-full">
       <ReactFlow
+        key={spanIds}
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}

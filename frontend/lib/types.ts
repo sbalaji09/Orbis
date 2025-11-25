@@ -22,7 +22,7 @@ export interface Span {
   trace_id: string;
   parent_span_ids: string[] | null;
   start_time: Date;
-  end_time: Date;
+  end_time: Date | null;
   duration: number | null;
   /** First 200 characters of input for preview display */
   input_preview: string | null;
@@ -39,4 +39,7 @@ export interface Span {
   status: string | null;
   error_message: string | null;
   name: string | null;
+  is_streaming: boolean;
+  time_to_first_token: number | null;
+  tokens_per_second: number | null;
 }

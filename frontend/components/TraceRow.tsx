@@ -16,7 +16,7 @@ export function TraceRow({ trace }: { trace: Trace }) {
   return (
     <button
       onClick={() => router.push(`/dashboard/trace/${trace.trace_id}`)}
-      className="w-full px-5 py-3.5 text-left transition-all hover:bg-mustard/5 hover:shadow-[inset_4px_0_0_#FFD600] border-b-2 border-black last:border-b-0 group"
+      className="w-full px-5 py-3.5 text-left transition-all hover:bg-mustard/5 hover:shadow-[inset_4px_0_0_#FFD600] border-b-2 border-black last:border-b-0 group cursor-pointer"
     >
       <div className="flex items-center justify-between gap-4">
         {/* Left: Truncated ID with prominent datetime */}

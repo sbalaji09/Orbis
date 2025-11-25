@@ -53,7 +53,7 @@ export default function Home() {
             </button>
             <Link
               href="/dashboard"
-              className="text-sm px-4 py-2 bg-black hover:bg-black/90 text-[#FFD600] border border-black transition-colors"
+              className="text-sm px-4 py-2 bg-black hover:bg-black/90 text-mustard border border-black transition-colors"
             >
               dashboard.open()
             </Link>
@@ -64,8 +64,8 @@ export default function Home() {
       {/* Hero Section */}
       <section className="max-w-7xl mx-auto px-6 pt-12 pb-16">
         <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 mb-8 px-3 py-1.5 bg-transparent text-[#4CAF50] border border-transparent">
-            <div className="w-2 h-2 bg-[#4CAF50] rounded-full animate-pulse"></div>
+          <div className="inline-flex items-center gap-2 mb-8 px-3 py-1.5 bg-transparent text-success border border-transparent">
+            <div className="w-2 h-2 bg-success rounded-full animate-pulse"></div>
             <span className="text-xs tracking-wider uppercase">{`// PRODUCTION_READY`}</span>
           </div>
 
@@ -83,14 +83,14 @@ export default function Home() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
             <Link
               href="/dashboard"
-              className="bg-black hover:bg-black/90 text-[#FFD600] px-6 py-2.5 border-2 border-black inline-flex items-center gap-2"
+              className="bg-black hover:bg-black/90 text-mustard px-6 py-2.5 border-2 border-black inline-flex items-center gap-2"
             >
               view_dashboard()
               <ArrowUpRight className="h-4 w-4" />
             </Link>
             <div className="flex items-center gap-3">
               <div className="inline-flex items-center gap-2 bg-black text-white border-2 border-black px-4 py-2.5">
-                <span className="text-sm text-[#FFD600]">$</span>
+                <span className="text-sm text-mustard">$</span>
                 <span className="text-sm">pip install orbis-sdk</span>
               </div>
             </div>
@@ -155,13 +155,13 @@ export default function Home() {
         <TabGroup>
           <div className="flex justify-center">
             <TabList className="grid grid-cols-3 w-full bg-transparent border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.1)] h-auto p-0 rounded-none gap-0">
-              <Tab className="px-8 py-4 rounded-none border-r-2 border-black transition-colors data-selected:bg-black data-selected:text-[#FFD600] text-black/60 hover:bg-black/5">
+              <Tab className="px-8 py-4 rounded-none border-r-2 border-black transition-colors data-selected:bg-black data-selected:text-mustard text-black/60 hover:bg-black/5">
                 <span className="mr-2">01</span> Add decorator
               </Tab>
-              <Tab className="px-8 py-4 rounded-none border-r-2 border-black transition-colors data-selected:bg-black data-selected:text-[#FFD600] text-black/60 hover:bg-black/5">
+              <Tab className="px-8 py-4 rounded-none border-r-2 border-black transition-colors data-selected:bg-black data-selected:text-mustard text-black/60 hover:bg-black/5">
                 <span className="mr-2">02</span> Run agent
               </Tab>
-              <Tab className="px-8 py-4 rounded-none transition-colors data-selected:bg-black data-selected:text-[#FFD600] text-black/60 hover:bg-black/5">
+              <Tab className="px-8 py-4 rounded-none transition-colors data-selected:bg-black data-selected:text-mustard text-black/60 hover:bg-black/5">
                 <span className="mr-2">03</span> View traces
               </Tab>
             </TabList>
@@ -187,7 +187,7 @@ export default function Home() {
                       <div className="w-3 h-3 bg-yellow-500 border border-white/30"></div>
                       <div className="w-3 h-3 bg-green-500 border border-white/30"></div>
                     </div>
-                    <span className="text-xs text-[#FFD600] ml-2">{`> example.py`}</span>
+                    <span className="text-xs text-mustard ml-2">{`> example.py`}</span>
                   </div>
                   <pre className="p-6 overflow-x-auto">
                     <code className="text-sm text-white/90 leading-relaxed">
@@ -217,13 +217,13 @@ def my_agent(query: str):
                   <div className="space-y-6">
                     <div className="flex items-center justify-between pb-6 border-b-2 border-black/10">
                       <span className="text-sm text-black/50">{`// span_captured`}</span>
-                      <span className="text-lg bg-black text-[#FFD600] px-3 py-1">
+                      <span className="text-lg bg-black text-mustard px-3 py-1">
                         2.3s
                       </span>
                     </div>
                     <div className="flex items-center justify-between pb-6 border-b-2 border-black/10">
                       <span className="text-sm text-black/50">{`// cost_calculated`}</span>
-                      <span className="text-lg bg-black text-[#FFD600] px-3 py-1">
+                      <span className="text-lg bg-black text-mustard px-3 py-1">
                         $0.004
                       </span>
                     </div>
@@ -257,7 +257,7 @@ def my_agent(query: str):
                   <div className="grid grid-cols-2 gap-8">
                     <div>
                       <div className="text-sm text-black/50 mb-2">status:</div>
-                      <div className="text-lg bg-[#f5f5f5] text-[#4CAF50] px-3 py-1 inline-block">
+                      <div className="text-lg bg-[#f5f5f5] text-success px-3 py-1 inline-block">
                         SUCCESS
                       </div>
                     </div>
@@ -403,7 +403,7 @@ def my_agent(query: str):
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
           <div className="text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-[#FFD600] border-2 border-black mb-6 shadow-[4px_4px_0_rgba(0,0,0,0.2)]">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-mustard border-2 border-black mb-6 shadow-[4px_4px_0_rgba(0,0,0,0.2)]">
               <Zap className="w-7 h-7 text-white" />
             </div>
             <div className="text-xs text-black/40 mb-3 tracking-wide uppercase">{`// Performance`}</div>
@@ -427,7 +427,7 @@ def my_agent(query: str):
           </div>
 
           <div className="text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-[#4CAF50] border-2 border-black mb-6 shadow-[4px_4px_0_rgba(0,0,0,0.2)]">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-success border-2 border-black mb-6 shadow-[4px_4px_0_rgba(0,0,0,0.2)]">
               <Database className="w-7 h-7 text-white" />
             </div>
             <div className="text-xs text-black/40 mb-3 tracking-wide uppercase">{`// Storage`}</div>
@@ -465,7 +465,7 @@ def my_agent(query: str):
                   <div className="w-3 h-3 bg-red-500 border border-white/30"></div>
                   <div className="w-3 h-3 bg-yellow-500 border border-white/30"></div>
                   <div className="w-3 h-3 bg-green-500 border border-white/30"></div>
-                  <span className="text-xs text-[#FFD600] ml-4">
+                  <span className="text-xs text-mustard ml-4">
                     {`> setup.py`}
                   </span>
                 </div>
@@ -483,7 +483,7 @@ def my_agent(query: str):
                   className="text-white/40 hover:text-[#5B5FFF] transition-colors"
                 >
                   {copied ? (
-                    <span className="text-[#FFD600]">✓</span>
+                    <span className="text-mustard">✓</span>
                   ) : (
                     <Copy className="w-4 h-4" />
                   )}
@@ -507,7 +507,7 @@ def my_agent(query: str):
           <div className="flex items-center justify-center gap-4">
             <Link
               href="/dashboard"
-              className="bg-black hover:bg-black/90 text-[#FFD600] px-6 py-2.5 border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.2)] inline-flex items-center gap-2"
+              className="bg-black hover:bg-black/90 text-mustard px-6 py-2.5 border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.2)] inline-flex items-center gap-2"
             >
               view_dashboard()
               <ArrowUpRight className="h-4 w-4" />
