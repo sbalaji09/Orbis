@@ -34,7 +34,13 @@ Text: {text}
 
 Respond with just a number."""
     )
-    return (response.text or "").strip()
+    # Parse the numeric response
+    try:
+        score = int((response.text or "0").strip())
+        return score
+    except ValueError:
+        # If parsing fails, return safe default
+        return 0
 
 @observe("check_spam")
 def check_spam(text):
@@ -58,11 +64,15 @@ def moderate_content(content_id, text):
     toxicity = check_toxicity(text)
     is_spam = check_spam(text)
     
-    decision = "APPROVED" if toxicity < 5 and is_spam == "no" else "REJECTED"
+    # Convert toxicity to int and check spam response
+    toxicity_score = int(toxicity) if isinstance(toxicity, str) else toxicity
+    is_spam_bool = "yes" in str(is_spam).lower()
+    
+    decision = "APPROVED" if toxicity_score < 5 and not is_spam_bool else "REJECTED"
     
     return {
         "content_id": content_id,
-        "toxicity_score": toxicity,
+        "toxicity_score": toxicity_score,
         "is_spam": is_spam,
         "decision": decision
     }

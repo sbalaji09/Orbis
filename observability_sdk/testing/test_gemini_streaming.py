@@ -11,7 +11,7 @@ import time
 
 # Configure
 configure(
-    api_key="test-key-123",
+    api_key="sk_live_Vy41Kdajw0Nigty3A3HrJlCx0ZXGXSqovDHCre6zU3Y",
     api_url="http://localhost:8080",
     debug=True
 )

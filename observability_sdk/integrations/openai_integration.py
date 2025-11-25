@@ -245,19 +245,18 @@ class OpenAIInstrumentor:
             span.set_error(e)
             span.complete(status="error")
 
-            # send span to collector
-            collector = get_collector()
-            collector.collect(span)
-
             raise
 
         finally:
-            # send span to collector (always executes)
-            collector = get_collector()
-            collector.collect(span)
+            # For non-streaming, send span to collector
+            # For streaming, the wrapper handles collection
+            if not is_streaming:
+                collector = get_collector()
+                collector.collect(span)
 
             # restore previous span context
             set_current_span(previous_span)
+
 
 # global instrumentor instance
 _openai_instrumentor = OpenAIInstrumentor()
