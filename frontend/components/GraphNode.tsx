@@ -7,7 +7,7 @@ import {
   Transition,
   TransitionChild,
 } from "@headlessui/react";
-import { Fragment, useState } from "react";
+import { Fragment, useCallback, useState } from "react";
 import { Span } from "@/lib/types";
 
 interface GraphNodeProps {
@@ -42,6 +42,34 @@ interface DraggableGraphNodeProps extends GraphNodeProps {
   isDragging?: boolean;
 }
 
+const getHeaderColor = (traceId: string, spanId: string) => {
+  const combined = `${traceId}-${spanId}`;
+  let hash = 50001;
+
+  for (let i = 0; i < combined.length; i++) {
+    const char = combined.charCodeAt(i);
+    hash = ((hash << 5) + hash) ^ char; // hash * 33 XOR char
+  }
+
+  // Additional mixing to improve distribution
+  hash = hash ^ (hash >>> 16);
+  hash = Math.imul(hash, 0x85ebca6b);
+  hash = hash ^ (hash >>> 13);
+  hash = Math.imul(hash, 0xc2b2ae35);
+  hash = hash ^ (hash >>> 16);
+
+  const colorIndex = Math.abs(hash) % 4;
+
+  const colors = [
+    "bg-[#e8c302]",
+    "bg-[#4CAF50]",
+    "bg-[#D1437C]",
+    "bg-[#5B5FFF]",
+  ];
+
+  return colors[colorIndex];
+};
+
 export default function GraphNode({
   span,
   onDrag,
@@ -49,14 +77,6 @@ export default function GraphNode({
 }: DraggableGraphNodeProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
-
-  // Debug: log modal state changes
-  console.log(
-    "GraphNode render - isModalOpen:",
-    isModalOpen,
-    "span:",
-    span.name
-  );
 
   const statusConfig = {
     success: { bg: "bg-emerald-50", text: "text-success", dot: "bg-success" },
@@ -125,8 +145,8 @@ export default function GraphNode({
     <>
       <div className="relative inline-block">
         <button
-          className={`group relative w-[200px] border-2 border-black bg-white text-left overflow-hidden
-            focus:outline-none focus:ring-2 focus:ring-[#FFD600] focus:ring-offset-2
+          className={`group relative w-[200px] border-2 border-foreground bg-white text-left overflow-hidden
+            focus:outline-none focus:ring-2 focus:ring-mustard focus:ring-offset-2
             ${
               isDragging
                 ? "shadow-[8px_8px_0_rgba(0,0,0,0.2)] scale-[1.02]"
@@ -140,7 +160,10 @@ export default function GraphNode({
         >
           {/* Terminal-style colored top bar - draggable handle (remove nodrag from this) */}
           <div
-            className={`h-6 ${status.dot} border-b-2 border-black flex items-center px-2 gap-1 cursor-grab active:cursor-grabbing`}
+            className={`h-6 ${getHeaderColor(
+              span.trace_id,
+              span.span_id
+            )} border-b-2 border-black flex items-center px-2 gap-1 cursor-grab active:cursor-grabbing`}
           >
             <div className="w-2 h-2 rounded-full bg-white/30"></div>
             <div className="w-2 h-2 rounded-full bg-white/30"></div>
@@ -148,7 +171,7 @@ export default function GraphNode({
           </div>
 
           {/* Content - prevent dragging on content area */}
-          <div className="p-3 nodrag">
+          <div className="p-3 nodrag hover:cursor-pointer">
             {/* Header: Name + Status */}
             <div className="flex items-start justify-between gap-2 mb-2">
               <h3 className="text-xs font-semibold tracking-tight leading-tight truncate flex-1 transition-colors duration-200">
@@ -200,7 +223,7 @@ export default function GraphNode({
               </div>
 
               {span.cost !== null && (
-                <div className="flex items-center gap-1 text-[#FFD600] ml-auto">
+                <div className="flex items-center gap-1 text-mustard ml-auto">
                   <svg
                     className="w-3 h-3 opacity-70 transition-opacity duration-200 group-hover:opacity-90"
                     fill="none"
@@ -226,7 +249,7 @@ export default function GraphNode({
         {/* Tooltip */}
         {showTooltip && !isDragging && (
           <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 -translate-y-full whitespace-nowrap bg-black border-2 border-black px-2.5 py-1.5 shadow-[4px_4px_0_rgba(0,0,0,0.2)] pointer-events-none z-50">
-            <div className="flex items-center gap-1.5 text-[9px] text-[#FFD600] font-mono">
+            <div className="flex items-center gap-1.5 text-[9px] text-mustard font-mono">
               <span className="font-semibold">
                 {span.name || "Unnamed Span"}
               </span>
@@ -325,24 +348,24 @@ export default function GraphNode({
                             {formatDuration(span.duration)}
                           </span>
                         </div>
-                        <div className="flex flex-col gap-1 p-3 bg-[#FFD600]/10 border-2 border-[#FFD600] shadow-[2px_2px_0_rgba(0,0,0,0.1)]">
+                        <div className="flex flex-col gap-1 p-3 bg-mustard/10 border-2 border-mustard shadow-[2px_2px_0_rgba(0,0,0,0.1)]">
                           <span className="text-[10px] font-medium text-black/60 uppercase tracking-wide">
                             Cost
                           </span>
-                          <span className="text-lg text-[#FFD600] font-mono">
+                          <span className="text-lg text-mustard font-mono">
                             {formatCost(span.cost)}
                           </span>
                         </div>
                       </div>
                       <div className="text-[11px] text-black/60 space-y-1 pt-2 border-t-2 border-black/10">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium w-12">{`// Start`}</span>
+                          <span className="font-medium w-14">{`// Start`}</span>
                           <span className="font-mono">
                             {formatDate(span.start_time)}
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="font-medium w-12">{`// End`}</span>
+                          <span className="font-medium w-14">{`// End`}</span>
                           <span className="font-mono">
                             {formatDate(span.end_time)}
                           </span>

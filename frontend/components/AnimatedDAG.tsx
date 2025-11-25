@@ -46,7 +46,7 @@ export function AnimatedDAG() {
       y: 180,
       label: "process_data",
       duration: "38ms",
-      color: "#FFD600",
+      color: "#e8c302",
     },
     {
       id: "generate",
