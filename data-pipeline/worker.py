@@ -9,13 +9,11 @@ import uuid
 from queues.redis_queue import RedisQueue
 from dotenv import load_dotenv
 from data_processing.prompt_upload import upload_input, upload_output
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from backend.db_connection import db
 from collections import defaultdict
 import socket
 import signal
-
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-
 
 # add the application logging layer to the path
 sys.path.append(os.path.join(os.path.dirname(__file__), 'application_logging'))
