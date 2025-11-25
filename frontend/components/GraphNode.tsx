@@ -7,7 +7,7 @@ import {
   Transition,
   TransitionChild,
 } from "@headlessui/react";
-import { Fragment, useCallback, useState } from "react";
+import { Fragment, useState } from "react";
 import { Span } from "@/lib/types";
 
 interface GraphNodeProps {
@@ -28,8 +28,22 @@ function formatCost(cost: number | null): string {
   return `$${cost.toFixed(4)}`;
 }
 
-function formatDate(date: Date): string {
+function formatDate(date: Date | null): string | null {
+  if (!date) return null;
   return new Date(date.toString() + "Z").toLocaleString();
+}
+
+// Skeleton component for loading states
+function Skeleton({
+  width = "w-20",
+  height = "h-4",
+}: {
+  width?: string;
+  height?: string;
+}) {
+  return (
+    <div className={`${width} ${height} bg-gray-200 animate-pulse rounded`} />
+  );
 }
 
 interface DraggableGraphNodeProps extends GraphNodeProps {
@@ -144,8 +158,17 @@ export default function GraphNode({
   return (
     <>
       <div className="relative inline-block">
+        {/* Streaming indicator - pulsing dot outside top-right corner */}
+        {/* {span.is_streaming && (
+          <div className="absolute -top-1 -right-1 z-50 pointer-events-none">
+            <div className="relative">
+              <div className="w-2 h-2 rounded-full bg-success"></div>
+              <div className="absolute inset-0 w-2 h-2 rounded-full bg-success animate-ping opacity-75"></div>
+            </div>
+          </div>
+        )} */}
         <button
-          className={`group relative w-[200px] border-2 border-foreground bg-white text-left overflow-hidden
+          className={`group relative w-60 border-2 border-foreground bg-white text-left overflow-hidden
             focus:outline-none focus:ring-2 focus:ring-mustard focus:ring-offset-2
             ${
               isDragging
@@ -196,36 +219,17 @@ export default function GraphNode({
 
             {/* Model - only show if exists */}
             {span.llm_model && (
-              <div className="text-[9px] text-black/60 font-medium mb-2 truncate">
+              <div className="text-[10px] text-black/60 font-medium mb-2 truncate">
                 {`// ${span.llm_model}`}
               </div>
             )}
 
             {/* Metrics - clean inline layout */}
-            <div className="flex items-center gap-3 text-[9px] pt-2 border-t-2 border-black/10">
-              <div className="flex items-center gap-1 text-black/60">
-                <svg
-                  className="w-3 h-3 opacity-50 transition-opacity duration-200 group-hover:opacity-70"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                <span className="font-mono font-semibold">
-                  {formatDuration(span.duration)}
-                </span>
-              </div>
-
-              {span.cost !== null && (
-                <div className="flex items-center gap-1 text-mustard ml-auto">
+            {!span.is_streaming ? (
+              <div className="flex items-center gap-3 text-[10px] pt-2 border-t-2 border-black/10">
+                <div className="flex items-center gap-1 text-black/60">
                   <svg
-                    className="w-3 h-3 opacity-70 transition-opacity duration-200 group-hover:opacity-90"
+                    className="w-3.5 h-3.5 opacity-50 transition-opacity duration-200 group-hover:opacity-70"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -234,15 +238,66 @@ export default function GraphNode({
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth={2}
-                      d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                     />
                   </svg>
                   <span className="font-mono font-semibold">
-                    {formatCost(span.cost)}
+                    {formatDuration(span.duration)}
                   </span>
                 </div>
-              )}
-            </div>
+
+                {span.cost !== null && (
+                  <div className="flex items-center gap-1 text-mustard ml-auto">
+                    <svg
+                      className="w-3.5 h-3.5 opacity-70 transition-opacity duration-200 group-hover:opacity-90"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    <span className="font-mono font-semibold">
+                      {formatCost(span.cost)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center justify-between text-[8px] pt-2 mt-2 border-t-2 border-success/20">
+                <div className="flex items-center gap-1 px-1.5 py-0.5 bg-success border border-success/30 text-background">
+                  <div className="w-1.5 h-1.5 rounded-full bg-background animate-pulse"></div>
+                  <span className="uppercase font-bold tracking-wide">
+                    streaming
+                  </span>
+                </div>
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-1 text-black/60">
+                    <span className="">TTFT:</span>
+                    <span className="font-mono">
+                      {span.time_to_first_token !== null ? (
+                        `${span.time_to_first_token.toFixed(0)}ms`
+                      ) : (
+                        <Skeleton width="w-10" height="h-3" />
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 text-black/60">
+                    <span className="font-mono">
+                      {span.tokens_per_second !== null ? (
+                        `${span.tokens_per_second.toFixed(1)} tok/s`
+                      ) : (
+                        <Skeleton width="w-12" height="h-3" />
+                      )}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </button>
 
@@ -345,7 +400,11 @@ export default function GraphNode({
                             Duration
                           </span>
                           <span className="text-lg font-mono">
-                            {formatDuration(span.duration)}
+                            {span.duration !== null ? (
+                              formatDuration(span.duration)
+                            ) : (
+                              <Skeleton width="w-16" height="h-6" />
+                            )}
                           </span>
                         </div>
                         <div className="flex flex-col gap-1 p-3 bg-mustard/10 border-2 border-mustard shadow-[2px_2px_0_rgba(0,0,0,0.1)]">
@@ -353,7 +412,11 @@ export default function GraphNode({
                             Cost
                           </span>
                           <span className="text-lg text-mustard font-mono">
-                            {formatCost(span.cost)}
+                            {span.cost !== null ? (
+                              formatCost(span.cost)
+                            ) : (
+                              <Skeleton width="w-16" height="h-6" />
+                            )}
                           </span>
                         </div>
                       </div>
@@ -367,7 +430,11 @@ export default function GraphNode({
                         <div className="flex items-center gap-2">
                           <span className="font-medium w-14">{`// End`}</span>
                           <span className="font-mono">
-                            {formatDate(span.end_time)}
+                            {span.end_time ? (
+                              formatDate(span.end_time)
+                            ) : (
+                              <Skeleton width="w-32" height="h-4" />
+                            )}
                           </span>
                         </div>
                       </div>
@@ -387,7 +454,11 @@ export default function GraphNode({
                                 Prompt
                               </span>
                               <span className="text-base font-mono">
-                                {span.prompt_tokens?.toLocaleString() || 0}
+                                {span.prompt_tokens !== null ? (
+                                  span.prompt_tokens.toLocaleString()
+                                ) : (
+                                  <Skeleton width="w-12" height="h-5" />
+                                )}
                               </span>
                             </div>
                           </div>
@@ -398,7 +469,11 @@ export default function GraphNode({
                                 Completion
                               </span>
                               <span className="text-base font-mono">
-                                {span.completion_tokens?.toLocaleString() || 0}
+                                {span.completion_tokens !== null ? (
+                                  span.completion_tokens.toLocaleString()
+                                ) : (
+                                  <Skeleton width="w-12" height="h-5" />
+                                )}
                               </span>
                             </div>
                           </div>
@@ -409,10 +484,14 @@ export default function GraphNode({
                                 Total
                               </span>
                               <span className="text-base text-foreground font-mono">
-                                {(
-                                  (span.prompt_tokens || 0) +
-                                  (span.completion_tokens || 0)
-                                ).toLocaleString()}
+                                {span.prompt_tokens !== null &&
+                                span.completion_tokens !== null ? (
+                                  (
+                                    span.prompt_tokens + span.completion_tokens
+                                  ).toLocaleString()
+                                ) : (
+                                  <Skeleton width="w-12" height="h-5" />
+                                )}
                               </span>
                             </div>
                           </div>
