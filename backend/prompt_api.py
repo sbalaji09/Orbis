@@ -51,9 +51,14 @@ async def get_prompt_by_agent_id(self, agent_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 # TODO
 @app.get("prompts/{prompt_id}/versions")
-
+async def get_version_numbers(self, prompt_id: str):
+    try:
+        pass
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
 @app.get("prompts/{prompt_id}/content")
-async def get_prompt_content(self, prompt_id: str, version_number: int=None) -> str:
+async def get_prompt_content(self, prompt_id: str, version_number: int=None):
     try:
         pass
     except Exception as e:

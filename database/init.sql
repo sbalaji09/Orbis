@@ -56,7 +56,7 @@ CREATE TABLE spans (
 );
 
 CREATE TABLE prompt_versions (
-    prompt_version_id UUID PRIMARY KEY,
+    prompt_id UUID PRIMARY KEY,
     name VARCHAR(50),
     version_number INT,
     s3_url VARCHAR(200),

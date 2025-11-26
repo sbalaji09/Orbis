@@ -798,6 +798,39 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
         
+    def get_s3url_by_prompt_id(self, prompt_id: str, version_number:int=None) -> List[Dict]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                if version_number:
+                    query = """
+                        SELECT s3_url FROM prompt_versions
+                        WHERE prompt_id = %s
+                        AND version_number = %s
+                    """
+                    cur.execute(
+                        query,
+                        (prompt_id, version_number)
+                    )
+                    result = cur.fetchone()
+                    conn.commit()
+                    return {"S3 URL": result}
+                else:
+                    query = """
+                        SELECT s3_url FROM prompt_versions
+                        WHERE prompt_id = %s
+                    """
+                    cur.execute(
+                        query,
+                        (prompt_id)
+                    )
+                    result = cur.fetchone()
+                    conn.commit()
+                    return {"S3 URL": result}
+        except Exception as e:
+            raise Exception(f"Failed to get s3URL by prompt id")
+        finally:
+            self.return_connection(conn)
     # closes all the connections in the pool
     def close(self):
         self.pool.closeall()
