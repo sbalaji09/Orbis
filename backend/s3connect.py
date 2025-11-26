@@ -38,3 +38,22 @@ def upload_prompt_to_s3(
     # s3 URI to store
     s3_uri = f"s3://{bucket_name}/{object_key}"
     return s3_uri
+
+# download prompt content from s3 based on s3 url and return the content
+def download_prompt_from_s3(s3_uri: str) -> str:
+    if not s3_uri.startswith("s3://"):
+        raise ValueError("Invalid S3 URI format")
+
+    # parse s3://bucket/key
+    _, _, bucket_and_key = s3_uri.partition("s3://")
+    bucket, _, key = bucket_and_key.partition("/")
+
+    s3_client = boto3.client("s3")
+
+    try:
+        response = s3_client.get_object(Bucket=bucket, Key=key)
+        content = response["Body"].read().decode("utf-8")
+        return content
+
+    except ClientError as e:
+        raise RuntimeError(f"Failed to download prompt from S3: {e}") from e

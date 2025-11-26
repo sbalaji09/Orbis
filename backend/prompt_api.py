@@ -60,7 +60,8 @@ async def get_version_numbers(self, prompt_id: str):
 @app.get("prompts/{prompt_id}/content")
 async def get_prompt_content(self, prompt_id: str, version_number: int=None):
     try:
-        pass
+        s3_url = db.get_s3url_by_prompt_id(prompt_id, version_number)
+        
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
