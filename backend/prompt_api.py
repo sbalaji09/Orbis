@@ -42,6 +42,13 @@ async def create_prompt(agent_id: str, name: str, content: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("prompts/{agent_id}")
+async def get_prompt_by_agent_id(self, agent_id: str):
+    try:
+        pass
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 def compute_hash_sha256(content: str) -> str:
     hash_object = hashlib.sha256(content.encode("utf-8"))
     return hash_object.hexdigest()
