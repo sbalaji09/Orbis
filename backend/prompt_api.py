@@ -21,8 +21,8 @@ app.add_middleware(
 
 @app.post("/prompts")
 async def create_prompt(agent_id: str, name: str, content: str):
-    # Generate plaintext API key
-    api_key = generate_key_with_string(agent_name)
+    # generate hash for content
+    content_hash = compute_hash_sha256(content)
 
     # Hash the API key for database storage
     hashed_key = hash_api_key(api_key)

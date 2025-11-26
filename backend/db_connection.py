@@ -649,6 +649,31 @@ class SupabaseDB:
             raise Exception(f"Failed to batch insert spans: {e}")
         finally:
             self.return_connection(conn)
+    
+    def check_identical_hash(self, hash_val: str, agent_id: str) -> Optional[bool]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                query = """
+                    SELECT * FROM prompt_versions
+                    WHERE prompt_hash = %s
+                    AND agent_id = %s
+                """
+                cur.execute(query, (hash_val, agent_id))
+
+                result = cur.fetchone()
+                if not result:
+                    return None
+
+                span = dict(result)
+                if len(span) != 0:
+                    return True
+                return False
+        except Exception as e:
+            conn.rollback()
+            raise Exception(f"Failed to check for identical hash: {e}")
+        finally:
+            self.return_connection(conn)
 
     # closes all the connections in the pool
     def close(self):
