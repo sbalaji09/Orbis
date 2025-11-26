@@ -762,7 +762,23 @@ class SupabaseDB:
             raise Exception(f"Failed to insert row into prompt versions")
         finally:
             self.return_connection(conn)
-
+    
+    def get_prompts_by_agent_id(self, agent_id: str) -> List[Dict]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                query = """
+                    SELECT * from prompt_versions
+                    WHERE agent_id = %s
+                """
+                cur.execute(query, (agent_id))
+                results = cur.fetchall()
+                return [dict(row) for row in results]
+        except Exception as e:
+            conn.rollback()
+            raise Exception(f"Failed to get prompts by agent id")
+        finally:
+            self.return_connection(conn)
     # closes all the connections in the pool
     def close(self):
         self.pool.closeall()
