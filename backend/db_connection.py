@@ -772,13 +772,32 @@ class SupabaseDB:
                     WHERE agent_id = %s
                 """
                 cur.execute(query, (agent_id))
-                results = cur.fetchall()
-                return [dict(row) for row in results]
+                rows = cur.fetchall()
+
+                prompts = [dict(row) for row in rows]
+
+                # group prompts by name
+                families = {}
+                for p in prompts:
+                    name = p["name"]
+                    if name not in families:
+                        families[name] = {
+                            "name": name,
+                            "version_count": 0,
+                            "versions": []
+                        }
+
+                    families[name]["versions"].append(p)
+                    families[name]["version_count"] += 1
+
+                # convert the mapping to a list
+                return list(families.values())
         except Exception as e:
             conn.rollback()
             raise Exception(f"Failed to get prompts by agent id")
         finally:
             self.return_connection(conn)
+        
     # closes all the connections in the pool
     def close(self):
         self.pool.closeall()
