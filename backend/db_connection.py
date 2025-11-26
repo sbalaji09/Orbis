@@ -674,6 +674,30 @@ class SupabaseDB:
             raise Exception(f"Failed to check for identical hash: {e}")
         finally:
             self.return_connection(conn)
+    
+    def max_version_prompt_number(self, name: str) -> int:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                query = """
+                    SELECT COALESCE(MAX(version_number), 0) + 1
+                    INTO next_version
+                    FROM prompt_versions
+                    WHERE name = %s
+                    RETURN next_version
+                """
+
+                cur.execute(query, (
+                    name,
+                ))
+                result = cur.fetchone()
+                conn.commit()
+                return "Next version number: {result}"
+        except Exception as e:
+            conn.rollback()
+            raise Exception(f"Failed to query largest prompt number")
+        finally:
+            self.return_connection(conn)
 
     # closes all the connections in the pool
     def close(self):
