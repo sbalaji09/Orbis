@@ -42,4 +42,10 @@ export interface Span {
   is_streaming: boolean;
   time_to_first_token: number | null;
   tokens_per_second: number | null;
+  /** Prompt identifier for version tracking */
+  prompt_id: string | null;
+  /** Prompt version number or label (e.g., "v1.0", "v2.3") */
+  prompt_version: string | null;
+  /** Hash of the prompt content for integrity verification */
+  prompt_hash: string | null;
 }
