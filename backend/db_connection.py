@@ -692,7 +692,7 @@ class SupabaseDB:
                 ))
                 result = cur.fetchone()
                 conn.commit()
-                return "Next version number: {result}"
+                return {"Version number": result}
         except Exception as e:
             conn.rollback()
             raise Exception(f"Failed to query largest prompt number")

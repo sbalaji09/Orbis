@@ -1,7 +1,9 @@
+import os
 from db_connection import db
 from fastapi import FastAPI, HTTPException, Query, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
+from s3connect import upload_prompt_to_s3
 import hashlib
 
 app = FastAPI(
@@ -24,25 +26,16 @@ async def create_prompt(agent_id: str, name: str, content: str):
     # generate hash for content
     content_hash = compute_hash_sha256(content)
 
-    # Hash the API key for database storage
-    hashed_key = hash_api_key(api_key)
-
     try:
-        res = db.insert_agent(user_id, agent_name, hashed_key)
-        # res is a string message like "API Key insertion successful with api_key_id: 123"
-        # Extract the id from the message
-        agent_id = res.split(":")[-1].strip()
+        if db.check_identical_hash(content_hash, agent_id):
+            return
+        
+        bucket_name = os.getenv('S3_BUCKET_NAME')
+        aws_region = os.getenv('AWS_REGION')
 
-        # Cache plaintext API key in Redis for fast auth lookup by data-pipeline
-        # Redis stores: api_key:{plaintext} -> user_id
-        cache_api_key_in_redis(user_id, api_key)
-
-        return {
-            "agent_id": agent_id,
-            "agent_name": agent_name,
-            "api_key": api_key,  # Return plaintext to user (only time they see it)
-            "message": "API Key inserted successfully. Save this key - it cannot be retrieved again."
-        }
+        version_number = db.max_version_prompt_number(name)["Version number"]
+        s3URL = upload_prompt_to_s3(content, bucket_name, name, version_number, aws_region)
+        
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
