@@ -3,7 +3,7 @@ from db_connection import db
 from fastapi import FastAPI, HTTPException, Query, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
-from s3connect import upload_prompt_to_s3
+from s3connect import *
 import hashlib
 
 app = FastAPI(
@@ -61,7 +61,8 @@ async def get_version_numbers(self, prompt_id: str):
 async def get_prompt_content(self, prompt_id: str, version_number: int=None):
     try:
         s3_url = db.get_s3url_by_prompt_id(prompt_id, version_number)
-        
+        content = download_prompt_from_s3(s3_url)
+        return {"Content": content}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
