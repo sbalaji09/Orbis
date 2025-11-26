@@ -35,7 +35,9 @@ async def create_prompt(agent_id: str, name: str, content: str):
 
         version_number = db.max_version_prompt_number(name)["Version number"]
         s3URL = upload_prompt_to_s3(content, bucket_name, name, version_number, aws_region)
+
         
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

@@ -698,6 +698,70 @@ class SupabaseDB:
             raise Exception(f"Failed to query largest prompt number")
         finally:
             self.return_connection(conn)
+    
+    def insert_prompt_row(self, name: str, version_number: int, s3_url: str, 
+                          agent_id: str, prompt_hash: str, content_preview: str):
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                query = """
+                    INSERT INTO prompt_versions (
+                        prompt_version_id,
+                        name,
+                        version_number,
+                        s3_url,
+                        created_at,
+                        is_active,
+                        agent_id,
+                        prompt_hash,
+                        content_preview,
+                        metadata,
+                        parent_version_id
+                    ) VALUES (
+                        gen_random_uuid(),  -- prompt_version_id
+                        %s,                 -- name
+                        %s,                 -- version_number
+                        %s,                 -- s3_url
+                        NOW(),              -- created_at
+                        TRUE,               -- is_active
+                        %s,                 -- agent_id
+                        %s,                 -- prompt_hash
+                        %s,                 -- content_preview
+                        '{}'::jsonb,        -- metadata (empty by default)
+                        NULL                -- parent_version_id
+                    )
+                    RETURNING
+                        prompt_version_id,
+                        name,
+                        version_number,
+                        s3_url,
+                        created_at,
+                        is_active,
+                        agent_id,
+                        prompt_hash,
+                        content_preview,
+                        metadata,
+                        parent_version_id;
+                """
+
+                cur.execute(
+                    query,
+                    (name, version_number, s3_url, agent_id, prompt_hash, content_preview)
+                )
+                created_prompt = cur.fetchone()
+                conn.commit()
+                columns = [
+                    "prompt_version_id", "name", "version_number", "s3_url",
+                    "created_at", "is_active", "agent_id", "prompt_hash",
+                    "content_preview", "metadata", "parent_version_id"
+                ]
+
+            return dict(zip(columns, created_prompt))
+        except Exception as e:
+            conn.rollback()
+            raise Exception(f"Failed to insert row into prompt versions")
+        finally:
+            self.return_connection(conn)
 
     # closes all the connections in the pool
     def close(self):
