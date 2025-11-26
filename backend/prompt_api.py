@@ -49,6 +49,16 @@ async def get_prompt_by_agent_id(self, agent_id: str):
         return prompt_families
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+# TODO
+@app.get("prompts/{prompt_id}/versions")
+
+@app.get("prompts/{prompt_id}/content")
+async def get_prompt_content(self, prompt_id: str, version_number: int=None) -> str:
+    try:
+        pass
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 def compute_hash_sha256(content: str) -> str:
     hash_object = hashlib.sha256(content.encode("utf-8"))
