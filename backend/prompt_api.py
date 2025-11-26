@@ -45,7 +45,8 @@ async def create_prompt(agent_id: str, name: str, content: str):
 @app.get("prompts/{agent_id}")
 async def get_prompt_by_agent_id(self, agent_id: str):
     try:
-        pass
+        prompt_families = db.get_prompts_by_agent_id(agent_id)
+        return prompt_families
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
