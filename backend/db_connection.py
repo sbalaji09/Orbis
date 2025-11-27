@@ -157,14 +157,16 @@ class SupabaseDB:
                         input_preview, input_blob_url,
                         output_preview, output_blob_url,
                         llm_model, prompt_tokens, completion_tokens,
-                        cost, status, error_message
+                        cost, status, error_message, prompt_id, 
+                        prompt_version, prompt_hash
                     ) VALUES (
                         %s, %s, %s::uuid[], %s,
                         %s, %s, %s,
                         %s, %s,
                         %s, %s,
                         %s, %s, %s,
-                        %s, %s, %s
+                        %s, %s, %s,
+                        %s, %s
                     )
                     RETURNING span_id
                 """
@@ -185,7 +187,10 @@ class SupabaseDB:
                     span_data.get('completion_tokens'),
                     span_data.get('cost'),
                     span_data.get('status'),
-                    span_data.get('error_message')
+                    span_data.get('error_message'),
+                    span_data.get('prompt_id'),
+                    span_data.get('prompt_version'),
+                    span_data.get('prompt_hash')
                 ))
                 result = cur.fetchone()
                 conn.commit()
