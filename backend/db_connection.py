@@ -832,19 +832,19 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
 
-    def get_prompts_versions(self, prompt_id: str) -> List[Dict]:
+    def get_prompts_versions(self, name: str) -> List[Dict]:
         conn = self.get_connection()
         try:
             with conn.cursor() as cur:
                 query = """
                     SELECT version_number, metadata, created_at, is_active
                     FROM prompt_versions
-                    WHERE prompt_id = %s
+                    WHERE name = %s
                     ORDER BY version_number DESC
                 """
                 cur.execute(
                     query,
-                    (prompt_id,)
+                    (name,)
                 )
                 rows = cur.fetchall()
             
