@@ -49,11 +49,12 @@ async def get_prompt_by_agent_id(self, agent_id: str):
         return prompt_families
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-# TODO
+    
 @app.get("prompts/{prompt_id}/versions")
 async def get_version_numbers(self, prompt_id: str):
     try:
-        pass
+        prompt_versions = db.get_prompts_versions(prompt_id)
+        return prompt_versions
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
