@@ -71,6 +71,12 @@ async def get_prompt_content(self, name: str, version_number: int | None = None)
 async def get_prompt_differences(self, prompt_id1: str, prompt_id2: str):
     try:
         s3_url1 = db.get_s3url_by_prompt_id(prompt_id1)
+        s3_url2 = db.get_s3url_by_prompt_id(prompt_id2)
+
+        content1 = download_prompt_from_s3(s3_url1)
+        content2 = download_prompt_from_s3(s3_url2)
+
+        return prompt_diff(content1, prompt_id1, content2, prompt_id2)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

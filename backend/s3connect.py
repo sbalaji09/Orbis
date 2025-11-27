@@ -1,3 +1,4 @@
+import difflib
 import boto3
 from botocore.exceptions import ClientError
 from typing import Optional
@@ -57,3 +58,49 @@ def download_prompt_from_s3(s3_uri: str) -> str:
 
     except ClientError as e:
         raise RuntimeError(f"Failed to download prompt from S3: {e}") from e
+
+def prompt_diff(content1: str, prompt_id1: str, content2: str, prompt_id2: str) -> dict:
+    lines1 = content1.splitlines()
+    lines2 = content2.splitlines()
+
+    # 4. Generate unified diff
+    diff_lines = list(
+        difflib.unified_diff(
+            lines1,
+            lines2,
+            fromfile=prompt_id1,
+            tofile=prompt_id2,
+            lineterm=""  # avoid extra newlines in each entry
+        )
+    )
+
+    # 5. Build structured diff
+    added: list[str] = []
+    removed: list[str] = []
+    unchanged: list[str] = []
+
+    for line in diff_lines:
+        # Skip headers and hunk markers
+        if line.startswith(("---", "+++", "@@")):
+            continue
+
+        if line.startswith("+"):
+            added.append(line[1:])      # strip leading '+'
+        elif line.startswith("-"):
+            removed.append(line[1:])    # strip leading '-'
+        elif line.startswith(" "):
+            unchanged.append(line[1:])  # strip leading ' '
+
+    # Optional: include raw unified diff as a single string too
+    raw_unified_diff = "\n".join(diff_lines)
+
+    return {
+        "prompt_id1": prompt_id1,
+        "prompt_id2": prompt_id2,
+        "diff": {
+            "added": added,
+            "removed": removed,
+            "unchanged": unchanged,
+            "raw": raw_unified_diff,  # remove this if you only want structured
+        },
+    }
