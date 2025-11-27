@@ -42,7 +42,7 @@ async def create_prompt(agent_id: str, name: str, content: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("prompts/{agent_id}")
+@app.get("/prompts/{agent_id}")
 async def get_prompt_by_agent_id(self, agent_id: str):
     try:
         prompt_families = db.get_prompts_by_agent_id(agent_id)
@@ -50,7 +50,7 @@ async def get_prompt_by_agent_id(self, agent_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
-@app.get("prompts/{name}/versions")
+@app.get("/prompts/{name}/versions")
 async def get_version_numbers(self, name: str):
     try:
         prompt_versions = db.get_prompts_versions(name)
@@ -58,8 +58,8 @@ async def get_version_numbers(self, name: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
-@app.get("prompts/{name}/content")
-async def get_prompt_content(self, name: str, version_number: int=None):
+@app.get("/prompts/{name}/content")
+async def get_prompt_content(self, name: str, version_number: int | None = None):
     try:
         s3_url = db.get_s3url_by_prompt_id(name, version_number)
         content = download_prompt_from_s3(s3_url)
@@ -67,7 +67,7 @@ async def get_prompt_content(self, name: str, version_number: int=None):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("prompts/diff")
+@app.get("/prompts/diff")
 async def get_prompt_differences(self, prompt_id1: str, prompt_id2: str):
     try:
         s3_url1 = db.get_s3url_by_prompt_id(prompt_id1)
