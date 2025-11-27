@@ -862,7 +862,16 @@ class SupabaseDB:
             raise Exception(f"Failed to get all prompt versions")
         finally:
             self.return_connection(conn)
-        
+    
+    def get_prompt_version_differences(self, prompt_id1: str, prompt_id2: str) -> List[Dict]:
+        conn = self.get_connection()
+        try:
+            pass
+                
+        except Exception as e:
+            raise Exception(f"Failed to get prompt version differences")
+        finally:
+            self.return_connection(conn)
     # closes all the connections in the pool
     def close(self):
         self.pool.closeall()

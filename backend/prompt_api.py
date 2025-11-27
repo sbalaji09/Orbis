@@ -67,6 +67,13 @@ async def get_prompt_content(self, prompt_id: str, version_number: int=None):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("prompts/{prompt_id}/content")
+async def get_prompt_differences(self, prompt_id1: str, prompt_id2: str):
+    try:
+        prompt_differences = db.get_prompt_differences(prompt_id1, prompt_id2)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 def compute_hash_sha256(content: str) -> str:
     hash_object = hashlib.sha256(content.encode("utf-8"))
