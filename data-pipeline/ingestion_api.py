@@ -32,10 +32,16 @@ class SpanIn(BaseModel):
     error_message: Optional[str] = None
     user_id: str
     agent_id: Optional[str] = None
+
     # Streaming fields
     is_streaming: Optional[bool] = False
     time_to_first_token: Optional[float] = None
     tokens_per_second: Optional[float] = None
+
+    # 🆕 new fields
+    prompt_id: Optional[str] = None
+    prompt_version: Optional[int] = None
+    prompt_hash: Optional[str] = None
 
 
 class EndTraceIn(BaseModel):
