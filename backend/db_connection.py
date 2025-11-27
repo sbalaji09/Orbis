@@ -878,27 +878,46 @@ class SupabaseDB:
                     query,
                     (name, version_number,)
                 )
-                rows = cur.fetchall()
+                row = cur.fetchone()
             
-            # convert to list of dicts if you're using a regular cursor
-            versions: List[Dict[str, Any]] = [
-                {   
-                    "s3_url": row[0],
-                    "agent_id": row[1],
-                    "prompt_hash": row[2],
-                    "content_preview": row[3],
-                    "metadata": row[4],
-                    "parent_version_id": row[5],
-                }
-                for row in rows
-            ]
-            return versions
-            
+            if not row:
+                return None
+
+            return {
+                "id": row[0],
+                "s3_url": row[1],
+                "agent_id": row[2],
+                "prompt_hash": row[3],
+                "content_preview": row[4],
+                "metadata": row[5],
+                "parent_version_id": row[6],
+            }
+                
+        except Exception as e:
+            raise Exception(f"Failed to get prompt version")
+        finally:
+            self.return_connection(conn)
+
+    def deactivate_version(self, name: str, version_number: int) -> bool:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                query = """
+                    UPDATE prompt_versions
+                    SET is_active = False
+                    WHERE name = %s
+                    AND version_number = %s
+                """
+                cur.execute(
+                    query,
+                    (name, version_number)
+                )
+                row = cur.fetchone()
+            return "sucessful"
         except Exception as e:
             raise Exception(f"Failed to get all prompt versions")
         finally:
             self.return_connection(conn)
-
     # closes all the connections in the pool
     def close(self):
         self.pool.closeall()

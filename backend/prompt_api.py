@@ -43,7 +43,7 @@ async def create_prompt(agent_id: str, name: str, content: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/prompts/{agent_id}")
-async def get_prompt_by_agent_id(self, agent_id: str):
+async def get_prompt_by_agent_id(agent_id: str):
     try:
         prompt_families = db.get_prompts_by_agent_id(agent_id)
         return prompt_families
@@ -51,7 +51,7 @@ async def get_prompt_by_agent_id(self, agent_id: str):
         raise HTTPException(status_code=500, detail=str(e))
     
 @app.get("/prompts/{name}/versions")
-async def get_version_numbers(self, name: str):
+async def get_version_numbers(name: str):
     try:
         prompt_versions = db.get_prompts_versions(name)
         return prompt_versions
@@ -59,7 +59,7 @@ async def get_version_numbers(self, name: str):
         raise HTTPException(status_code=500, detail=str(e))
     
 @app.get("/prompts/{name}/content")
-async def get_prompt_content(self, name: str, version_number: int | None = None):
+async def get_prompt_content(name: str, version_number: int | None = None):
     try:
         s3_url = db.get_s3url_by_prompt_id(name, version_number)
         content = download_prompt_from_s3(s3_url)
@@ -68,7 +68,7 @@ async def get_prompt_content(self, name: str, version_number: int | None = None)
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/prompts/diff")
-async def get_prompt_differences(self, prompt_id1: str, prompt_id2: str):
+async def get_prompt_differences(prompt_id1: str, prompt_id2: str):
     try:
         s3_url1 = db.get_s3url_by_prompt_id(prompt_id1)
         s3_url2 = db.get_s3url_by_prompt_id(prompt_id2)
@@ -81,13 +81,19 @@ async def get_prompt_differences(self, prompt_id1: str, prompt_id2: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/prompts/{name}/rollback")
-async def rollback_prompt(self, name: str, version_number: int):
+async def rollback_prompt(name: str, version_number: int):
     try:
         prompt_rollback = db.get_prompt_version(name, version_number)
-        content = download_prompt_from_s3(prompt_rollback["s3_url"])
-        db.insert_prompt_row(name, version_number, prompt_rollback["s3_url"], prompt_rollback["agent_id"],
+        db.deactivate_version(name, version_number)
+        new_version = db.insert_prompt_row(name, version_number, prompt_rollback["s3_url"], prompt_rollback["agent_id"],
                              prompt_rollback["prompt_hash"], prompt_rollback["content_preview"])
-        
+        return {
+            "name": name,
+            "rolled_back_to_version": version_number,
+            "new_version_number": version_number + 1,
+            "new_version_id": new_version["prompt_version_id"],
+        }
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
