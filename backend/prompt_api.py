@@ -81,11 +81,12 @@ async def get_prompt_differences(self, prompt_id1: str, prompt_id2: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/prompts/{name}/rollback")
-async def rollback_prompt(self, prompt_id: str, name: str, version_number: int):
+async def rollback_prompt(self, name: str, version_number: int):
     try:
-        s3_url = db.get_s3url_by_prompt_id(prompt_id, version_number)
-        content = download_prompt_from_s3(s3_url)
-
+        prompt_rollback = db.get_prompt_version(name, version_number)
+        content = download_prompt_from_s3(prompt_rollback["s3_url"])
+        db.insert_prompt_row(name, version_number, prompt_rollback["s3_url"], prompt_rollback["agent_id"],
+                             prompt_rollback["prompt_hash"], prompt_rollback["content_preview"])
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
