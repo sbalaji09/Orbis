@@ -1,10 +1,11 @@
 import datetime
+import json
 import os
 import psycopg2
 from psycopg2.extras import RealDictCursor, execute_values
 from psycopg2.pool import SimpleConnectionPool
 from dotenv import load_dotenv
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from uuid import UUID
 from psycopg2.extras import execute_values
 
@@ -863,15 +864,41 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
     
-    def get_prompt_version_differences(self, prompt_id1: str, prompt_id2: str) -> List[Dict]:
+    def get_prompt_version(self, name: str, version_number: int) -> List[Dict]:
         conn = self.get_connection()
         try:
-            pass
-                
+            with conn.cursor() as cur:
+                query = """
+                    SELECT s3_url, agent_id, prompt_hash, content_preview, metadata, parent_version_id
+                    FROM prompt_versions
+                    WHERE name = %s
+                    AND version_number = %s
+                """
+                cur.execute(
+                    query,
+                    (name, version_number,)
+                )
+                rows = cur.fetchall()
+            
+            # convert to list of dicts if you're using a regular cursor
+            versions: List[Dict[str, Any]] = [
+                {   
+                    "s3_url": row[0],
+                    "agent_id": row[1],
+                    "prompt_hash": row[2],
+                    "content_preview": row[3],
+                    "metadata": row[4],
+                    "parent_version_id": row[5],
+                }
+                for row in rows
+            ]
+            return versions
+            
         except Exception as e:
-            raise Exception(f"Failed to get prompt version differences")
+            raise Exception(f"Failed to get all prompt versions")
         finally:
             self.return_connection(conn)
+
     # closes all the connections in the pool
     def close(self):
         self.pool.closeall()
