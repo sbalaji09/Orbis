@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useMemo, useEffect } from "react";
+import { useCallback, useMemo, useEffect, useState } from "react";
 import useSWR from "swr";
 import ReactFlow, {
   Node,
@@ -18,6 +18,10 @@ import ReactFlow, {
 import "reactflow/dist/style.css";
 import { Span } from "@/lib/types";
 import GraphNode from "@/components/GraphNode";
+import PromptVersionPanel from "@/components/PromptVersionPanel";
+import PromptContentViewer from "@/components/PromptContentViewer";
+import PromptDiffViewer from "@/components/PromptDiffViewer";
+import { fetchPromptContent, fetchPromptDiff, rollbackPrompt } from "@/lib/prompt-api";
 
 interface NodePosition {
   x: number;
@@ -86,12 +90,7 @@ function CustomNode({
 }: {
   data: {
     span: Span;
-    onDrag?: (
-      spanId: string,
-      deltaX: number,
-      deltaY: number,
-      commit: boolean
-    ) => void;
+    onPromptClick?: (promptName: string) => void;
   };
 }) {
   return (
@@ -111,7 +110,12 @@ function CustomNode({
       />
       {/* GraphNode component - wrapped in div to allow dragging */}
       <div>
-        <GraphNode span={data.span} x={0} y={0} />
+        <GraphNode
+          span={data.span}
+          x={0}
+          y={0}
+          onPromptClick={data.onPromptClick}
+        />
       </div>
       {/* Handle for outgoing edges (bottom) - invisible but functional */}
       <Handle
@@ -143,6 +147,25 @@ export default function TraceGraphClient({
   const traceId = initialSpans.length > 0 ? initialSpans[0].trace_id : null;
   const DEFAULT_USER_ID = "00000000-0000-0000-0000-000000000000";
 
+  // Prompt panel state
+  const [selectedPromptName, setSelectedPromptName] = useState<string | null>(null);
+  const [isPanelOpen, setIsPanelOpen] = useState(false);
+
+  // Content viewer state
+  const [viewingContent, setViewingContent] = useState<{
+    content: string;
+    version: number;
+    promptName: string;
+  } | null>(null);
+
+  // Diff viewer state
+  const [diffState, setDiffState] = useState<{
+    oldContent: string;
+    newContent: string;
+    oldVersion: number;
+    newVersion: number;
+  } | null>(null);
+
   // Fetch spans with SWR for real-time updates (polls every 2 seconds)
   const { data: fetchedSpans } = useSWR(
     traceId ? `/traces/${traceId}/spans` : null,
@@ -166,19 +189,71 @@ export default function TraceGraphClient({
       fallbackData: initialSpans,
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
-      dedupingInterval: 2000, // Prevent duplicate requests within 2s
-      keepPreviousData: true, // Smooth transitions between updates
+      dedupingInterval: 2000,
+      keepPreviousData: true,
     }
   );
 
   const spans = fetchedSpans || initialSpans;
   const spanIds = spans.map((s) => s.span_id).join(",");
 
+  // Handler for prompt badge clicks
+  const handlePromptClick = useCallback((promptName: string) => {
+    setSelectedPromptName(promptName);
+    setIsPanelOpen(true);
+  }, []);
+
+  // Handler for viewing a specific version
+  const handleViewVersion = useCallback(async (version: number) => {
+    if (!selectedPromptName) return;
+
+    const content = await fetchPromptContent(DEFAULT_USER_ID, selectedPromptName, version);
+    if (content) {
+      setViewingContent({
+        content,
+        version,
+        promptName: selectedPromptName,
+      });
+    }
+  }, [selectedPromptName]);
+
+  // Handler for comparing two versions
+  const handleCompare = useCallback(async (version1: number, version2: number) => {
+    if (!selectedPromptName) return;
+
+    // Fetch both versions' content
+    const [content1, content2] = await Promise.all([
+      fetchPromptContent(DEFAULT_USER_ID, selectedPromptName, version1),
+      fetchPromptContent(DEFAULT_USER_ID, selectedPromptName, version2),
+    ]);
+
+    if (content1 && content2) {
+      setDiffState({
+        oldContent: content1,
+        newContent: content2,
+        oldVersion: version1,
+        newVersion: version2,
+      });
+    }
+  }, [selectedPromptName]);
+
+  // Handler for rollback
+  const handleRollback = useCallback(async (version: number) => {
+    if (!selectedPromptName) return;
+
+    const result = await rollbackPrompt(DEFAULT_USER_ID, selectedPromptName, version);
+    if (result) {
+      // Close and reopen panel to refresh versions
+      setIsPanelOpen(false);
+      setTimeout(() => setIsPanelOpen(true), 100);
+    }
+  }, [selectedPromptName]);
+
   // Calculate layout when spans change
   const initialLayout = useMemo(
     () => calculateDAGLayout(spans),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [spanIds, spans] // spanIds needed to detect span additions/removals
+    [spanIds, spans]
   );
 
   // Convert to React Flow nodes
@@ -188,10 +263,10 @@ export default function TraceGraphClient({
         id: pos.span.span_id,
         type: "custom",
         position: { x: pos.x, y: pos.y },
-        data: { span: pos.span },
+        data: { span: pos.span, onPromptClick: handlePromptClick },
         draggable: true,
       })),
-    [initialLayout]
+    [initialLayout, handlePromptClick]
   );
 
   // Convert to React Flow edges
@@ -237,7 +312,7 @@ export default function TraceGraphClient({
   }, []);
 
   return (
-    <div className="w-full h-full">
+    <div className="w-full h-full relative">
       <ReactFlow
         key={spanIds}
         nodes={nodes}
@@ -295,6 +370,81 @@ export default function TraceGraphClient({
           maskColor="rgba(0, 0, 0, 0.05)"
         />
       </ReactFlow>
+
+      {/* Prompt Version Panel */}
+      <PromptVersionPanel
+        promptName={selectedPromptName}
+        isOpen={isPanelOpen}
+        onClose={() => {
+          setIsPanelOpen(false);
+          setSelectedPromptName(null);
+        }}
+        onView={handleViewVersion}
+        onCompare={handleCompare}
+        onRollback={handleRollback}
+      />
+
+      {/* Content Viewer Modal */}
+      {viewingContent && (
+        <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/25 backdrop-blur-sm"
+            onClick={() => setViewingContent(null)}
+          />
+          <div className="relative w-full max-w-3xl">
+            <button
+              onClick={() => setViewingContent(null)}
+              className="absolute -top-2 -right-2 z-10 p-2 bg-white border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.2)] hover:bg-black/5"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <div className="mb-3">
+              <h3 className="text-sm font-semibold text-white bg-black px-3 py-1.5 inline-block border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.2)]">
+                {viewingContent.promptName} v{viewingContent.version}
+              </h3>
+            </div>
+            <PromptContentViewer
+              content={viewingContent.content}
+              metadata={{
+                description: `Version ${viewingContent.version} of ${viewingContent.promptName}`,
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Diff Viewer Modal */}
+      {diffState && (
+        <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/25 backdrop-blur-sm"
+            onClick={() => setDiffState(null)}
+          />
+          <div className="relative w-full max-w-5xl">
+            <button
+              onClick={() => setDiffState(null)}
+              className="absolute -top-2 -right-2 z-10 p-2 bg-white border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.2)] hover:bg-black/5"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <div className="mb-3">
+              <h3 className="text-sm font-semibold text-white bg-black px-3 py-1.5 inline-block border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.2)]">
+                {`/* Comparing v${diffState.oldVersion} → v${diffState.newVersion} */`}
+              </h3>
+            </div>
+            <PromptDiffViewer
+              oldContent={diffState.oldContent}
+              newContent={diffState.newContent}
+              oldVersion={diffState.oldVersion}
+              newVersion={diffState.newVersion}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

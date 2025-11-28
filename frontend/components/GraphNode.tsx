@@ -10,11 +10,13 @@ import {
 import { Fragment, useState } from "react";
 import useSWRSubscription from "swr/subscription";
 import { Span } from "@/lib/types";
+import PromptBadge from "@/components/PromptBadge";
 
 interface GraphNodeProps {
   span: Span;
   x?: number;
   y?: number;
+  onPromptClick?: (promptName: string) => void;
 }
 
 function formatDuration(duration: number | null): string {
@@ -55,6 +57,7 @@ interface DraggableGraphNodeProps extends GraphNodeProps {
     commit: boolean
   ) => void;
   isDragging?: boolean;
+  onPromptClick?: (promptName: string) => void;
 }
 
 const getHeaderColor = (traceId: string, spanId: string) => {
@@ -89,6 +92,7 @@ export default function GraphNode({
   span,
   onDrag,
   isDragging,
+  onPromptClick,
 }: DraggableGraphNodeProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
@@ -268,6 +272,21 @@ export default function GraphNode({
               </div>
             )}
 
+            {/* Prompt Badge - only show if prompt_id exists */}
+            {currentSpan.prompt_id && (
+              <div className="mb-2">
+                <PromptBadge
+                  promptId={currentSpan.prompt_id}
+                  promptVersion={parseInt(currentSpan.prompt_version || "1", 10)}
+                  onClick={() => {
+                    if (onPromptClick && currentSpan.prompt_id) {
+                      onPromptClick(currentSpan.prompt_id);
+                    }
+                  }}
+                />
+              </div>
+            )}
+
             {/* Metrics - clean inline layout */}
             {!currentSpan.is_streaming ? (
               <div className="flex items-center gap-3 text-[10px] pt-2 border-t-2 border-black/10">
@@ -398,6 +417,20 @@ export default function GraphNode({
                         <p className="text-xs text-muted font-medium">
                           {currentSpan.llm_model}
                         </p>
+                      )}
+                      {currentSpan.prompt_id && (
+                        <div className="mt-2">
+                          <PromptBadge
+                            promptId={currentSpan.prompt_id}
+                            promptVersion={parseInt(currentSpan.prompt_version || "1", 10)}
+                            onClick={() => {
+                              setIsModalOpen(false);
+                              if (onPromptClick && currentSpan.prompt_id) {
+                                onPromptClick(currentSpan.prompt_id);
+                              }
+                            }}
+                          />
+                        </div>
                       )}
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
