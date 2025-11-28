@@ -45,5 +45,30 @@ export async function fetchPromptContent(userId: string = DEFAULT_USER_ID, promp
         console.error("Error fetching prompt content", error);
         return [];
     }
+}
 
+export async function fetchPromptDiff(userId: string = DEFAULT_USER_ID, version_number1: number, version_number2: number) {
+    const url = new URL(`${API_BASE_URL}/diff`);
+    url.searchParams.set("prompt_id1", String(version_number1));
+    url.searchParams.set("prompt_id2", String(version_number2));
+
+    try {
+        const response = await fetch(url.toString(), {
+            headers: {
+                "X-User-ID": userId,
+            },
+            cache: "no-store",
+        });
+
+        if (!response.ok) {
+        console.error(`Failed to fetch prompt diff: ${response.statusText}`);
+        return [];
+        }
+
+        const data = await response.json();
+        return data.contents || [];
+    } catch (error) {
+        console.error("Error fetching prompt differences", error);
+        return [];
+    }
 }
