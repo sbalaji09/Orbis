@@ -12,11 +12,16 @@ import asyncio
 # add parent directory to path
 sys.path.append(os.path.dirname(__file__))
 
+from prompt_api import router as prompt_router
+
 app = FastAPI(
     title="Orbis Query API",
     description="API for reading traces, spans, and metrics",
     version="1.0.0"
 )
+
+# Include the prompt router
+app.include_router(prompt_router)
 
 # CORS - allows your frontend to call this API
 app.add_middleware(

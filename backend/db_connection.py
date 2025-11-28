@@ -703,14 +703,15 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
     
-    def insert_prompt_row(self, name: str, version_number: int, s3_url: str, 
-                          agent_id: str, prompt_hash: str, content_preview: str):
+    def insert_prompt_row(self, name: str, version_number: int, s3_url: str,
+                          agent_id: str, prompt_hash: str, content_preview: str,
+                          parent_version_id: str = None):
         conn = self.get_connection()
         try:
             with conn.cursor() as cur:
                 query = """
                     INSERT INTO prompt_versions (
-                        prompt_version_id,
+                        prompt_id,
                         name,
                         version_number,
                         s3_url,
@@ -722,7 +723,7 @@ class SupabaseDB:
                         metadata,
                         parent_version_id
                     ) VALUES (
-                        gen_random_uuid(),  -- prompt_version_id
+                        gen_random_uuid(),  -- prompt_id
                         %s,                 -- name
                         %s,                 -- version_number
                         %s,                 -- s3_url
@@ -732,10 +733,10 @@ class SupabaseDB:
                         %s,                 -- prompt_hash
                         %s,                 -- content_preview
                         '{}'::jsonb,        -- metadata (empty by default)
-                        NULL                -- parent_version_id
+                        %s                  -- parent_version_id
                     )
                     RETURNING
-                        prompt_version_id,
+                        prompt_id,
                         name,
                         version_number,
                         s3_url,
@@ -750,12 +751,12 @@ class SupabaseDB:
 
                 cur.execute(
                     query,
-                    (name, version_number, s3_url, agent_id, prompt_hash, content_preview)
+                    (name, version_number, s3_url, agent_id, prompt_hash, content_preview, parent_version_id)
                 )
                 created_prompt = cur.fetchone()
                 conn.commit()
                 columns = [
-                    "prompt_version_id", "name", "version_number", "s3_url",
+                    "prompt_id", "name", "version_number", "s3_url",
                     "created_at", "is_active", "agent_id", "prompt_hash",
                     "content_preview", "metadata", "parent_version_id"
                 ]
@@ -872,7 +873,7 @@ class SupabaseDB:
         try:
             with conn.cursor() as cur:
                 query = """
-                    SELECT s3_url, agent_id, prompt_hash, content_preview, metadata, parent_version_id
+                    SELECT prompt_id, s3_url, agent_id, prompt_hash, content_preview, metadata, parent_version_id
                     FROM prompt_versions
                     WHERE name = %s
                     AND version_number = %s
@@ -882,17 +883,18 @@ class SupabaseDB:
                     (name, version_number,)
                 )
                 row = cur.fetchone()
-            
+
             if not row:
                 return None
 
             return {
-                "s3_url": row[0],
-                "agent_id": row[1],
-                "prompt_hash": row[2],
-                "content_preview": row[3],
-                "metadata": row[4],
-                "parent_version_id": row[5],
+                "prompt_id": row[0],
+                "s3_url": row[1],
+                "agent_id": row[2],
+                "prompt_hash": row[3],
+                "content_preview": row[4],
+                "metadata": row[5],
+                "parent_version_id": row[6],
             }
                 
         except Exception as e:
