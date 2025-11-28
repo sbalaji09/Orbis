@@ -85,7 +85,8 @@ async def rollback_prompt(name: str, version_number: int):
     try:
         prompt_rollback = db.get_prompt_version(name, version_number)
         db.deactivate_version(name, version_number)
-        new_version = db.insert_prompt_row(name, version_number, prompt_rollback["s3_url"], prompt_rollback["agent_id"],
+        prompt_version_number = db.max_version_prompt_number(name)
+        new_version = db.insert_prompt_row(name, prompt_version_number + 1, prompt_rollback["s3_url"], prompt_rollback["agent_id"],
                              prompt_rollback["prompt_hash"], prompt_rollback["content_preview"])
         return {
             "name": name,

@@ -686,11 +686,9 @@ class SupabaseDB:
         try:
             with conn.cursor() as cur:
                 query = """
-                    SELECT COALESCE(MAX(version_number), 0) + 1
-                    INTO next_version
-                    FROM prompt_versions
+                    SELECT COALESCE(MAX(version_number), 0) + 1 
+                    FROM prompt_versions 
                     WHERE name = %s
-                    RETURN next_version
                 """
 
                 cur.execute(query, (
@@ -804,19 +802,19 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
         
-    def get_s3url_by_prompt_id(self, prompt_id: str, version_number:int=None) -> List[Dict]:
+    def get_s3url_by_prompt_id(self, name: str, version_number:int=None) -> List[Dict]:
         conn = self.get_connection()
         try:
             with conn.cursor() as cur:
                 if version_number:
                     query = """
                         SELECT s3_url FROM prompt_versions
-                        WHERE prompt_id = %s
+                        WHERE name = %s
                         AND version_number = %s
                     """
                     cur.execute(
                         query,
-                        (prompt_id, version_number)
+                        (name, version_number)
                     )
                     result = cur.fetchone()
                     conn.commit()
@@ -828,7 +826,7 @@ class SupabaseDB:
                     """
                     cur.execute(
                         query,
-                        (prompt_id)
+                        (name)
                     )
                     result = cur.fetchone()
                     conn.commit()
@@ -889,13 +887,12 @@ class SupabaseDB:
                 return None
 
             return {
-                "id": row[0],
-                "s3_url": row[1],
-                "agent_id": row[2],
-                "prompt_hash": row[3],
-                "content_preview": row[4],
-                "metadata": row[5],
-                "parent_version_id": row[6],
+                "s3_url": row[0],
+                "agent_id": row[1],
+                "prompt_hash": row[2],
+                "content_preview": row[3],
+                "metadata": row[4],
+                "parent_version_id": row[5],
             }
                 
         except Exception as e:
