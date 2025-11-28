@@ -1,5 +1,32 @@
+import { PromptFamily } from "./types";
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const DEFAULT_USER_ID = "00000000-0000-0000-0000-000000000000"; // In production, get from auth/session
+
+export async function fetchPromptFamilies(
+  userId: string = DEFAULT_USER_ID,
+  agentId: string
+): Promise<PromptFamily[]> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/prompts/agent/${agentId}`, {
+      headers: {
+        "X-User-ID": userId,
+      },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      console.error(`Failed to fetch prompt families: ${response.statusText}`);
+      return [];
+    }
+
+    const data = await response.json();
+    return data || [];
+  } catch (error) {
+    console.error("Error fetching prompt families:", error);
+    return [];
+  }
+}
 
 export async function fetchPromptVersions(
     userId: string = DEFAULT_USER_ID,
