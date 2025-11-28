@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { Copy, ClipboardCheck } from 'lucide-react';
 
 interface PromptContentViewerProps {
   content: string;
@@ -25,42 +24,55 @@ export default function PromptContentViewer({
   };
 
   return (
-    <div className={`bg-white rounded-lg shadow-sm border border-gray-200 ${className}`}>
-      {/* Metadata */}
+    <div className={`bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] ${className}`}>
+      {/* Metadata Header */}
       {metadata && (
-        <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 rounded-t-lg">
+        <div className="px-6 py-4 border-b-2 border-black/10 bg-background">
+          <h4 className="text-xs font-semibold text-black/40 uppercase tracking-wide mb-2">
+            {`/* Metadata */`}
+          </h4>
           {metadata.author && (
-            <div className="flex items-center text-sm text-gray-600 mb-1">
-              <span className="font-medium text-gray-900 mr-2">Author:</span>
-              {metadata.author}
+            <div className="flex items-center text-[11px] text-black/60 mb-1">
+              <span className="font-medium w-20">{`// Author`}</span>
+              <span className="font-mono">{metadata.author}</span>
             </div>
           )}
           {metadata.description && (
-            <p className="text-sm text-gray-600 line-clamp-2">{metadata.description}</p>
+            <div className="flex items-start text-[11px] text-black/60 mb-1">
+              <span className="font-medium w-20 shrink-0">{`// Desc`}</span>
+              <span className="line-clamp-2">{metadata.description}</span>
+            </div>
           )}
           {metadata.created_at && (
-            <p className="text-xs text-gray-500 mt-2">
-              Created: {new Date(metadata.created_at).toLocaleDateString()}
-            </p>
+            <div className="flex items-center text-[11px] text-black/60">
+              <span className="font-medium w-20">{`// Created`}</span>
+              <span className="font-mono">{new Date(metadata.created_at).toLocaleDateString()}</span>
+            </div>
           )}
         </div>
       )}
 
-      {/* Scrollable Content + Copy Button */}
+      {/* Content */}
       <div className="p-6 max-h-96 overflow-y-auto">
         <div className="relative">
-          <pre className="bg-gray-50 p-4 rounded-lg text-xs font-mono whitespace-pre-wrap">
-            <e>{content}</code>
+          <pre className="bg-background p-4 border-2 border-black/10 text-xs font-mono whitespace-pre-wrap text-foreground/80 leading-relaxed">
+            <code>{content}</code>
           </pre>
           <button
             onClick={copyToClipboard}
-            className="absolute top-3 right-3 p-2 rounded-lg bg-white border hover:bg-gray-50 transition-all shadow-sm flex items-center gap-1"
+            className={`absolute top-3 right-3 p-2 border-2 border-black transition-all shadow-[2px_2px_0_rgba(0,0,0,0.1)] hover:shadow-[3px_3px_0_rgba(0,0,0,0.15)] ${
+              copied ? 'bg-success text-white border-success' : 'bg-white hover:bg-mustard/10'
+            }`}
             title="Copy to clipboard"
           >
             {copied ? (
-              <ClipboardCheck className="w-4 h-4 text-green-600" />
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
             ) : (
-              <Copy className="w-4 h-4 text-gray-500" />
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
             )}
           </button>
         </div>
