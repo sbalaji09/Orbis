@@ -776,7 +776,7 @@ class SupabaseDB:
                     SELECT * from prompt_versions
                     WHERE agent_id = %s
                 """
-                cur.execute(query, (agent_id))
+                cur.execute(query, (agent_id,))
                 rows = cur.fetchall()
 
             prompts = [dict(row) for row in rows]
