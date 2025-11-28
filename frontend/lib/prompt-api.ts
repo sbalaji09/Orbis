@@ -24,3 +24,26 @@ export async function fetchPromptVersions(
         return [];
     }
 }
+
+export async function fetchPromptContent(userId: string = DEFAULT_USER_ID, prompt_name: string, versionId: number) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/${prompt_name}/${versionId}`, {
+            headers: {
+              "X-User-ID": userId,
+            },
+            cache: "no-store",
+        });
+
+        if (!response.ok) {
+            console.error(`Failed to fetch prompt versions: ${response.statusText}`);
+            return [];
+        }
+
+        const data = await response.json();
+        return data.contents || [];
+    } catch (error) {
+        console.error("Error fetching prompt content", error);
+        return [];
+    }
+
+}

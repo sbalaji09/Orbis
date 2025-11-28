@@ -65,7 +65,7 @@ async def get_prompt_content(name: str, version_number: int | None = None):
     try:
         s3_url = db.get_s3url_by_prompt_id(name, version_number)
         content = download_prompt_from_s3(s3_url)
-        return {"Content": content}
+        return {"content": content}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
