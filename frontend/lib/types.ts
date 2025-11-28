@@ -42,4 +42,17 @@ export interface Span {
   is_streaming: boolean;
   time_to_first_token: number | null;
   tokens_per_second: number | null;
+  prompt_id: string | null;
+  prompt_version: string | null;
+  prompt_hash: string | null;
+}
+
+export interface PromptVersion {
+  prompt_version_id: string;
+  name: string;
+  version_number: number;
+  content_preview: string;
+  created_at: Date;
+  is_active: string;
+  metadata: JSON;
 }
