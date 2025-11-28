@@ -9,7 +9,7 @@ router = APIRouter(
     tags=["prompts"]
 )
 
-@router.post("")
+@router.post("/prompts")
 async def create_prompt(agent_id: str, name: str, content: str):
     # generate hash for content
     content_hash = compute_hash_sha256(content)
@@ -56,7 +56,7 @@ async def get_prompt_by_agent_id(agent_id: str):
 async def get_version_numbers(name: str):
     try:
         prompt_versions = db.get_prompts_versions(name)
-        return prompt_versions
+        return {"versions": prompt_versions}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
