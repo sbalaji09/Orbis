@@ -56,3 +56,10 @@ export interface PromptVersion {
   is_active: string;
   metadata: JSON;
 }
+
+export interface PromptFamily {
+  name: string;
+  agent_id: string;
+  versions: PromptVersion[];
+  total_traces: number;
+}
