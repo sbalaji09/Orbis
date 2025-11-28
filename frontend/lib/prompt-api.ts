@@ -72,3 +72,25 @@ export async function fetchPromptDiff(userId: string = DEFAULT_USER_ID, version_
         return [];
     }
 }
+
+export async function rollbackPrompt(userId: string = DEFAULT_USER_ID, name: string) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/${name}/rollback`, {
+            headers: {
+              "X-User-ID": userId,
+            },
+            cache: "no-store",
+        });
+
+        if (!response.ok) {
+            console.error(`Failed to fetch prompt versions: ${response.statusText}`);
+            return [];
+        }
+
+        const data = await response.json();
+        return data.contents || [];
+    } catch (error) {
+        console.error("Error fetching prompt content", error);
+        return [];
+    }
+}
