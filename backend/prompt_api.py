@@ -100,7 +100,7 @@ async def analytics_query(prompt_id: str, user_id: str = Header(..., alias="X-Us
         traces_per_prompt_version = db.get_traces_per_prompt_version(prompt_id)
         average_cost_per_version = db.average_cost_per_version(prompt_id)
         average_latency_per_version = db.average_latency_per_version(prompt_id)
-        error_rate_per_version = ...
+        error_rate_per_version = db.error_rate_per_version(prompt_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
