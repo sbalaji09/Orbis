@@ -916,13 +916,36 @@ class SupabaseDB:
                     query,
                     (name, version_number)
                 )
-                row = cur.fetchone()
             return "sucessful"
         except Exception as e:
             raise Exception(f"Failed to get all prompt versions")
         finally:
             self.return_connection(conn)
     
+    def get_traces_per_prompt_version(self, prompt_id: str) -> List[Dict[str, Any]]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                query = """
+                    SELECT
+                        pv.prompt_id,
+                        pv.name,
+                        pv.version_number,
+                        COUNT(DISTINCT s.trace_id) AS trace_count
+                    FROM prompt_versions pv
+                    LEFT JOIN spans s ON s.prompt_id = pv.prompt_id
+                    GROUP BY pv.prompt_id, pv.name, pv.version_number
+                    ORDER BY pv.name, pv.version_number;
+                """
+
+                cur.execute(query, (prompt_id))
+                rows = cur.fetchall()
+            
+            return [dict(r) for r in rows]
+        except Exception as e:
+            raise Exception(f"Failed to get traces per prompt version")
+        finally:
+            self.return_connection(conn)
     # closes all the connections in the pool
     def close(self):
         self.pool.closeall()
