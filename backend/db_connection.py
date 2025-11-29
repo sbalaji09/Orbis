@@ -922,61 +922,11 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
     
-    def get_traces_per_prompt_version(self, prompt_id: str) -> List[Dict[str, Any]]:
-        conn = self.get_connection()
-        try:
-            with conn.cursor() as cur:
-                query = """
-                    SELECT
-                        pv.prompt_id,
-                        pv.name,
-                        pv.version_number,
-                        COUNT(DISTINCT s.trace_id) AS trace_count
-                    FROM prompt_versions pv
-                    LEFT JOIN spans s ON s.prompt_id = pv.prompt_id
-                    GROUP BY pv.prompt_id, pv.name, pv.version_number
-                    ORDER BY pv.name, pv.version_number;
-                """
-
-                cur.execute(query, (prompt_id))
-                rows = cur.fetchall()
-            
-            return [dict(r) for r in rows]
-        except Exception as e:
-            raise Exception(f"Failed to get traces per prompt version")
-        finally:
-            self.return_connection(conn)
-    
-    def average_cost_per_version(self, prompt_id: str) -> List[Dict[str, Any]]:
-        conn = self.get_connection()
-        try:
-            with conn.cursor() as cur:
-                query = """
-                    SELECT
-                        pv.prompt_id,
-                        pv.name,
-                        pv.version_number,
-                        AVG(s.cost) AS avg_cost
-                    FROM prompt_versions pv
-                    LEFT JOIN spans s ON s.prompt_id = pv.prompt_id
-                    GROUP BY
-                        pv.prompt_id,
-                        pv.name,
-                        pv.version_number
-                    ORDER BY
-                        pv.name,
-                        pv.version_number;
-                """
-                cur.execute(query, (prompt_id))
-                rows = cur.fetchall()
-            
-            return [dict(r) for r in rows]
-        except Exception as e:
-            raise Exception(f"Failed to get average cost per version")
-        finally:
-            self.return_connection(conn)
-
-    def average_latency_per_version(self, prompt_id: str) -> List[Dict[str, Any]]:
+    def get_prompt_analytics(self, prompt_name: str) -> List[Dict[str, Any]]:
+        """
+        Get consolidated analytics for all versions of a prompt family.
+        Returns trace count, avg cost, avg latency, and error rate per version.
+        """
         conn = self.get_connection()
         try:
             with conn.cursor() as cur:
@@ -986,57 +936,25 @@ class SupabaseDB:
                         pv.name,
                         pv.version_number,
                         COUNT(DISTINCT s.trace_id) AS trace_count,
-                        AVG(s.cost)                 AS avg_cost
-                    FROM prompt_versions pv
-                    LEFT JOIN spans s ON s.prompt_id = pv.prompt_id
-                    GROUP BY
-                        pv.prompt_id,
-                        pv.name,
-                        pv.version_number
-                    ORDER BY
-                        pv.name,
-                        pv.version_number;
-                """
-                cur.execute(query, (prompt_id))
-                rows = cur.fetchall()
-            
-            return [dict(r) for r in rows]
-        except Exception as e:
-            raise Exception(f"Failed to get average latency per version")
-        finally:
-            self.return_connection(conn)
-    
-    def error_rate_per_version(self, prompt_id: str) -> List[Dict[str, any]]:
-        conn = self.get_connection()
-        try:
-            with conn.cursor() as cur:
-                query = """
-                    SELECT
-                        pv.prompt_id,
-                        pv.name,
-                        pv.version_number,
-                        COUNT(DISTINCT s.trace_id) AS trace_count,
-                        COUNT(DISTINCT CASE WHEN s.error IS NOT NULL THEN s.trace_id END) AS error_traces,
+                        COALESCE(AVG(s.cost), 0) AS avg_cost,
+                        COALESCE(AVG(s.duration), 0) AS avg_latency,
+                        COUNT(DISTINCT CASE WHEN s.error_message IS NOT NULL THEN s.trace_id END) AS error_traces,
                         ROUND(
-                            COUNT(DISTINCT CASE WHEN s.error IS NOT NULL THEN s.trace_id END)::FLOAT 
+                            COUNT(DISTINCT CASE WHEN s.error_message IS NOT NULL THEN s.trace_id END)::FLOAT
                             / NULLIF(COUNT(DISTINCT s.trace_id), 0) * 100, 2
                         ) AS error_rate_pct
                     FROM prompt_versions pv
                     LEFT JOIN spans s ON s.prompt_id = pv.prompt_id
-                    GROUP BY
-                        pv.prompt_id,
-                        pv.name,
-                        pv.version_number
-                    ORDER BY
-                        pv.name,
-                        pv.version_number;
+                    WHERE pv.name = %s
+                    GROUP BY pv.prompt_id, pv.name, pv.version_number
+                    ORDER BY pv.version_number DESC;
                 """
-                cur.execute(query, (prompt_id))
+                cur.execute(query, (prompt_name,))
                 rows = cur.fetchall()
-            
+
             return [dict(r) for r in rows]
         except Exception as e:
-            raise Exception(f"Failed to get error rate per version")
+            raise Exception(f"Failed to get prompt analytics: {e}")
         finally:
             self.return_connection(conn)
     # closes all the connections in the pool

@@ -1,6 +1,6 @@
 import os
 from db_connection import db
-from fastapi import FastAPI, HTTPException, Query, Header
+from fastapi import APIRouter, HTTPException, Header
 from s3connect import *
 import hashlib
 
@@ -94,13 +94,12 @@ async def rollback_prompt(name: str, version_number: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/analytics")
-async def analytics_query(prompt_id: str, user_id: str = Header(..., alias="X-User-ID")):
+@router.get("/analytics/{prompt_name}")
+async def get_prompt_analytics(prompt_name: str, user_id: str = Header(..., alias="X-User-ID")):
+    """Get analytics for all versions of a prompt family (by name)."""
     try:
-        traces_per_prompt_version = db.get_traces_per_prompt_version(prompt_id)
-        average_cost_per_version = db.average_cost_per_version(prompt_id)
-        average_latency_per_version = db.average_latency_per_version(prompt_id)
-        error_rate_per_version = db.error_rate_per_version(prompt_id)
+        analytics = db.get_prompt_analytics(prompt_name)
+        return {"prompt_name": prompt_name, "versions": analytics}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
