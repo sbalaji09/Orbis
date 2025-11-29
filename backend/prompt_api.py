@@ -1,6 +1,6 @@
 import os
 from db_connection import db
-from fastapi import APIRouter, HTTPException
+from fastapi import FastAPI, HTTPException, Query, Header
 from s3connect import *
 import hashlib
 
@@ -94,6 +94,15 @@ async def rollback_prompt(name: str, version_number: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.post("/analytics")
+async def analytics_query(user_id: str = Header(..., alias="X-User-ID")):
+    try:
+        traces_per_prompt_version = ...
+        average_cost_per_version = ...
+        average_latency_per_version = ...
+        error_rate_per_version = ...
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 def compute_hash_sha256(content: str) -> str:
     hash_object = hashlib.sha256(content.encode("utf-8"))

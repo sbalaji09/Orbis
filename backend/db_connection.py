@@ -922,6 +922,7 @@ class SupabaseDB:
             raise Exception(f"Failed to get all prompt versions")
         finally:
             self.return_connection(conn)
+    
     # closes all the connections in the pool
     def close(self):
         self.pool.closeall()
