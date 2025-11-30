@@ -1038,6 +1038,25 @@ class SupabaseDB:
             raise Exception(f"Failed to get prompt analytics: {e}")
         finally:
             self.return_connection(conn)
+    
+    def get_output_preview(self, prompt_id: str) -> List[Dict[str, Any]]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                query = """
+                    SELECT output_preview
+                    FROM spans
+                    WHERE prompt_id = %s
+                """
+                cur.execute(query, (prompt_id,))
+                row = cur.fetchone()
+            
+            return row
+        except Exception as e:
+            raise Exception(f"Failed to get prompt analytics: {e}")
+        finally:
+            self.return_connection(conn)
+        
     # closes all the connections in the pool
     def close(self):
         self.pool.closeall()

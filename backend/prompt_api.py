@@ -114,10 +114,13 @@ async def get_prompt_analytics(prompt_name: str):
 @router.get("/prompts/compare")
 async def compare_prompt_analytics(prompt_id1: str, prompt_id2: str):
     try:
-        content1 = db.get_content_by_promptid(prompt_id1)
-        content2 = db.get_content_by_promptid(prompt_id2)
+        s3_url1 = db.get_content_by_promptid(prompt_id1)
+        s3_url2 = db.get_content_by_promptid(prompt_id2)
 
-        analytics = db.get_prompt_analytics_for_versions
+        analytics = db.get_prompt_analytics_for_prompt_ids(prompt_id1, prompt_id2)
+        
+
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 def compute_hash_sha256(content: str) -> str:
