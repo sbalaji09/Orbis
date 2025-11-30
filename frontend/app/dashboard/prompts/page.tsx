@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { fetchPromptFamilies, PromptFamily } from '@/lib/prompt-api';
 import PromptBadge from '@/components/PromptBadge';
@@ -270,36 +270,119 @@ export default function PromptsPage() {
 
         {/* Empty state */}
         {filteredFamilies.length === 0 && (
-          <div className="px-6 py-12 text-center">
+          <div className="px-6 py-16 text-center">
             {families.length === 0 ? (
+              <div className="max-w-md mx-auto">
+                {/* Icon */}
+                <div className="w-16 h-16 mx-auto mb-6 bg-babyblue/10 border-2 border-babyblue/30 flex items-center justify-center">
+                  <svg
+                    className="w-8 h-8 text-babyblue"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                </div>
+
+                {/* Title */}
+                <h3 className="text-lg font-semibold text-foreground mb-2">
+                  No prompts tracked yet
+                </h3>
+                <p className="text-sm text-muted mb-6">
+                  Start tracking your prompts to compare versions, analyze performance, and rollback when needed.
+                </p>
+
+                {/* How to add prompts */}
+                <div className="bg-background border-2 border-black/10 p-4 text-left mb-6">
+                  <h4 className="text-xs font-semibold text-black/60 uppercase tracking-wide mb-3">
+                    {`/* How to add prompt versioning */`}
+                  </h4>
+                  <div className="space-y-3">
+                    <div className="flex gap-3">
+                      <span className="flex-shrink-0 w-5 h-5 bg-babyblue text-white text-[10px] font-bold flex items-center justify-center">
+                        1
+                      </span>
+                      <p className="text-xs text-foreground/80">
+                        Install the Orbis SDK in your project
+                      </p>
+                    </div>
+                    <div className="flex gap-3">
+                      <span className="flex-shrink-0 w-5 h-5 bg-babyblue text-white text-[10px] font-bold flex items-center justify-center">
+                        2
+                      </span>
+                      <p className="text-xs text-foreground/80">
+                        Wrap your LLM calls with the Orbis tracer
+                      </p>
+                    </div>
+                    <div className="flex gap-3">
+                      <span className="flex-shrink-0 w-5 h-5 bg-babyblue text-white text-[10px] font-bold flex items-center justify-center">
+                        3
+                      </span>
+                      <p className="text-xs text-foreground/80">
+                        Add a <code className="px-1 py-0.5 bg-black/5 font-mono text-[10px]">prompt_name</code> parameter to track versions automatically
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Code example */}
+                  <div className="mt-4 bg-[#1e1e1e] p-3 overflow-x-auto">
+                    <pre className="text-[10px] font-mono text-white/90 leading-relaxed">
+{`from orbis import trace
+
+@trace(prompt_name="my-prompt")
+def generate_response(user_input):
+    return openai.chat.completions.create(
+        model="gpt-4",
+        messages=[{"role": "user", "content": user_input}]
+    )`}
+                    </pre>
+                  </div>
+                </div>
+
+                {/* Documentation link */}
+                <a
+                  href="https://docs.orbis.dev/sdk/prompt-versioning"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold uppercase tracking-wide border-2 border-babyblue bg-babyblue text-white hover:bg-babyblue/90 transition-colors shadow-[3px_3px_0_rgba(0,0,0,0.15)]"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                  </svg>
+                  View SDK Documentation
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                </a>
+              </div>
+            ) : (
               <div className="text-muted">
                 <svg
-                  className="w-12 h-12 mx-auto mb-4 text-black/20"
+                  className="w-10 h-10 mx-auto mb-3 text-black/20"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                  />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
-                <p className="text-sm font-medium">No prompts yet</p>
-                <p className="text-xs mt-1">Prompts will appear here when they are used in traces.</p>
-              </div>
-            ) : (
-              <div className="text-muted">
-                <p className="text-sm">No prompts match your filters</p>
+                <p className="text-sm font-medium">No prompts match your filters</p>
+                <p className="text-xs text-black/40 mt-1 mb-3">
+                  Try adjusting your search or filter criteria
+                </p>
                 <button
                   onClick={() => {
                     setSearchQuery('');
                     setSelectedAgent('all');
                   }}
-                  className="mt-2 text-xs text-babyblue hover:underline"
+                  className="px-3 py-1.5 text-xs font-semibold border-2 border-black bg-white hover:bg-black/5 transition-colors shadow-[2px_2px_0_rgba(0,0,0,0.1)]"
                 >
-                  Clear filters
+                  Clear all filters
                 </button>
               </div>
             )}
