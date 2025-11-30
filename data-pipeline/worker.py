@@ -285,7 +285,10 @@ class SpanWorker:
             "error_message": span.get('error_message'),
             "is_streaming": span.get('is_streaming', False),
             "time_to_first_token": span.get('time_to_first_token'),
-            "tokens_per_second": span.get('tokens_per_second')
+            "tokens_per_second": span.get('tokens_per_second'),
+            "prompt_id": span.get('prompt_id'),
+            "prompt_version": span.get('prompt_version'),
+            "prompt_hash": span.get('prompt_hash')
         }
         
         return prepared_data

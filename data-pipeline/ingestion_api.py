@@ -40,7 +40,7 @@ class SpanIn(BaseModel):
 
     # 🆕 new fields
     prompt_id: Optional[str] = None
-    prompt_version: Optional[int] = None
+    prompt_version: Optional[str] = None
     prompt_hash: Optional[str] = None
 
 
@@ -186,6 +186,10 @@ def validate_span(span: SpanIn) -> bool:
         
         # Streaming fields are optional
         if attr_name in ('is_streaming', 'time_to_first_token', 'tokens_per_second'):
+            continue
+        
+        # Prompt versioning fields are optional
+        if attr_name in ('prompt_id', 'prompt_version', 'prompt_hash'):
             continue
 
         if attr_value is None:
