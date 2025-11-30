@@ -1039,19 +1039,23 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
     
-    def get_output_preview(self, prompt_id: str) -> List[Dict[str, Any]]:
+    def get_output_preview(self, prompt_id: str, limit: int = 5) -> List[Dict[str, Any]]:
         conn = self.get_connection()
         try:
             with conn.cursor() as cur:
                 query = """
-                    SELECT output_preview
+                    SELECT output_preview, output_blob_url, cost, duration, error_message
                     FROM spans
                     WHERE prompt_id = %s
+                    AND output_preview IS NOT NULL
+                    ORDER BY start_time DESC
+                    LIMIT %s
                 """
-                cur.execute(query, (prompt_id,))
-                row = cur.fetchall()
+                cur.execute(query, (prompt_id, limit))
+                rows = cur.fetchall()
             
-            return row
+            col_names = [desc[0] for desc in cur.description]
+            return [dict(zip(col_names, row)) for row in rows]
         except Exception as e:
             raise Exception(f"Failed to get prompt analytics: {e}")
         finally:
