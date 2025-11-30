@@ -1005,7 +1005,7 @@ class SupabaseDB:
             self.return_connection(conn)
     
     # gets analytics for two versions of a prompt
-    def get_prompt_analytics_for_versions(self, prompt_name: str, version1: int, version2: int) -> List[Dict[str, Any]]:
+    def get_prompt_analytics_for_prompt_ids(self, prompt_id1: str, prompt_id2: str) -> List[Dict[str, Any]]:
         conn = self.get_connection()
         try:
             with conn.cursor() as cur:
@@ -1024,14 +1024,14 @@ class SupabaseDB:
                         ) AS error_rate_pct
                     FROM prompt_versions pv
                     LEFT JOIN spans s ON s.prompt_id = pv.prompt_id
-                    WHERE pv.name = %s
-                    AND pv.version_number IN (%s, %s)
+                    WHERE pv.prompt_id IN (%s, %s)
                     GROUP BY pv.prompt_id, pv.name, pv.version_number
                     ORDER BY pv.version_number DESC;
                 """
-                cur.execute(query, (prompt_name, version1, version2))
+                cur.execute(query, (prompt_id1, prompt_id2))
                 rows = cur.fetchall()
 
+            # Convert rows to dicts using cursor description
             col_names = [desc[0] for desc in cur.description]
             return [dict(zip(col_names, row)) for row in rows]
         except Exception as e:

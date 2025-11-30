@@ -117,7 +117,7 @@ async def compare_prompt_analytics(prompt_id1: str, prompt_id2: str):
         content1 = db.get_content_by_promptid(prompt_id1)
         content2 = db.get_content_by_promptid(prompt_id2)
 
-        analytics = get_prompt_analytics()
+        analytics = db.get_prompt_analytics_for_versions
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 def compute_hash_sha256(content: str) -> str:
