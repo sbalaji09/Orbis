@@ -831,7 +831,7 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
         
-    def get_s3url_by_prompt_id(self, name: str, version_number:int=None) -> List[Dict]:
+    def get_s3url_prompt(self, name: str, version_number:int=None) -> List[Dict]:
         conn = self.get_connection()
         try:
             with conn.cursor() as cur:
@@ -981,6 +981,24 @@ class SupabaseDB:
                 rows = cur.fetchall()
 
             return [dict(r) for r in rows]
+        except Exception as e:
+            raise Exception(f"Failed to get prompt analytics: {e}")
+        finally:
+            self.return_connection(conn)
+    
+    def get_content_by_promptid(self, prompt_id: str) -> List[Dict[str]]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                query = """
+                    SELECT s3_url
+                    FROM prompt_versions
+                    WHERE prompt_id = %s
+                """
+                cur.execute(query, (prompt_id,))
+                row = cur.fetchone()
+            
+            return row
         except Exception as e:
             raise Exception(f"Failed to get prompt analytics: {e}")
         finally:

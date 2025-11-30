@@ -72,7 +72,7 @@ async def get_version_numbers(name: str):
 @router.get("/{name}/content")
 async def get_prompt_content(name: str, version_number: int | None = None):
     try:
-        s3_url = db.get_s3url_by_prompt_id(name, version_number)
+        s3_url = db.get_s3url_prompt(name, version_number)
         content = download_prompt_from_s3(s3_url)
         return {"content": content}
     except Exception as e:
@@ -112,6 +112,13 @@ async def get_prompt_analytics(prompt_name: str, user_id: str = Header(..., alia
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/prompts/compare")
+async def compare_prompt_analytics(prompt_id1: str, prompt_id2: str):
+    try:
+        content1 = db.get_content_by_promptid(prompt_id1)
+        content2 = db.get_content_by_promptid(prompt_id2)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 def compute_hash_sha256(content: str) -> str:
     hash_object = hashlib.sha256(content.encode("utf-8"))
     return hash_object.hexdigest()
