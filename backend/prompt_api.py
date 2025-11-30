@@ -104,8 +104,7 @@ async def rollback_prompt(name: str, version_number: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/analytics/{prompt_name}")
-async def get_prompt_analytics(prompt_name: str, user_id: str = Header(..., alias="X-User-ID")):
-    """Get analytics for all versions of a prompt family (by name)."""
+async def get_prompt_analytics(prompt_name: str):
     try:
         analytics = db.get_prompt_analytics(prompt_name)
         return {"prompt_name": prompt_name, "versions": analytics}
@@ -117,6 +116,8 @@ async def compare_prompt_analytics(prompt_id1: str, prompt_id2: str):
     try:
         content1 = db.get_content_by_promptid(prompt_id1)
         content2 = db.get_content_by_promptid(prompt_id2)
+
+        analytics = get_prompt_analytics()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 def compute_hash_sha256(content: str) -> str:
