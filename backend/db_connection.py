@@ -986,7 +986,7 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
     
-    def get_content_by_promptid(self, prompt_id: str) -> tuple:
+    def get_content_by_promptid(self, prompt_id: str) -> tuple | None:
         conn = self.get_connection()
         try:
             with conn.cursor() as cur:
