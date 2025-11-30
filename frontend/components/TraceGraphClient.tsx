@@ -160,10 +160,10 @@ export default function TraceGraphClient({
 
   // Diff viewer state
   const [diffState, setDiffState] = useState<{
-    oldContent: string;
-    newContent: string;
+    promptName: string;
     oldVersion: number;
     newVersion: number;
+    diff: string;
   } | null>(null);
 
   // Fetch spans with SWR for real-time updates (polls every 2 seconds)
@@ -228,11 +228,29 @@ export default function TraceGraphClient({
     ]);
 
     if (content1 && content2) {
+      // Create a simple unified diff format
+      const lines1 = (content1 as string).split('\n');
+      const lines2 = (content2 as string).split('\n');
+      const diffLines: string[] = [];
+
+      // Simple line-by-line comparison
+      const maxLen = Math.max(lines1.length, lines2.length);
+      for (let i = 0; i < maxLen; i++) {
+        const line1 = lines1[i];
+        const line2 = lines2[i];
+        if (line1 === line2) {
+          diffLines.push(` ${line1 || ''}`);
+        } else {
+          if (line1 !== undefined) diffLines.push(`-${line1}`);
+          if (line2 !== undefined) diffLines.push(`+${line2}`);
+        }
+      }
+
       setDiffState({
-        oldContent: content1,
-        newContent: content2,
+        promptName: selectedPromptName,
         oldVersion: version1,
         newVersion: version2,
+        diff: diffLines.join('\n'),
       });
     }
   }, [selectedPromptName]);
@@ -385,66 +403,23 @@ export default function TraceGraphClient({
       />
 
       {/* Content Viewer Modal */}
-      {viewingContent && (
-        <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-black/25 backdrop-blur-sm"
-            onClick={() => setViewingContent(null)}
-          />
-          <div className="relative w-full max-w-3xl">
-            <button
-              onClick={() => setViewingContent(null)}
-              className="absolute -top-2 -right-2 z-10 p-2 bg-white border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.2)] hover:bg-black/5"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-            <div className="mb-3">
-              <h3 className="text-sm font-semibold text-white bg-black px-3 py-1.5 inline-block border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.2)]">
-                {viewingContent.promptName} v{viewingContent.version}
-              </h3>
-            </div>
-            <PromptContentViewer
-              content={viewingContent.content}
-              metadata={{
-                description: `Version ${viewingContent.version} of ${viewingContent.promptName}`,
-              }}
-            />
-          </div>
-        </div>
-      )}
+      <PromptContentViewer
+        isOpen={!!viewingContent}
+        onClose={() => setViewingContent(null)}
+        promptName={viewingContent?.promptName || ''}
+        versionNumber={viewingContent?.version || 0}
+        content={viewingContent?.content || ''}
+      />
 
       {/* Diff Viewer Modal */}
-      {diffState && (
-        <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-black/25 backdrop-blur-sm"
-            onClick={() => setDiffState(null)}
-          />
-          <div className="relative w-full max-w-5xl">
-            <button
-              onClick={() => setDiffState(null)}
-              className="absolute -top-2 -right-2 z-10 p-2 bg-white border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.2)] hover:bg-black/5"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-            <div className="mb-3">
-              <h3 className="text-sm font-semibold text-white bg-black px-3 py-1.5 inline-block border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.2)]">
-                {`/* Comparing v${diffState.oldVersion} → v${diffState.newVersion} */`}
-              </h3>
-            </div>
-            <PromptDiffViewer
-              oldContent={diffState.oldContent}
-              newContent={diffState.newContent}
-              oldVersion={diffState.oldVersion}
-              newVersion={diffState.newVersion}
-            />
-          </div>
-        </div>
-      )}
+      <PromptDiffViewer
+        isOpen={!!diffState}
+        onClose={() => setDiffState(null)}
+        promptName={diffState?.promptName || ''}
+        version1={diffState?.oldVersion || 0}
+        version2={diffState?.newVersion || 0}
+        diff={diffState?.diff || ''}
+      />
     </div>
   );
 }
