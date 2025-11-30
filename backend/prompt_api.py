@@ -3,6 +3,7 @@ from db_connection import db
 from fastapi import APIRouter, HTTPException, Header
 from s3connect import *
 import hashlib
+from llm_service import get_llm_comparison_analysis
 
 router = APIRouter(
     prefix="/prompts",
@@ -72,7 +73,7 @@ async def get_version_numbers(name: str):
 @router.get("/{name}/content")
 async def get_prompt_content(name: str, version_number: int | None = None):
     try:
-        s3_url = db.get_s3url_by_prompt_id(name, version_number)
+        s3_url = db.get_s3url_prompt(name, version_number)
         content = download_prompt_from_s3(s3_url)
         return {"content": content}
     except Exception as e:
@@ -104,14 +105,69 @@ async def rollback_prompt(name: str, version_number: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/analytics/{prompt_name}")
-async def get_prompt_analytics(prompt_name: str, user_id: str = Header(..., alias="X-User-ID")):
-    """Get analytics for all versions of a prompt family (by name)."""
+async def get_prompt_analytics(prompt_name: str):
     try:
         analytics = db.get_prompt_analytics(prompt_name)
         return {"prompt_name": prompt_name, "versions": analytics}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/compare")
+async def compare_prompt_analytics(prompt_id1: str, prompt_id2: str):
+    try:
+        # get the s3 urls and their content
+        s3_url1 = db.get_content_by_promptid(prompt_id1)
+        s3_url2 = db.get_content_by_promptid(prompt_id2)
+
+        prompt1_content = download_prompt_from_s3(s3_url1[0])  # s3_url1 is a tuple
+        prompt2_content = download_prompt_from_s3(s3_url2[0])
+
+        # get analytics for both prompts
+        analytics_list = db.get_prompt_analytics_for_prompt_ids(prompt_id1, prompt_id2)
+        analytics1 = next((a for a in analytics_list if str(a['prompt_id']) == prompt_id1), {})
+        analytics2 = next((a for a in analytics_list if str(a['prompt_id']) == prompt_id2), {})
+
+        # get sample outputs for each version
+        outputs1 = db.get_output_preview(prompt_id1, limit=5)
+        outputs2 = db.get_output_preview(prompt_id2, limit=5)
+
+        output_texts1 = [o['output_preview'] for o in outputs1 if o['output_preview']]
+        output_texts2 = [o['output_preview'] for o in outputs2 if o['output_preview']]
+
+        # generate text differences
+        diff_result = prompt_diff(prompt1_content, prompt_id1, prompt2_content, prompt_id2)
+
+        # call LLM for analysis
+        llm_analysis = get_llm_comparison_analysis(
+            prompt1_content=prompt1_content,
+            prompt2_content=prompt2_content,
+            outputs1=output_texts1,
+            outputs2=output_texts2,
+            analytics1=analytics1,
+            analytics2=analytics2
+        )
+
+        # return complete comparison
+        return {
+            "prompts": {
+                "version1": {
+                    "prompt_id": prompt_id1,
+                    "content": prompt1_content,
+                    "analytics": analytics1,
+                    "sample_outputs": output_texts1
+                },
+                "version2": {
+                    "prompt_id": prompt_id2,
+                    "content": prompt2_content,
+                    "analytics": analytics2,
+                    "sample_outputs": output_texts2
+                }
+            },
+            "diff": diff_result,
+            "llm_analysis": llm_analysis
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 def compute_hash_sha256(content: str) -> str:
     hash_object = hashlib.sha256(content.encode("utf-8"))
     return hash_object.hexdigest()

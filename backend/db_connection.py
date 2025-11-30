@@ -831,7 +831,7 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
         
-    def get_s3url_by_prompt_id(self, name: str, version_number:int=None) -> List[Dict]:
+    def get_s3url_prompt(self, name: str, version_number:int=None) -> List[Dict]:
         conn = self.get_connection()
         try:
             with conn.cursor() as cur:
@@ -985,6 +985,82 @@ class SupabaseDB:
             raise Exception(f"Failed to get prompt analytics: {e}")
         finally:
             self.return_connection(conn)
+    
+    def get_content_by_promptid(self, prompt_id: str) -> tuple | None:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                query = """
+                    SELECT s3_url
+                    FROM prompt_versions
+                    WHERE prompt_id = %s
+                """
+                cur.execute(query, (prompt_id,))
+                row = cur.fetchone()
+            
+            return row
+        except Exception as e:
+            raise Exception(f"Failed to get prompt analytics: {e}")
+        finally:
+            self.return_connection(conn)
+    
+    # gets analytics for two versions of a prompt
+    def get_prompt_analytics_for_prompt_ids(self, prompt_id1: str, prompt_id2: str) -> List[Dict[str, Any]]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                query = """
+                    SELECT
+                        pv.prompt_id,
+                        pv.name,
+                        pv.version_number,
+                        COUNT(DISTINCT s.trace_id) AS trace_count,
+                        COALESCE(AVG(s.cost), 0) AS avg_cost,
+                        COALESCE(AVG(s.duration), 0) AS avg_latency,
+                        COUNT(DISTINCT CASE WHEN s.error_message IS NOT NULL THEN s.trace_id END) AS error_traces,
+                        ROUND(
+                            COUNT(DISTINCT CASE WHEN s.error_message IS NOT NULL THEN s.trace_id END)::FLOAT
+                            / NULLIF(COUNT(DISTINCT s.trace_id), 0) * 100, 2
+                        ) AS error_rate_pct
+                    FROM prompt_versions pv
+                    LEFT JOIN spans s ON s.prompt_id = pv.prompt_id
+                    WHERE pv.prompt_id IN (%s, %s)
+                    GROUP BY pv.prompt_id, pv.name, pv.version_number
+                    ORDER BY pv.version_number DESC;
+                """
+                cur.execute(query, (prompt_id1, prompt_id2))
+                rows = cur.fetchall()
+
+            # Convert rows to dicts using cursor description
+            col_names = [desc[0] for desc in cur.description]
+            return [dict(zip(col_names, row)) for row in rows]
+        except Exception as e:
+            raise Exception(f"Failed to get prompt analytics: {e}")
+        finally:
+            self.return_connection(conn)
+    
+    def get_output_preview(self, prompt_id: str, limit: int = 5) -> List[Dict[str, Any]]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                query = """
+                    SELECT output_preview, output_blob_url, cost, duration, error_message
+                    FROM spans
+                    WHERE prompt_id = %s
+                    AND output_preview IS NOT NULL
+                    ORDER BY start_time DESC
+                    LIMIT %s
+                """
+                cur.execute(query, (prompt_id, limit))
+                rows = cur.fetchall()
+            
+            col_names = [desc[0] for desc in cur.description]
+            return [dict(zip(col_names, row)) for row in rows]
+        except Exception as e:
+            raise Exception(f"Failed to get prompt analytics: {e}")
+        finally:
+            self.return_connection(conn)
+        
     # closes all the connections in the pool
     def close(self):
         self.pool.closeall()

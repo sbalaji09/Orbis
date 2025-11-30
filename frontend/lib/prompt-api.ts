@@ -12,6 +12,29 @@ export interface PromptFamily {
   last_updated: string;
 }
 
+export interface PromptComparisonResult {
+  prompts: {
+    version1: {
+      prompt_id: string;
+      content: string;
+      analytics: PromptVersionAnalytics;
+      sample_outputs: string[];
+    };
+    version2: {
+      prompt_id: string;
+      content: string;
+      analytics: PromptVersionAnalytics;
+      sample_outputs: string[];
+    };
+  };
+  diff: {
+    added: string[];
+    removed: string[];
+    raw: string;
+  };
+  llm_analysis: string;
+}
+
 export async function fetchPromptFamilies(
   userId: string = DEFAULT_USER_ID
 ): Promise<PromptFamily[]> {
@@ -137,6 +160,32 @@ export async function rollbackPrompt(
       console.error("Error rolling back prompt", error);
       return null;
     }
+}
+
+export async function comparePrompts(
+  promptId1: string,
+  promptId2: string,
+  userId: string = DEFAULT_USER_ID
+): Promise<PromptComparisonResult> {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/prompts/compare?prompt_id1=${promptId1}&prompt_id2=${promptId2}`,
+      {
+        headers: {
+          "X-User-ID": userId,
+        },
+        cache: "no-store",
+      }
+    );
+    if (!response.ok) {
+      console.error(`Failed to compare prompts: ${response.statusText}`);
+      throw new Error('Failed to compare prompts');
+    }
+    return response.json();
+  } catch (error) {
+    console.error("Error comparing prompts:", error);
+    throw error;
+  }
 }
 
 export interface PromptVersionAnalytics {
