@@ -3,7 +3,6 @@ from db_connection import db
 from fastapi import APIRouter, HTTPException, Header
 from s3connect import *
 import hashlib
-from prompts.prompt_versions_prompt import prompt as evaluation_prompt
 from llm_service import get_llm_comparison_analysis
 
 router = APIRouter(
@@ -113,25 +112,25 @@ async def get_prompt_analytics(prompt_name: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("compare")
+@router.get("/compare")
 async def compare_prompt_analytics(prompt_id1: str, prompt_id2: str):
     try:
         # get the s3 urls and their content
         s3_url1 = db.get_content_by_promptid(prompt_id1)
         s3_url2 = db.get_content_by_promptid(prompt_id2)
-        
+
         prompt1_content = download_prompt_from_s3(s3_url1[0])  # s3_url1 is a tuple
         prompt2_content = download_prompt_from_s3(s3_url2[0])
 
         # get analytics for both prompts
         analytics_list = db.get_prompt_analytics_for_prompt_ids(prompt_id1, prompt_id2)
-        analytics1 = next((a for a in analytics_list if a['prompt_id'] == prompt_id1), {})
-        analytics2 = next((a for a in analytics_list if a['prompt_id'] == prompt_id2), {})
+        analytics1 = next((a for a in analytics_list if str(a['prompt_id']) == prompt_id1), {})
+        analytics2 = next((a for a in analytics_list if str(a['prompt_id']) == prompt_id2), {})
 
         # get sample outputs for each version
         outputs1 = db.get_output_preview(prompt_id1, limit=5)
         outputs2 = db.get_output_preview(prompt_id2, limit=5)
-        
+
         output_texts1 = [o['output_preview'] for o in outputs1 if o['output_preview']]
         output_texts2 = [o['output_preview'] for o in outputs2 if o['output_preview']]
 
@@ -145,8 +144,7 @@ async def compare_prompt_analytics(prompt_id1: str, prompt_id2: str):
             outputs1=output_texts1,
             outputs2=output_texts2,
             analytics1=analytics1,
-            analytics2=analytics2,
-            evaluation_prompt=evaluation_prompt
+            analytics2=analytics2
         )
 
         # return complete comparison
@@ -168,13 +166,6 @@ async def compare_prompt_analytics(prompt_id1: str, prompt_id2: str):
             "diff": diff_result,
             "llm_analysis": llm_analysis
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-
-
-
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 def compute_hash_sha256(content: str) -> str:
