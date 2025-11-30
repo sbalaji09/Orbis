@@ -768,6 +768,34 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
     
+    # gets all the propmt families with their latest versions and version counts
+    def get_all_prompt_families(self, user_id: str) -> List[Dict]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                query = """
+                    SELECT
+                        pv.name,
+                        pv.agent_id,
+                        a.agent_name,
+                        COUNT(*) as version_count,
+                        MAX(pv.version_number) as latest_version,
+                        MAX(pv.created_at) as last_updated
+                    FROM prompt_versions pv
+                    LEFT JOIN agents a ON pv.agent_id = a.agent_id
+                    WHERE a.user_id = %s OR a.user_id IS NULL
+                    GROUP BY pv.name, pv.agent_id, a.agent_name
+                    ORDER BY MAX(pv.created_at) DESC
+                """
+                cur.execute(query, (user_id,))
+                rows = cur.fetchall()
+                return [dict(row) for row in rows]
+        except Exception as e:
+            conn.rollback()
+            raise Exception(f"Failed to get prompt families: {str(e)}")
+        finally:
+            self.return_connection(conn)
+
     def get_prompts_by_agent_id(self, agent_id: str) -> List[Dict]:
         conn = self.get_connection()
         try:
@@ -776,7 +804,7 @@ class SupabaseDB:
                     SELECT * from prompt_versions
                     WHERE agent_id = %s
                 """
-                cur.execute(query, (agent_id))
+                cur.execute(query, (agent_id,))
                 rows = cur.fetchall()
 
             prompts = [dict(row) for row in rows]
