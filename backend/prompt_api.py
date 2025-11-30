@@ -118,7 +118,14 @@ async def compare_prompt_analytics(prompt_id1: str, prompt_id2: str):
         s3_url2 = db.get_content_by_promptid(prompt_id2)
 
         analytics = db.get_prompt_analytics_for_prompt_ids(prompt_id1, prompt_id2)
+
+        prompt1 = download_prompt_from_s3(s3_url1)
+        prompt2 = download_prompt_from_s3(s3_url2)
         
+        output_preview1 = db.get_output_preview(prompt_id1)
+        output_preview2 = db.get_output_preview(prompt_id2)
+
+
 
 
     except Exception as e:
