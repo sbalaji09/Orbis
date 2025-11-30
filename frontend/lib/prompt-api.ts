@@ -162,14 +162,28 @@ export async function rollbackPrompt(
 
 export async function comparePrompts(
   promptId1: string,
-  promptId2: string
+  promptId2: string,
+  userId: string = DEFAULT_USER_ID
 ): Promise<PromptComparisonResult> {
+  try {
     const response = await fetch(
       `${API_BASE_URL}/prompts/compare?prompt_id1=${promptId1}&prompt_id2=${promptId2}`,
-      { headers: getHeaders() }
+      {
+        headers: {
+          "X-User-ID": userId,
+        },
+        cache: "no-store",
+      }
     );
-    if (!response.ok) throw new Error('Failed to compare prompts');
+    if (!response.ok) {
+      console.error(`Failed to compare prompts: ${response.statusText}`);
+      throw new Error('Failed to compare prompts');
+    }
     return response.json();
+  } catch (error) {
+    console.error("Error comparing prompts:", error);
+    throw error;
+  }
 }
 
 export interface PromptVersionAnalytics {

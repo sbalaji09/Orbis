@@ -5,14 +5,15 @@ import Link from 'next/link';
 import {
   fetchPromptVersions,
   fetchPromptContent,
-  fetchPromptDiff,
   rollbackPrompt,
   fetchPromptAnalytics,
+  comparePrompts,
   PromptVersionAnalytics,
+  PromptComparisonResult,
 } from '@/lib/prompt-api';
 import PromptBadge from '@/components/PromptBadge';
 import PromptContentViewer from '@/components/PromptContentViewer';
-import PromptDiffViewer from '@/components/PromptDiffViewer';
+import PromptComparisonView from '@/components/PromptComparisonView';
 import PromptAnalytics from '@/components/PromptAnalytics';
 
 interface Version {
@@ -41,9 +42,11 @@ export default function PromptDetailPage({
   const [viewerContent, setViewerContent] = useState('');
   const [viewerVersion, setViewerVersion] = useState(0);
 
-  const [diffOpen, setDiffOpen] = useState(false);
-  const [diffContent, setDiffContent] = useState('');
-  const [diffVersions, setDiffVersions] = useState<[number, number]>([0, 0]);
+  const [comparisonOpen, setComparisonOpen] = useState(false);
+  const [comparisonData, setComparisonData] = useState<PromptComparisonResult | null>(null);
+  const [comparisonVersions, setComparisonVersions] = useState<[number, number]>([0, 0]);
+  const [comparisonLoading, setComparisonLoading] = useState(false);
+  const [comparisonError, setComparisonError] = useState<string | null>(null);
 
   const [rollbackLoading, setRollbackLoading] = useState<number | null>(null);
 
@@ -75,10 +78,21 @@ export default function PromptDetailPage({
     const version2 = versions.find((v) => v.version_number === v2);
     if (!version1 || !version2) return;
 
-    const diff = await fetchPromptDiff(undefined, parseInt(version1.prompt_id), parseInt(version2.prompt_id));
-    setDiffContent(diff);
-    setDiffVersions([v1, v2]);
-    setDiffOpen(true);
+    // Open comparison modal and start loading
+    setComparisonVersions([v1, v2]);
+    setComparisonOpen(true);
+    setComparisonLoading(true);
+    setComparisonError(null);
+    setComparisonData(null);
+
+    try {
+      const data = await comparePrompts(version1.prompt_id, version2.prompt_id);
+      setComparisonData(data);
+    } catch (err) {
+      setComparisonError(err instanceof Error ? err.message : 'Failed to load comparison');
+    } finally {
+      setComparisonLoading(false);
+    }
   };
 
   const handleRollback = async (versionNumber: number) => {
@@ -293,17 +307,17 @@ export default function PromptDetailPage({
         />
       )}
 
-      {/* Diff Viewer Modal */}
-      {diffOpen && (
-        <PromptDiffViewer
-          isOpen={diffOpen}
-          onClose={() => setDiffOpen(false)}
-          promptName={decodedName}
-          version1={diffVersions[0]}
-          version2={diffVersions[1]}
-          diff={diffContent}
-        />
-      )}
+      {/* Full Comparison View Modal */}
+      <PromptComparisonView
+        isOpen={comparisonOpen}
+        onClose={() => setComparisonOpen(false)}
+        promptName={decodedName}
+        version1={comparisonVersions[0]}
+        version2={comparisonVersions[1]}
+        comparisonData={comparisonData}
+        loading={comparisonLoading}
+        error={comparisonError}
+      />
     </div>
   );
 }
