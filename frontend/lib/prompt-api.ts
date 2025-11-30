@@ -3,12 +3,20 @@ import { PromptFamily } from "./types";
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const DEFAULT_USER_ID = "00000000-0000-0000-0000-000000000000"; // In production, get from auth/session
 
+export interface PromptFamily {
+  name: string;
+  agent_id: string;
+  agent_name: string | null;
+  version_count: number;
+  latest_version: number;
+  last_updated: string;
+}
+
 export async function fetchPromptFamilies(
-  userId: string = DEFAULT_USER_ID,
-  agentId: string
+  userId: string = DEFAULT_USER_ID
 ): Promise<PromptFamily[]> {
   try {
-    const response = await fetch(`${API_BASE_URL}/prompts/agent/${agentId}`, {
+    const response = await fetch(`${API_BASE_URL}/prompts/families`, {
       headers: {
         "X-User-ID": userId,
       },
@@ -21,7 +29,7 @@ export async function fetchPromptFamilies(
     }
 
     const data = await response.json();
-    return data || [];
+    return data.families || [];
   } catch (error) {
     console.error("Error fetching prompt families:", error);
     return [];
@@ -108,26 +116,65 @@ export async function rollbackPrompt(
     // URL: /prompts/{name}/rollback?version_number=3
     const url = new URL(`${API_BASE_URL}/prompts/${encodeURIComponent(name)}/rollback`);
     url.searchParams.set("version_number", String(versionNumber));
-  
+
     try {
       const response = await fetch(url.toString(), {
-        method: "POST",                    
+        method: "POST",
         headers: {
           "X-User-ID": userId,
         },
         cache: "no-store",
       });
-  
+
       if (!response.ok) {
         console.error(`Failed to rollback prompt: ${response.statusText}`);
-        return null;                       
+        return null;
       }
-  
+
       const data = await response.json();
-      return data;                        
+      return data;
     } catch (error) {
       console.error("Error rolling back prompt", error);
       return null;
     }
+}
+
+export interface PromptVersionAnalytics {
+  prompt_id: string;
+  name: string;
+  version_number: number;
+  trace_count: number;
+  avg_cost: number;
+  avg_latency: number;
+  error_traces: number;
+  error_rate_pct: number | null;
+}
+
+export async function fetchPromptAnalytics(
+  userId: string = DEFAULT_USER_ID,
+  promptName: string
+): Promise<PromptVersionAnalytics[]> {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/prompts/analytics/${encodeURIComponent(promptName)}`,
+      {
+        headers: {
+          "X-User-ID": userId,
+        },
+        cache: "no-store",
+      }
+    );
+
+    if (!response.ok) {
+      console.error(`Failed to fetch prompt analytics: ${response.statusText}`);
+      return [];
+    }
+
+    const data = await response.json();
+    return data.versions || [];
+  } catch (error) {
+    console.error("Error fetching prompt analytics:", error);
+    return [];
+  }
 }
   

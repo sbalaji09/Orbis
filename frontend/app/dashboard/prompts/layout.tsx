@@ -4,8 +4,8 @@ export default function PromptsLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex h-full overflow-hidden">
-      <div className="flex-1 min-w-0 overflow-auto">{children}</div>
+    <div className="h-full overflow-auto bg-[#F5F3F0]">
+      {children}
     </div>
   );
 }

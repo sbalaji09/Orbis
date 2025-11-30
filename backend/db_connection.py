@@ -768,6 +768,34 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
     
+    # gets all the propmt families with their latest versions and version counts
+    def get_all_prompt_families(self, user_id: str) -> List[Dict]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                query = """
+                    SELECT
+                        pv.name,
+                        pv.agent_id,
+                        a.agent_name,
+                        COUNT(*) as version_count,
+                        MAX(pv.version_number) as latest_version,
+                        MAX(pv.created_at) as last_updated
+                    FROM prompt_versions pv
+                    LEFT JOIN agents a ON pv.agent_id = a.agent_id
+                    WHERE a.user_id = %s OR a.user_id IS NULL
+                    GROUP BY pv.name, pv.agent_id, a.agent_name
+                    ORDER BY MAX(pv.created_at) DESC
+                """
+                cur.execute(query, (user_id,))
+                rows = cur.fetchall()
+                return [dict(row) for row in rows]
+        except Exception as e:
+            conn.rollback()
+            raise Exception(f"Failed to get prompt families: {str(e)}")
+        finally:
+            self.return_connection(conn)
+
     def get_prompts_by_agent_id(self, agent_id: str) -> List[Dict]:
         conn = self.get_connection()
         try:
@@ -916,10 +944,45 @@ class SupabaseDB:
                     query,
                     (name, version_number)
                 )
-                row = cur.fetchone()
             return "sucessful"
         except Exception as e:
             raise Exception(f"Failed to get all prompt versions")
+        finally:
+            self.return_connection(conn)
+    
+    def get_prompt_analytics(self, prompt_name: str) -> List[Dict[str, Any]]:
+        """
+        Get consolidated analytics for all versions of a prompt family.
+        Returns trace count, avg cost, avg latency, and error rate per version.
+        """
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                query = """
+                    SELECT
+                        pv.prompt_id,
+                        pv.name,
+                        pv.version_number,
+                        COUNT(DISTINCT s.trace_id) AS trace_count,
+                        COALESCE(AVG(s.cost), 0) AS avg_cost,
+                        COALESCE(AVG(s.duration), 0) AS avg_latency,
+                        COUNT(DISTINCT CASE WHEN s.error_message IS NOT NULL THEN s.trace_id END) AS error_traces,
+                        ROUND(
+                            COUNT(DISTINCT CASE WHEN s.error_message IS NOT NULL THEN s.trace_id END)::FLOAT
+                            / NULLIF(COUNT(DISTINCT s.trace_id), 0) * 100, 2
+                        ) AS error_rate_pct
+                    FROM prompt_versions pv
+                    LEFT JOIN spans s ON s.prompt_id = pv.prompt_id
+                    WHERE pv.name = %s
+                    GROUP BY pv.prompt_id, pv.name, pv.version_number
+                    ORDER BY pv.version_number DESC;
+                """
+                cur.execute(query, (prompt_name,))
+                rows = cur.fetchall()
+
+            return [dict(r) for r in rows]
+        except Exception as e:
+            raise Exception(f"Failed to get prompt analytics: {e}")
         finally:
             self.return_connection(conn)
     # closes all the connections in the pool

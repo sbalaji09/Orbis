@@ -1,6 +1,6 @@
 import os
 from db_connection import db
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Header
 from s3connect import *
 import hashlib
 
@@ -30,7 +30,16 @@ async def create_prompt(agent_id: str, name: str, content: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# Static route must come before dynamic routes
+# Static routes must come before dynamic routes
+@router.get("/families")
+async def get_all_prompt_families(user_id: str = Header(..., alias="X-User-ID")):
+    """Get all prompt families with version counts and latest update times."""
+    try:
+        families = db.get_all_prompt_families(user_id)
+        return {"families": families}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/diff")
 async def get_prompt_differences(prompt_id1: str, prompt_id2: str):
     try:
@@ -94,6 +103,14 @@ async def rollback_prompt(name: str, version_number: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/analytics/{prompt_name}")
+async def get_prompt_analytics(prompt_name: str, user_id: str = Header(..., alias="X-User-ID")):
+    """Get analytics for all versions of a prompt family (by name)."""
+    try:
+        analytics = db.get_prompt_analytics(prompt_name)
+        return {"prompt_name": prompt_name, "versions": analytics}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 def compute_hash_sha256(content: str) -> str:
     hash_object = hashlib.sha256(content.encode("utf-8"))
