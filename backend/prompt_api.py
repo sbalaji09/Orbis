@@ -35,9 +35,14 @@ async def create_prompt(agent_id: str, name: str, content: str):
 @router.get("/families")
 async def get_all_prompt_families(user_id: str = Header(..., alias="X-User-ID")):
     try:
+        print(f"Fetching prompt families for user_id: {user_id}")
         families = db.get_all_prompt_families(user_id)
+        print(f"Found {len(families)} families")
         return {"families": families}
     except Exception as e:
+        print(f"Error fetching prompt families: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/diff")

@@ -778,7 +778,7 @@ class SupabaseDB:
     def get_all_prompt_families(self, user_id: str) -> List[Dict]:
         conn = self.get_connection()
         try:
-            with conn.cursor() as cur:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:  # Use RealDictCursor
                 query = """
                     SELECT
                         pv.name,
@@ -789,13 +789,12 @@ class SupabaseDB:
                         MAX(pv.created_at) as last_updated
                     FROM prompt_versions pv
                     LEFT JOIN agents a ON pv.agent_id = a.agent_id
-                    WHERE a.user_id = %s OR a.user_id IS NULL
+                    WHERE a.user_id = %s OR pv.agent_id IS NULL OR a.user_id IS NULL
                     GROUP BY pv.name, pv.agent_id, a.agent_name
                     ORDER BY MAX(pv.created_at) DESC
                 """
                 cur.execute(query, (user_id,))
-                rows = cur.fetchall()
-                return [dict(row) for row in rows]
+                return cur.fetchall()  # fetchall() will return a list of dictionaries
         except Exception as e:
             conn.rollback()
             raise Exception(f"Failed to get prompt families: {str(e)}")
