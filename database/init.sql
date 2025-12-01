@@ -65,6 +65,7 @@ CREATE TABLE spans (
     time_to_first_token FLOAT,
     tokens_per_second FLOAT,
     prompt_id UUID REFERENCES prompt_versions(prompt_id),
+    prompt_name VARCHAR(50),
     prompt_version TEXT,
     prompt_hash TEXT
 );

@@ -43,6 +43,8 @@ export interface Span {
   time_to_first_token: number | null;
   tokens_per_second: number | null;
   prompt_id: string | null;
+  /** The human-readable prompt name (e.g., "customer-support") */
+  prompt_name: string | null;
   prompt_version: string | null;
   prompt_hash: string | null;
 }

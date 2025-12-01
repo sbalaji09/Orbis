@@ -157,8 +157,8 @@ class SupabaseDB:
                         input_preview, input_blob_url,
                         output_preview, output_blob_url,
                         llm_model, prompt_tokens, completion_tokens,
-                        cost, status, error_message, prompt_id, 
-                        prompt_version, prompt_hash
+                        cost, status, error_message, prompt_id,
+                        prompt_name, prompt_version, prompt_hash
                     ) VALUES (
                         %s, %s, %s::uuid[], %s,
                         %s, %s, %s,
@@ -166,7 +166,7 @@ class SupabaseDB:
                         %s, %s,
                         %s, %s, %s,
                         %s, %s, %s,
-                        %s, %s
+                        %s, %s, %s, %s
                     )
                     RETURNING span_id
                 """
@@ -189,6 +189,7 @@ class SupabaseDB:
                     span_data.get('status'),
                     span_data.get('error_message'),
                     span_data.get('prompt_id'),
+                    span_data.get('prompt_name'),
                     span_data.get('prompt_version'),
                     span_data.get('prompt_hash')
                 ))
@@ -623,7 +624,8 @@ class SupabaseDB:
                         duration, input_preview, input_blob_url, output_preview,
                         output_blob_url, llm_model, prompt_tokens, completion_tokens,
                         cost, status, error_message,
-                        is_streaming, time_to_first_token, tokens_per_second
+                        is_streaming, time_to_first_token, tokens_per_second,
+                        prompt_id, prompt_name, prompt_version, prompt_hash
                     ) VALUES %s
                     RETURNING span_id
                 """
@@ -639,13 +641,17 @@ class SupabaseDB:
                         span['status'], span['error_message'],
                         span.get('is_streaming', False),
                         span.get('time_to_first_token'),
-                        span.get('tokens_per_second')
+                        span.get('tokens_per_second'),
+                        span.get('prompt_id'),
+                        span.get('prompt_name'),
+                        span.get('prompt_version'),
+                        span.get('prompt_hash')
                     )
                     for span in spans
                 ]
 
                 # Use explicit UUID casting in template
-                template = "(%s, %s, %s::uuid[], %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                template = "(%s, %s, %s::uuid[], %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
                 execute_values(cur, query, values, template=template, fetch=True)
 
                 conn.commit()
