@@ -49,6 +49,7 @@ export async function fetchPromptFamilies(
       return [];
     }
 
+    
     const data = await response.json();
     return data.families || [];
   } catch (error) {

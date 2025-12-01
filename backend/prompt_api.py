@@ -34,7 +34,6 @@ async def create_prompt(agent_id: str, name: str, content: str):
 # Static routes must come before dynamic routes
 @router.get("/families")
 async def get_all_prompt_families(user_id: str = Header(..., alias="X-User-ID")):
-    """Get all prompt families with version counts and latest update times."""
     try:
         families = db.get_all_prompt_families(user_id)
         return {"families": families}
