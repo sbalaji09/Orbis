@@ -373,7 +373,7 @@ class SpanWorker:
                     self.logger.error(f"Failed to prepare span: {e}")
                     failed_tasks.append(task)
 
-                # batch insert all prepared spans
+            # batch insert all prepared spans
             if prepared_spans:
                 span_dicts = [s[1] for s in prepared_spans]
                 db.insert_spans_batch(span_dicts)  # NEW METHOD in db_connection
@@ -524,6 +524,49 @@ class SpanWorker:
             }})
         except Exception as e:
             self.logger.error(f"Failed to finalize trace {trace_id}: {e}")
+    
+    def publish_span_to_redis(self, span_data: dict, user_id: str | None = None) -> None:
+        try:
+            trace_id = span_data.get("trace_id")
+            span_id = span_data.get("span_id")
+            status = span_data.get("status")
+
+            if not trace_id or not span_id:
+                return
+            
+            message = {
+                "event": "span.inserted",
+                "span_id": span_id,
+                "trace_id": trace_id,
+                "status": status,
+                "user_id": user_id,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+
+            payload = json.dumps(message)
+
+            # specific channel for the traces
+            self.queue.redis_client.publish(f"trace:{trace_id}", payload)
+
+            # specific channel based on users
+            if user_id:
+                self.queue.redis_client.publish(f"user:{user_id}:spans", payload)
+
+
+        except Exception as e:
+            self.logger.warning(
+                "Failed to publish span update to Redis",
+                extra={
+                    "extra_data": {
+                        "span_id": span_data.get("span_id"),
+                        "trace_id": span_data.get("trace_id"),
+                        "user_id": user_id,
+                        "worker_id": self.worker_id,
+                        "error": str(e),
+                    }
+                },
+                exc_info=True,
+            )
 
         
 def generate_hash_key(user_id: str, agent_id: str) -> str:
