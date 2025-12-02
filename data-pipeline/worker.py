@@ -157,10 +157,11 @@ class SpanWorker:
                     'worker_id': self.worker_id
                 }})
 
-            # Save span to database
             span_id = db.insert_span(span_db_data)
+            user_id = str(span.get('user_id') or task_data.get('user_id') or "")
+            self.publish_span_to_redis(span_db_data, user_id=user_id or None)
 
-            # NEW: If span has error status, mark the trace as failed
+            # if span has an error message, then mark the trace as failed
             if span.get('status') == 'error':
                 update_data = {
                     "status": "error"
