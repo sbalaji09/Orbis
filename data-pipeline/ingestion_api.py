@@ -1,13 +1,19 @@
 from fastapi import FastAPI, Request, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from datetime import datetime, timezone
 from uuid import UUID
 from typing import Optional
 import os
 import sys
+import logging
 from queues.redis_queue import queue
 from auth.auth_middleware import check_api_key
 from rate_limiter import check_rate_limit
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Add backend to path for database access
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
@@ -46,11 +52,36 @@ class EndTraceIn(BaseModel):
 
 app = FastAPI()
 
+# custom exception for queue backpressure
+class QueueFullException(Exception):
+    def __init__(self, queue_length: int, retry_after: int = 30):
+        self.queue_length = queue_length
+        self.retry_after = retry_after
+        super().__init__(f"Queue full: {queue_length} items")
+
 def check_queue_depth():
     queue_length = queue.get_queue_length()
     if queue_length > MAX_QUEUE_DEPTH:
-        raise HTTPException(status_code=503, detail = "Queue full - try again later")
+        logger.warning(
+            f"Queue backpressure triggered: queue_depth={queue_length}, "
+            f"max_depth={MAX_QUEUE_DEPTH}, returning 503"
+        )
+        raise QueueFullException(queue_length)
     return
+
+# handles queue backpressure with Retry-After header
+@app.exception_handler(QueueFullException)
+async def queue_full_exception_handler(request: Request, exc: QueueFullException):
+    """Handle queue backpressure with Retry-After header"""
+    return JSONResponse(
+        status_code=503,
+        content={
+            "detail": "Queue full - try again later",
+            "queue_depth": exc.queue_length,
+            "max_queue_depth": MAX_QUEUE_DEPTH
+        },
+        headers={"Retry-After": str(exc.retry_after)}
+    )
 
 # post endpoint from the SDK to the backend infra that now uses the message queu
 # instead of sending to the database automatically
@@ -99,8 +130,8 @@ async def post_span(request: Request, span: SpanIn):
             "status": "accepted",
             "message": "Span queued for processing"
         }
-    except HTTPException:
-        raise  # Re-raise the 503 queue full exception
+    except (HTTPException, QueueFullException):
+        raise  # Re-raise HTTP and queue full exceptions
 
 
 # endpoint to signal that a trace is complete
