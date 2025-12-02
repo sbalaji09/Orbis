@@ -377,7 +377,17 @@ class SpanWorker:
             # batch insert all prepared spans
             if prepared_spans:
                 span_dicts = [s[1] for s in prepared_spans]
-                db.insert_spans_batch(span_dicts)  # NEW METHOD in db_connection
+                db.insert_spans_batch(span_dicts)
+
+                for task, span_data in prepared_spans:
+                    user_id = str(
+                        task.get('user_id')
+                        or span_data.get('user_id')
+                        or span_data.get('user_id')  # in case you add it later
+                        or ""
+                    )
+                    self.publish_span_to_redis(span_data, user_id=user_id or None)
+                    
                 self.tasks_processed += len(prepared_spans)
                 self.last_task_time = time.time()
             
