@@ -1,4 +1,6 @@
 import difflib
+import json
+import uuid
 import boto3
 from botocore.exceptions import ClientError
 from typing import Optional
@@ -104,3 +106,29 @@ def prompt_diff(content1: str, prompt_id1: str, content2: str, prompt_id2: str) 
             "raw": raw_unified_diff,  # remove this if you only want structured
         },
     }
+
+def upload_span_output_to_s3(output_data: dict | str, bucket_name: str, trace_id: str, span_id: str, aws_region: str | None = None) -> str:
+    if isinstance(output_data, dict):
+        body = json.dumps(output_data).encode("utf-8")
+        content_type = "application/json; charset=utf-8"
+        extension = "json"
+    else:
+        body = str(output_data).encode("utf-8")
+        content_type = "text/plain; charset=utf-8"
+        extension = "txt"
+
+    object_key = f"spans/{trace_id}/{span_id}-{uuid.uuid4().hex}.{extension}"
+
+    s3_client = boto3.client("s3", region_name=aws_region) if aws_region else boto3.client("s3")
+
+    try:
+        s3_client.put_object(
+            Bucket=bucket_name,
+            Key=object_key,
+            Body=body,
+            ContentType=content_type,
+        )
+    except ClientError as e:
+        raise RuntimeError(f"Failed to upload span output to S3: {e}") from e
+
+    return f"s3://{bucket_name}/{object_key}"

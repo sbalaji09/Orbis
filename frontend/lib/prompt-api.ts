@@ -52,6 +52,7 @@ export async function fetchPromptFamilies(
     }
 
     const data = await response.json();
+    console.log("DATA", data);
     return data.families || [];
   } catch (error) {
     console.error("Error fetching prompt families:", error);

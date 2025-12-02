@@ -272,15 +272,15 @@ export default function GraphNode({
               </div>
             )}
 
-            {/* Prompt Badge - only show if prompt_id exists */}
-            {currentSpan.prompt_id && (
+            {/* Prompt Badge - only show if prompt_name exists */}
+            {currentSpan.prompt_name && (
               <div className="mb-2">
                 <PromptBadge
-                  promptId={currentSpan.prompt_id}
+                  promptId={currentSpan.prompt_name}
                   promptVersion={parseInt(currentSpan.prompt_version || "1", 10)}
                   onClick={() => {
-                    if (onPromptClick && currentSpan.prompt_id) {
-                      onPromptClick(currentSpan.prompt_id);
+                    if (onPromptClick && currentSpan.prompt_name) {
+                      onPromptClick(currentSpan.prompt_name);
                     }
                   }}
                 />
@@ -418,15 +418,15 @@ export default function GraphNode({
                           {currentSpan.llm_model}
                         </p>
                       )}
-                      {currentSpan.prompt_id && (
+                      {currentSpan.prompt_name && (
                         <div className="mt-2">
                           <PromptBadge
-                            promptId={currentSpan.prompt_id}
+                            promptId={currentSpan.prompt_name}
                             promptVersion={parseInt(currentSpan.prompt_version || "1", 10)}
                             onClick={() => {
                               setIsModalOpen(false);
-                              if (onPromptClick && currentSpan.prompt_id) {
-                                onPromptClick(currentSpan.prompt_id);
+                              if (onPromptClick && currentSpan.prompt_name) {
+                                onPromptClick(currentSpan.prompt_name);
                               }
                             }}
                           />

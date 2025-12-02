@@ -1,7 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, use } from 'react';
-import Link from 'next/link';
+import { useState, useEffect, use } from 'react';
 import {
   fetchPromptVersions,
   fetchPromptContent,
@@ -160,19 +159,6 @@ export default function PromptDetailPage({
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
-      {/* Breadcrumb */}
-      <div className="mb-4">
-        <Link
-          href="/dashboard/prompts"
-          className="inline-flex items-center gap-1 text-xs text-black/40 hover:text-black/60 transition-colors"
-        >
-          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-          All Prompts
-        </Link>
-      </div>
-
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-2xl font-semibold text-foreground font-mono">{decodedName}</h1>

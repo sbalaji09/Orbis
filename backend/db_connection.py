@@ -157,8 +157,8 @@ class SupabaseDB:
                         input_preview, input_blob_url,
                         output_preview, output_blob_url,
                         llm_model, prompt_tokens, completion_tokens,
-                        cost, status, error_message, prompt_id, 
-                        prompt_version, prompt_hash
+                        cost, status, error_message, prompt_id,
+                        prompt_name, prompt_version, prompt_hash
                     ) VALUES (
                         %s, %s, %s::uuid[], %s,
                         %s, %s, %s,
@@ -166,7 +166,7 @@ class SupabaseDB:
                         %s, %s,
                         %s, %s, %s,
                         %s, %s, %s,
-                        %s, %s
+                        %s, %s, %s, %s
                     )
                     RETURNING span_id
                 """
@@ -189,6 +189,7 @@ class SupabaseDB:
                     span_data.get('status'),
                     span_data.get('error_message'),
                     span_data.get('prompt_id'),
+                    span_data.get('prompt_name'),
                     span_data.get('prompt_version'),
                     span_data.get('prompt_hash')
                 ))
@@ -623,7 +624,8 @@ class SupabaseDB:
                         duration, input_preview, input_blob_url, output_preview,
                         output_blob_url, llm_model, prompt_tokens, completion_tokens,
                         cost, status, error_message,
-                        is_streaming, time_to_first_token, tokens_per_second
+                        is_streaming, time_to_first_token, tokens_per_second,
+                        prompt_id, prompt_name, prompt_version, prompt_hash
                     ) VALUES %s
                     RETURNING span_id
                 """
@@ -639,13 +641,17 @@ class SupabaseDB:
                         span['status'], span['error_message'],
                         span.get('is_streaming', False),
                         span.get('time_to_first_token'),
-                        span.get('tokens_per_second')
+                        span.get('tokens_per_second'),
+                        span.get('prompt_id'),
+                        span.get('prompt_name'),
+                        span.get('prompt_version'),
+                        span.get('prompt_hash')
                     )
                     for span in spans
                 ]
 
                 # Use explicit UUID casting in template
-                template = "(%s, %s, %s::uuid[], %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                template = "(%s, %s, %s::uuid[], %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
                 execute_values(cur, query, values, template=template, fetch=True)
 
                 conn.commit()
@@ -772,7 +778,7 @@ class SupabaseDB:
     def get_all_prompt_families(self, user_id: str) -> List[Dict]:
         conn = self.get_connection()
         try:
-            with conn.cursor() as cur:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:  # Use RealDictCursor
                 query = """
                     SELECT
                         pv.name,
@@ -783,13 +789,12 @@ class SupabaseDB:
                         MAX(pv.created_at) as last_updated
                     FROM prompt_versions pv
                     LEFT JOIN agents a ON pv.agent_id = a.agent_id
-                    WHERE a.user_id = %s OR a.user_id IS NULL
+                    WHERE a.user_id = %s OR pv.agent_id IS NULL OR a.user_id IS NULL
                     GROUP BY pv.name, pv.agent_id, a.agent_name
                     ORDER BY MAX(pv.created_at) DESC
                 """
                 cur.execute(query, (user_id,))
-                rows = cur.fetchall()
-                return [dict(row) for row in rows]
+                return cur.fetchall()  # fetchall() will return a list of dictionaries
         except Exception as e:
             conn.rollback()
             raise Exception(f"Failed to get prompt families: {str(e)}")
