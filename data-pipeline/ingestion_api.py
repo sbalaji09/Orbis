@@ -13,6 +13,7 @@ from rate_limiter import check_rate_limit
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from backend.db_connection import db
 
+MAX_QUEUE_DEPTH = int(os.getenv('MAX_QUEUE_DEPTH', 3))
 
 class SpanIn(BaseModel):
     trace_id: str
@@ -45,51 +46,61 @@ class EndTraceIn(BaseModel):
 
 app = FastAPI()
 
+def check_queue_depth():
+    queue_length = queue.get_queue_length()
+    if queue_length > MAX_QUEUE_DEPTH:
+        raise HTTPException(status_code=503, detail = "Queue full - try again later")
+    return
+
 # post endpoint from the SDK to the backend infra that now uses the message queu
 # instead of sending to the database automatically
 @app.post("/span", status_code=202)
 async def post_span(request: Request, span: SpanIn):
+    try:
+        check_queue_depth()
 
-    check_api_key(request)
+        check_api_key(request)
 
-    check_rate_limit(request.state.user_id)
+        check_rate_limit(request.state.user_id)
 
-    # first checks if the span is not valid and if it is not, we return an Exception
-    if not validate_span(span):
-        raise HTTPException(
-            status_code=400,
-            detail="Span not valid and could not be processed"
-        )
+        # first checks if the span is not valid and if it is not, we return an Exception
+        if not validate_span(span):
+            raise HTTPException(
+                status_code=400,
+                detail="Span not valid and could not be processed"
+            )
 
-    span_dict = span.model_dump()
+        span_dict = span.model_dump()
 
-    if isinstance(span_dict.get('start_time'), datetime):
-        span_dict['start_time'] = span_dict['start_time'].isoformat()
-    if isinstance(span_dict.get('end_time'), datetime):
-        span_dict['end_time'] = span_dict['end_time'].isoformat()
+        if isinstance(span_dict.get('start_time'), datetime):
+            span_dict['start_time'] = span_dict['start_time'].isoformat()
+        if isinstance(span_dict.get('end_time'), datetime):
+            span_dict['end_time'] = span_dict['end_time'].isoformat()
 
-    # convert the span data into a dict
-    task_data = {
-        "span": span_dict, # model_dump() converts the Pydantic instance into a dictionary
-        "user_id": request.state.user_id,
-        "received_at": datetime.now(timezone.utc).isoformat()
-    }
+        # convert the span data into a dict
+        task_data = {
+            "span": span_dict, # model_dump() converts the Pydantic instance into a dictionary
+            "user_id": request.state.user_id,
+            "received_at": datetime.now(timezone.utc).isoformat()
+        }
 
-    # enqueue the task into the Redis queue
-    success = queue.enqueue(task_data)
+        # enqueue the task into the Redis queue
+        success = queue.enqueue(task_data)
 
-    # if we could not enqueue the task, then raise an Exception
-    if not success:
-        raise HTTPException(
-            status_code=503,
-            detail="Failed to queue span for processing"
-        )
+        # if we could not enqueue the task, then raise an Exception
+        if not success:
+            raise HTTPException(
+                status_code=503,
+                detail="Failed to queue span for processing"
+            )
 
-    # return a success message if we could enqueue the task into the Redis queue
-    return {
-        "status": "accepted",
-        "message": "Span queued for processing"
-    }
+        # return a success message if we could enqueue the task into the Redis queue
+        return {
+            "status": "accepted",
+            "message": "Span queued for processing"
+        }
+    except HTTPException:
+        raise  # Re-raise the 503 queue full exception
 
 
 # endpoint to signal that a trace is complete
