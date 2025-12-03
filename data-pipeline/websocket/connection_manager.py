@@ -84,4 +84,18 @@ class ConnectionManager:
             if websocket.client_state == WebSocketState.CONNECTED:
                 await websocket.close()
     
-    
+    # this function sends JSON to a single WebSocket
+    async def _safe_send_json(self, websocket: WebSocket, message: dict) -> None:
+        try:
+            if websocket.client_state == WebSocketState.CONNECTED:
+                await websocket.send_json(message)
+        except Exception:
+            pass
+
+    # sends a message to all connections associated with a certain user_id
+    async def broadcast_to_user(self, user_id: str, message: dict) -> None:
+        async with self._lock:
+            conns = list(self._user_connections.get(user_id, []))
+        
+        for ws in conns:
+            await self._safe_send_json(ws, message)
