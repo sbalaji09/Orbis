@@ -1,0 +1,156 @@
+import logging
+import json
+import os
+from typing import *
+from ingestion_api import app
+from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
+from starlette.websockets import WebSocketState
+import asyncio
+import redis.asyncio as aioredis
+
+logger = logging.getLogger(__name__)
+
+# Redis connection for pub/sub
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+
+
+async def get_redis_pubsub() -> aioredis.client.PubSub:
+    """Create a new Redis connection for pub/sub subscription."""
+    client = aioredis.from_url(REDIS_URL, decode_responses=True)
+    return client.pubsub()
+
+class DashboardConnectionManager:
+    def __init__(self) -> None:
+        # user_id -> set of WebSocket objects
+        self.active_connections: Dict[str, Set[WebSocket]] = {}
+        # simple lock to avoid race conditions on connect/disconnect
+        self._lock = asyncio.Lock()
+    
+    async def connect(self, user_id: str, websocket: WebSocket) -> None:
+        await websocket.accept()
+        async with self._lock:
+            if user_id not in self.active_connections:
+                self.active_connections[user_id] = set()
+            self.active_connections[user_id].add(websocket)
+
+        logger.info(f"WebSocket connected for user {user_id}. Total connections: "
+                    f"{len(self.active_connections[user_id])}")
+
+    async def disconnect(self, user_id: str, websocket: WebSocket) -> None:
+        async with self._lock:
+            conns = self.active_connections.get(user_id)
+            if conns and websocket in conns:
+                conns.remove(websocket)
+                if not conns:
+                    # remove empty set to keep dict clean
+                    del self.active_connections[user_id]
+
+        logger.info(f"WebSocket disconnected for user {user_id}")
+
+    async def safe_send_json(self, websocket: WebSocket, message: dict) -> None:
+        """Send a message to a single websocket, swallowing connection errors."""
+        try:
+            if websocket.client_state == WebSocketState.CONNECTED:
+                await websocket.send_json(message)
+        except Exception as e:
+            logger.warning(f"Failed to send WS message: {e}")
+
+    async def broadcast_to_user(self, user_id: str, message: dict) -> None:
+        """Send a message to all connections for this user."""
+        async with self._lock:
+            conns = list(self.active_connections.get(user_id, []))
+
+        for ws in conns:
+            await self.safe_send_json(ws, message)
+
+
+connection_manager = DashboardConnectionManager()
+
+
+@app.websocket("/ws/traces/{trace_id}")
+async def websocket_trace_updates(websocket: WebSocket, trace_id: str):
+    """Stream real-time span updates for a specific trace."""
+    await websocket.accept()
+    pubsub = None
+
+    try:
+        # Subscribe to the trace-specific Redis channel
+        pubsub = await get_redis_pubsub()
+        await pubsub.subscribe(f"trace:{trace_id}")
+
+        await websocket.send_json({
+            "event": "subscribed",
+            "trace_id": trace_id,
+        })
+
+        # Listen for Redis messages and forward to WebSocket
+        async for message in pubsub.listen():
+            if message["type"] == "message":
+                data = json.loads(message["data"])
+                await websocket.send_json(data)
+
+    except WebSocketDisconnect:
+        logger.info(f"Client disconnected from trace {trace_id}")
+    except Exception as e:
+        logger.error(f"Error in trace WebSocket for {trace_id}: {e}", exc_info=True)
+    finally:
+        if pubsub:
+            await pubsub.unsubscribe(f"trace:{trace_id}")
+            await pubsub.close()
+
+@app.websocket("/ws/dashboard")
+async def websocket_dashboard(websocket: WebSocket, user_id: str = Query(..., description="User ID for dashboard subscription")):
+    """Stream real-time span updates for all traces belonging to a user."""
+    await websocket.accept()
+    pubsub = None
+
+    async def redis_listener():
+        """Background task to listen for Redis pub/sub messages."""
+        try:
+            async for message in pubsub.listen():
+                if message["type"] == "message":
+                    data = json.loads(message["data"])
+                    await websocket.send_json(data)
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            logger.error(f"Redis listener error for user {user_id}: {e}", exc_info=True)
+
+    try:
+        # Subscribe to user-specific Redis channel
+        pubsub = await get_redis_pubsub()
+        await pubsub.subscribe(f"user:{user_id}:spans")
+
+        await websocket.send_json({
+            "event": "connection_established",
+            "user_id": user_id,
+        })
+
+        # Start Redis listener as background task
+        listener_task = asyncio.create_task(redis_listener())
+
+        # Handle incoming WebSocket messages (ping, filters, etc.)
+        while True:
+            try:
+                data = await websocket.receive_text()
+                # Handle ping/pong for keepalive
+                if data == "ping":
+                    await websocket.send_json({"event": "pong"})
+
+            except WebSocketDisconnect:
+                break
+            except Exception as e:
+                logger.error(f"Error in dashboard WebSocket for user {user_id}: {e}", exc_info=True)
+                break
+
+    finally:
+        # Cleanup: cancel listener and unsubscribe
+        if 'listener_task' in locals():
+            listener_task.cancel()
+            try:
+                await listener_task
+            except asyncio.CancelledError:
+                pass
+        if pubsub:
+            await pubsub.unsubscribe(f"user:{user_id}:spans")
+            await pubsub.close()
