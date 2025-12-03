@@ -1,7 +1,10 @@
+import logging
 from typing import *
 from ingestion_api import app
 from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
 import asyncio
+
+logger = logging.getLogger(__name__)
 
 class DashboardConnectionManager:
     def __init__(self) -> None:
@@ -9,6 +12,44 @@ class DashboardConnectionManager:
         self.active_connections: Dict[str, Set[WebSocket]] = {}
         # simple lock to avoid race conditions on connect/disconnect
         self._lock = asyncio.Lock()
+    
+    async def connect(self, user_id: str, websocket: WebSocket) -> None:
+        await websocket.accept()
+        async with self._lock:
+            if user_id not in self.active_connections:
+                self.active_connections[user_id] = set()
+            self.active_connections[user_id].add(websocket)
+
+        logger.info(f"WebSocket connected for user {user_id}. Total connections: "
+                    f"{len(self.active_connections[user_id])}")
+
+    async def disconnect(self, user_id: str, websocket: WebSocket) -> None:
+        async with self._lock:
+            conns = self.active_connections.get(user_id)
+            if conns and websocket in conns:
+                conns.remove(websocket)
+                if not conns:
+                    # remove empty set to keep dict clean
+                    del self.active_connections[user_id]
+
+        logger.info(f"WebSocket disconnected for user {user_id}")
+
+    async def safe_send_json(self, websocket: WebSocket, message: dict) -> None:
+        """Send a message to a single websocket, swallowing connection errors."""
+        try:
+            if websocket.client_state == WebSocketState.CONNECTED:
+                await websocket.send_json(message)
+        except Exception as e:
+            logger.warning(f"Failed to send WS message: {e}")
+
+    async def broadcast_to_user(self, user_id: str, message: dict) -> None:
+        """Send a message to all connections for this user."""
+        async with self._lock:
+            conns = list(self.active_connections.get(user_id, []))
+
+        for ws in conns:
+            await self.safe_send_json(ws, message)
+
 
 connection_manager = DashboardConnectionManager()
 @app.websocket("/ws/traces/{trace_id}")
