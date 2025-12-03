@@ -14,6 +14,21 @@ CREATE TABLE agents (
     api_key TEXT
 );
 
+-- Create prompt_versions before spans (spans references prompt_versions)
+CREATE TABLE prompt_versions (
+    prompt_id UUID PRIMARY KEY,
+    name VARCHAR(50),
+    version_number INT,
+    s3_url VARCHAR(200),
+    created_at TIMESTAMP,
+    is_active BOOLEAN,
+    agent_id UUID REFERENCES agents(agent_id),
+    prompt_hash TEXT,
+    content_preview TEXT,
+    metadata JSONB,
+    parent_version_id UUID
+);
+
 -- Create tables with UUID for trace_id and span_id
 CREATE TABLE traces (
     trace_id UUID PRIMARY KEY,
@@ -48,16 +63,11 @@ CREATE TABLE spans (
     error_message VARCHAR(200),
     is_streaming BOOLEAN DEFAULT FALSE,
     time_to_first_token FLOAT,
-    tokens_per_second FLOAT
-);
-
-CREATE TABLE prompt_versions (
-    prompt_version_id UUID PRIMARY KEY,
-    name VARCHAR(50),
-    version_number INT,
-    s3_url VARCHAR(200),
-    created_at TIMESTAMP,
-    is_active BOOLEAN
+    tokens_per_second FLOAT,
+    prompt_id UUID REFERENCES prompt_versions(prompt_id),
+    prompt_name VARCHAR(50),
+    prompt_version TEXT,
+    prompt_hash TEXT
 );
 
 CREATE TABLE evaluations (
@@ -75,3 +85,5 @@ CREATE INDEX idx_spans_status ON spans(status);
 CREATE INDEX idx_prompt_versions_version_number ON prompt_versions(version_number);
 CREATE INDEX idx_evaluations_trace_id ON evaluations(trace_id);
 CREATE UNIQUE INDEX idx_agents_api_key ON agents(api_key);
+CREATE INDEX prompts_per_agent ON prompt_versions(agent_id, name);
+CREATE INDEX prompt_analytics ON spans(prompt_id, prompt_version);

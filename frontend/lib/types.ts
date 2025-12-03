@@ -42,10 +42,26 @@ export interface Span {
   is_streaming: boolean;
   time_to_first_token: number | null;
   tokens_per_second: number | null;
-  /** Prompt identifier for version tracking */
   prompt_id: string | null;
-  /** Prompt version number or label (e.g., "v1.0", "v2.3") */
+  /** The human-readable prompt name (e.g., "customer-support") */
+  prompt_name: string | null;
   prompt_version: string | null;
-  /** Hash of the prompt content for integrity verification */
   prompt_hash: string | null;
+}
+
+export interface PromptVersion {
+  prompt_version_id: string;
+  name: string;
+  version_number: number;
+  content_preview: string;
+  created_at: Date;
+  is_active: string;
+  metadata: JSON;
+}
+
+export interface PromptFamily {
+  name: string;
+  agent_id: string;
+  versions: PromptVersion[];
+  total_traces: number;
 }

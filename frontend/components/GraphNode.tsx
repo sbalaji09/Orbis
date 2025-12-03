@@ -3,12 +3,15 @@
 import { useState } from "react";
 import useSWRSubscription from "swr/subscription";
 import { Span } from "@/lib/types";
-import SpanModal from "@/components/SpanModal";
+import SpanModal from "./SpanModal";
+import PromptBadge from "./PromptBadge";
+import { Transition } from "@headlessui/react";
 
 interface GraphNodeProps {
   span: Span;
   x?: number;
   y?: number;
+  onPromptClick?: (promptName: string) => void;
 }
 
 function formatDuration(duration: number | null): string {
@@ -44,6 +47,7 @@ interface DraggableGraphNodeProps extends GraphNodeProps {
     commit: boolean
   ) => void;
   isDragging?: boolean;
+  onPromptClick?: (promptName: string) => void;
 }
 
 const getHeaderColor = (traceId: string, spanId: string) => {
@@ -78,6 +82,7 @@ export default function GraphNode({
   span,
   onDrag,
   isDragging,
+  onPromptClick,
 }: DraggableGraphNodeProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
@@ -257,6 +262,24 @@ export default function GraphNode({
               </div>
             )}
 
+            {/* Prompt Badge - only show if prompt_name exists */}
+            {currentSpan.prompt_name && (
+              <div className="mb-2">
+                <PromptBadge
+                  promptId={currentSpan.prompt_name}
+                  promptVersion={parseInt(
+                    currentSpan.prompt_version || "1",
+                    10
+                  )}
+                  onClick={() => {
+                    if (onPromptClick && currentSpan.prompt_name) {
+                      onPromptClick(currentSpan.prompt_name);
+                    }
+                  }}
+                />
+              </div>
+            )}
+
             {/* Metrics - clean inline layout */}
             {!currentSpan.is_streaming ? (
               <div className="flex items-center gap-3 text-[10px] pt-2 border-t-2 border-black/10">
@@ -345,8 +368,6 @@ export default function GraphNode({
           </div>
         )}
       </div>
-
-      {/* Modal */}
       <SpanModal
         span={currentSpan}
         isOpen={isModalOpen}

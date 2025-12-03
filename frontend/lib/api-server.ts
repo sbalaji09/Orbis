@@ -1,4 +1,4 @@
-import { Agent, Trace, Span } from "./types";
+import { Agent, Trace, Span, PromptFamily } from "./types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const DEFAULT_USER_ID = "00000000-0000-0000-0000-000000000000"; // In production, get from auth/session
@@ -114,5 +114,30 @@ export async function getTrace(
   } catch (error) {
     console.error("Error fetching trace:", error);
     return null;
+  }
+}
+
+export async function getPromptsByAgent(
+  agentId: string,
+  userId: string = DEFAULT_USER_ID
+): Promise<PromptFamily[]> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/prompts/agent/${agentId}`, {
+      headers: {
+        "X-User-ID": userId,
+      },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      console.error(`Failed to fetch prompts: ${response.statusText}`);
+      return [];
+    }
+
+    const data = await response.json();
+    return data || [];
+  } catch (error) {
+    console.error("Error fetching prompts:", error);
+    return [];
   }
 }

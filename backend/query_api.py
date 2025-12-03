@@ -12,11 +12,16 @@ import asyncio
 # add parent directory to path
 sys.path.append(os.path.dirname(__file__))
 
+from prompt_api import router as prompt_router
+
 app = FastAPI(
     title="Orbis Query API",
     description="API for reading traces, spans, and metrics",
     version="1.0.0"
 )
+
+# Include the prompt router
+app.include_router(prompt_router)
 
 # CORS - allows your frontend to call this API
 app.add_middleware(
@@ -93,21 +98,21 @@ async def get_trace(
     trace_id: str,
     user_id: str = Header(..., alias="X-User-ID")
 ):
-    # try:
-    trace = db.get_trace_by_id(trace_id)
+    try:
+        trace = db.get_trace_by_id(trace_id)
 
-    if not trace:
-        raise HTTPException(status_code=404, detail="Trace not found")
+        if not trace:
+            raise HTTPException(status_code=404, detail="Trace not found")
 
-    # check if the user has access to this trace
-    if trace.get('user_id') != user_id:
-        raise HTTPException(status_code=403, detail="Access denied")
+        # check if the user has access to this trace
+        if trace.get('user_id') != user_id:
+            raise HTTPException(status_code=403, detail="Access denied")
 
-    return trace
-    # except HTTPException:
-    #     raise
-    # except Exception as e:
-    #     raise HTTPException(status_code=500, detail=str(e))
+        return trace
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # get all the spans for a specific trace
 

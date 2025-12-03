@@ -1,10 +1,11 @@
 import datetime
+import json
 import os
 import psycopg2
 from psycopg2.extras import RealDictCursor, execute_values
 from psycopg2.pool import SimpleConnectionPool
 from dotenv import load_dotenv
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from uuid import UUID
 from psycopg2.extras import execute_values
 
@@ -156,14 +157,16 @@ class SupabaseDB:
                         input_preview, input_blob_url,
                         output_preview, output_blob_url,
                         llm_model, prompt_tokens, completion_tokens,
-                        cost, status, error_message
+                        cost, status, error_message, prompt_id,
+                        prompt_name, prompt_version, prompt_hash
                     ) VALUES (
                         %s, %s, %s::uuid[], %s,
                         %s, %s, %s,
                         %s, %s,
                         %s, %s,
                         %s, %s, %s,
-                        %s, %s, %s
+                        %s, %s, %s,
+                        %s, %s, %s, %s
                     )
                     RETURNING span_id
                 """
@@ -184,7 +187,11 @@ class SupabaseDB:
                     span_data.get('completion_tokens'),
                     span_data.get('cost'),
                     span_data.get('status'),
-                    span_data.get('error_message')
+                    span_data.get('error_message'),
+                    span_data.get('prompt_id'),
+                    span_data.get('prompt_name'),
+                    span_data.get('prompt_version'),
+                    span_data.get('prompt_hash')
                 ))
                 result = cur.fetchone()
                 conn.commit()
@@ -617,7 +624,8 @@ class SupabaseDB:
                         duration, input_preview, input_blob_url, output_preview,
                         output_blob_url, llm_model, prompt_tokens, completion_tokens,
                         cost, status, error_message,
-                        is_streaming, time_to_first_token, tokens_per_second
+                        is_streaming, time_to_first_token, tokens_per_second,
+                        prompt_id, prompt_name, prompt_version, prompt_hash
                     ) VALUES %s
                     RETURNING span_id
                 """
@@ -633,13 +641,17 @@ class SupabaseDB:
                         span['status'], span['error_message'],
                         span.get('is_streaming', False),
                         span.get('time_to_first_token'),
-                        span.get('tokens_per_second')
+                        span.get('tokens_per_second'),
+                        span.get('prompt_id'),
+                        span.get('prompt_name'),
+                        span.get('prompt_version'),
+                        span.get('prompt_hash')
                     )
                     for span in spans
                 ]
 
                 # Use explicit UUID casting in template
-                template = "(%s, %s, %s::uuid[], %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                template = "(%s, %s, %s::uuid[], %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
                 execute_values(cur, query, values, template=template, fetch=True)
 
                 conn.commit()
@@ -649,7 +661,411 @@ class SupabaseDB:
             raise Exception(f"Failed to batch insert spans: {e}")
         finally:
             self.return_connection(conn)
+    
+    def check_identical_hash(self, hash_val: str, agent_id: str) -> Optional[bool]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                query = """
+                    SELECT * FROM prompt_versions
+                    WHERE prompt_hash = %s
+                    AND agent_id = %s
+                """
+                cur.execute(query, (hash_val, agent_id))
 
+                result = cur.fetchone()
+                if not result:
+                    return None
+
+                span = dict(result)
+                if len(span) != 0:
+                    return True
+                return False
+        except Exception as e:
+            conn.rollback()
+            raise Exception(f"Failed to check for identical hash: {e}")
+        finally:
+            self.return_connection(conn)
+    
+    def max_version_prompt_number(self, name: str) -> int:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                query = """
+                    SELECT COALESCE(MAX(version_number), 0) + 1 
+                    FROM prompt_versions 
+                    WHERE name = %s
+                """
+
+                cur.execute(query, (
+                    name,
+                ))
+                result = cur.fetchone()
+                conn.commit()
+                return {"Version number": result}
+        except Exception as e:
+            conn.rollback()
+            raise Exception(f"Failed to query largest prompt number")
+        finally:
+            self.return_connection(conn)
+    
+    def insert_prompt_row(self, name: str, version_number: int, s3_url: str,
+                          agent_id: str, prompt_hash: str, content_preview: str,
+                          parent_version_id: str = None):
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                query = """
+                    INSERT INTO prompt_versions (
+                        prompt_id,
+                        name,
+                        version_number,
+                        s3_url,
+                        created_at,
+                        is_active,
+                        agent_id,
+                        prompt_hash,
+                        content_preview,
+                        metadata,
+                        parent_version_id
+                    ) VALUES (
+                        gen_random_uuid(),  -- prompt_id
+                        %s,                 -- name
+                        %s,                 -- version_number
+                        %s,                 -- s3_url
+                        NOW(),              -- created_at
+                        TRUE,               -- is_active
+                        %s,                 -- agent_id
+                        %s,                 -- prompt_hash
+                        %s,                 -- content_preview
+                        '{}'::jsonb,        -- metadata (empty by default)
+                        %s                  -- parent_version_id
+                    )
+                    RETURNING
+                        prompt_id,
+                        name,
+                        version_number,
+                        s3_url,
+                        created_at,
+                        is_active,
+                        agent_id,
+                        prompt_hash,
+                        content_preview,
+                        metadata,
+                        parent_version_id;
+                """
+
+                cur.execute(
+                    query,
+                    (name, version_number, s3_url, agent_id, prompt_hash, content_preview, parent_version_id)
+                )
+                created_prompt = cur.fetchone()
+                conn.commit()
+                columns = [
+                    "prompt_id", "name", "version_number", "s3_url",
+                    "created_at", "is_active", "agent_id", "prompt_hash",
+                    "content_preview", "metadata", "parent_version_id"
+                ]
+
+            return dict(zip(columns, created_prompt))
+        except Exception as e:
+            conn.rollback()
+            raise Exception(f"Failed to insert row into prompt versions")
+        finally:
+            self.return_connection(conn)
+    
+    # gets all the propmt families with their latest versions and version counts
+    def get_all_prompt_families(self, user_id: str) -> List[Dict]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:  # Use RealDictCursor
+                query = """
+                    SELECT
+                        pv.name,
+                        pv.agent_id,
+                        a.agent_name,
+                        COUNT(*) as version_count,
+                        MAX(pv.version_number) as latest_version,
+                        MAX(pv.created_at) as last_updated
+                    FROM prompt_versions pv
+                    LEFT JOIN agents a ON pv.agent_id = a.agent_id
+                    WHERE a.user_id = %s OR pv.agent_id IS NULL OR a.user_id IS NULL
+                    GROUP BY pv.name, pv.agent_id, a.agent_name
+                    ORDER BY MAX(pv.created_at) DESC
+                """
+                cur.execute(query, (user_id,))
+                return cur.fetchall()  # fetchall() will return a list of dictionaries
+        except Exception as e:
+            conn.rollback()
+            raise Exception(f"Failed to get prompt families: {str(e)}")
+        finally:
+            self.return_connection(conn)
+
+    def get_prompts_by_agent_id(self, agent_id: str) -> List[Dict]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                query = """
+                    SELECT * from prompt_versions
+                    WHERE agent_id = %s
+                """
+                cur.execute(query, (agent_id,))
+                rows = cur.fetchall()
+
+            prompts = [dict(row) for row in rows]
+
+            # group prompts by name
+            families = {}
+            for p in prompts:
+                name = p["name"]
+                if name not in families:
+                    families[name] = {
+                        "name": name,
+                        "version_count": 0,
+                        "versions": []
+                    }
+
+                families[name]["versions"].append(p)
+                families[name]["version_count"] += 1
+
+            # convert the mapping to a list
+            return list(families.values())
+        except Exception as e:
+            conn.rollback()
+            raise Exception(f"Failed to get prompts by agent id")
+        finally:
+            self.return_connection(conn)
+        
+    def get_s3url_prompt(self, name: str, version_number:int=None) -> List[Dict]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                if version_number:
+                    query = """
+                        SELECT s3_url FROM prompt_versions
+                        WHERE name = %s
+                        AND version_number = %s
+                    """
+                    cur.execute(
+                        query,
+                        (name, version_number)
+                    )
+                    result = cur.fetchone()
+                    conn.commit()
+                    return {"S3 URL": result}
+                else:
+                    query = """
+                        SELECT s3_url FROM prompt_versions
+                        WHERE prompt_id = %s
+                    """
+                    cur.execute(
+                        query,
+                        (name)
+                    )
+                    result = cur.fetchone()
+                    conn.commit()
+                    return {"S3 URL": result}
+        except Exception as e:
+            raise Exception(f"Failed to get s3URL by prompt id")
+        finally:
+            self.return_connection(conn)
+
+    def get_prompts_versions(self, name: str) -> List[Dict]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                query = """
+                    SELECT version_number, metadata, created_at, is_active
+                    FROM prompt_versions
+                    WHERE name = %s
+                    ORDER BY version_number DESC
+                """
+                cur.execute(
+                    query,
+                    (name,)
+                )
+                rows = cur.fetchall()
+            
+            versions = [
+                {
+                    "version_number": row[0],
+                    "metadata": row[1],
+                    "created_at": row[2],
+                    "is_active": row[3],
+                }
+                for row in rows
+            ]
+            return versions
+        except Exception as e:
+            raise Exception(f"Failed to get all prompt versions")
+        finally:
+            self.return_connection(conn)
+    
+    def get_prompt_version(self, name: str, version_number: int) -> List[Dict]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                query = """
+                    SELECT prompt_id, s3_url, agent_id, prompt_hash, content_preview, metadata, parent_version_id
+                    FROM prompt_versions
+                    WHERE name = %s
+                    AND version_number = %s
+                """
+                cur.execute(
+                    query,
+                    (name, version_number,)
+                )
+                row = cur.fetchone()
+
+            if not row:
+                return None
+
+            return {
+                "prompt_id": row[0],
+                "s3_url": row[1],
+                "agent_id": row[2],
+                "prompt_hash": row[3],
+                "content_preview": row[4],
+                "metadata": row[5],
+                "parent_version_id": row[6],
+            }
+                
+        except Exception as e:
+            raise Exception(f"Failed to get prompt version")
+        finally:
+            self.return_connection(conn)
+
+    def deactivate_version(self, name: str, version_number: int) -> bool:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                query = """
+                    UPDATE prompt_versions
+                    SET is_active = False
+                    WHERE name = %s
+                    AND version_number = %s
+                """
+                cur.execute(
+                    query,
+                    (name, version_number)
+                )
+            return "sucessful"
+        except Exception as e:
+            raise Exception(f"Failed to get all prompt versions")
+        finally:
+            self.return_connection(conn)
+    
+    def get_prompt_analytics(self, prompt_name: str) -> List[Dict[str, Any]]:
+        """
+        Get consolidated analytics for all versions of a prompt family.
+        Returns trace count, avg cost, avg latency, and error rate per version.
+        """
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                query = """
+                    SELECT
+                        pv.prompt_id,
+                        pv.name,
+                        pv.version_number,
+                        COUNT(DISTINCT s.trace_id) AS trace_count,
+                        COALESCE(AVG(s.cost), 0) AS avg_cost,
+                        COALESCE(AVG(s.duration), 0) AS avg_latency,
+                        COUNT(DISTINCT CASE WHEN s.error_message IS NOT NULL THEN s.trace_id END) AS error_traces,
+                        ROUND(
+                            COUNT(DISTINCT CASE WHEN s.error_message IS NOT NULL THEN s.trace_id END)::FLOAT
+                            / NULLIF(COUNT(DISTINCT s.trace_id), 0) * 100, 2
+                        ) AS error_rate_pct
+                    FROM prompt_versions pv
+                    LEFT JOIN spans s ON s.prompt_id = pv.prompt_id
+                    WHERE pv.name = %s
+                    GROUP BY pv.prompt_id, pv.name, pv.version_number
+                    ORDER BY pv.version_number DESC;
+                """
+                cur.execute(query, (prompt_name,))
+                rows = cur.fetchall()
+
+            return [dict(r) for r in rows]
+        except Exception as e:
+            raise Exception(f"Failed to get prompt analytics: {e}")
+        finally:
+            self.return_connection(conn)
+    
+    def get_content_by_promptid(self, prompt_id: str) -> tuple | None:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                query = """
+                    SELECT s3_url
+                    FROM prompt_versions
+                    WHERE prompt_id = %s
+                """
+                cur.execute(query, (prompt_id,))
+                row = cur.fetchone()
+            
+            return row
+        except Exception as e:
+            raise Exception(f"Failed to get prompt analytics: {e}")
+        finally:
+            self.return_connection(conn)
+    
+    # gets analytics for two versions of a prompt
+    def get_prompt_analytics_for_prompt_ids(self, prompt_id1: str, prompt_id2: str) -> List[Dict[str, Any]]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                query = """
+                    SELECT
+                        pv.prompt_id,
+                        pv.name,
+                        pv.version_number,
+                        COUNT(DISTINCT s.trace_id) AS trace_count,
+                        COALESCE(AVG(s.cost), 0) AS avg_cost,
+                        COALESCE(AVG(s.duration), 0) AS avg_latency,
+                        COUNT(DISTINCT CASE WHEN s.error_message IS NOT NULL THEN s.trace_id END) AS error_traces,
+                        ROUND(
+                            COUNT(DISTINCT CASE WHEN s.error_message IS NOT NULL THEN s.trace_id END)::FLOAT
+                            / NULLIF(COUNT(DISTINCT s.trace_id), 0) * 100, 2
+                        ) AS error_rate_pct
+                    FROM prompt_versions pv
+                    LEFT JOIN spans s ON s.prompt_id = pv.prompt_id
+                    WHERE pv.prompt_id IN (%s, %s)
+                    GROUP BY pv.prompt_id, pv.name, pv.version_number
+                    ORDER BY pv.version_number DESC;
+                """
+                cur.execute(query, (prompt_id1, prompt_id2))
+                rows = cur.fetchall()
+
+            # Convert rows to dicts using cursor description
+            col_names = [desc[0] for desc in cur.description]
+            return [dict(zip(col_names, row)) for row in rows]
+        except Exception as e:
+            raise Exception(f"Failed to get prompt analytics: {e}")
+        finally:
+            self.return_connection(conn)
+    
+    def get_output_preview(self, prompt_id: str, limit: int = 5) -> List[Dict[str, Any]]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                query = """
+                    SELECT output_preview, output_blob_url, cost, duration, error_message
+                    FROM spans
+                    WHERE prompt_id = %s
+                    AND output_preview IS NOT NULL
+                    ORDER BY start_time DESC
+                    LIMIT %s
+                """
+                cur.execute(query, (prompt_id, limit))
+                rows = cur.fetchall()
+            
+            col_names = [desc[0] for desc in cur.description]
+            return [dict(zip(col_names, row)) for row in rows]
+        except Exception as e:
+            raise Exception(f"Failed to get prompt analytics: {e}")
+        finally:
+            self.return_connection(conn)
+        
     # closes all the connections in the pool
     def close(self):
         self.pool.closeall()

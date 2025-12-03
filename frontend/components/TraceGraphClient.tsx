@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useMemo, useEffect } from "react";
+import { useCallback, useMemo, useEffect, useState } from "react";
 import useSWR from "swr";
 import ReactFlow, {
   Node,
@@ -18,6 +18,10 @@ import ReactFlow, {
 import "reactflow/dist/style.css";
 import { Span } from "@/lib/types";
 import GraphNode from "@/components/GraphNode";
+import PromptVersionPanel from "@/components/PromptVersionPanel";
+import PromptContentViewer from "@/components/PromptContentViewer";
+import PromptDiffViewer from "@/components/PromptDiffViewer";
+import { fetchPromptContent, fetchPromptDiff, rollbackPrompt } from "@/lib/prompt-api";
 
 interface NodePosition {
   x: number;
@@ -86,12 +90,7 @@ function CustomNode({
 }: {
   data: {
     span: Span;
-    onDrag?: (
-      spanId: string,
-      deltaX: number,
-      deltaY: number,
-      commit: boolean
-    ) => void;
+    onPromptClick?: (promptName: string) => void;
   };
 }) {
   return (
@@ -111,7 +110,12 @@ function CustomNode({
       />
       {/* GraphNode component - wrapped in div to allow dragging */}
       <div>
-        <GraphNode span={data.span} x={0} y={0} />
+        <GraphNode
+          span={data.span}
+          x={0}
+          y={0}
+          onPromptClick={data.onPromptClick}
+        />
       </div>
       {/* Handle for outgoing edges (bottom) - invisible but functional */}
       <Handle
@@ -143,6 +147,25 @@ export default function TraceGraphClient({
   const traceId = initialSpans.length > 0 ? initialSpans[0].trace_id : null;
   const DEFAULT_USER_ID = "00000000-0000-0000-0000-000000000000";
 
+  // Prompt panel state
+  const [selectedPromptName, setSelectedPromptName] = useState<string | null>(null);
+  const [isPanelOpen, setIsPanelOpen] = useState(false);
+
+  // Content viewer state
+  const [viewingContent, setViewingContent] = useState<{
+    content: string;
+    version: number;
+    promptName: string;
+  } | null>(null);
+
+  // Diff viewer state
+  const [diffState, setDiffState] = useState<{
+    promptName: string;
+    oldVersion: number;
+    newVersion: number;
+    diff: string;
+  } | null>(null);
+
   // Fetch spans with SWR for real-time updates (polls every 2 seconds)
   const { data: fetchedSpans } = useSWR(
     traceId ? `/traces/${traceId}/spans` : null,
@@ -166,19 +189,89 @@ export default function TraceGraphClient({
       fallbackData: initialSpans,
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
-      dedupingInterval: 2000, // Prevent duplicate requests within 2s
-      keepPreviousData: true, // Smooth transitions between updates
+      dedupingInterval: 2000,
+      keepPreviousData: true,
     }
   );
 
   const spans = fetchedSpans || initialSpans;
   const spanIds = spans.map((s) => s.span_id).join(",");
 
+  // Handler for prompt badge clicks
+  const handlePromptClick = useCallback((promptName: string) => {
+    setSelectedPromptName(promptName);
+    setIsPanelOpen(true);
+  }, []);
+
+  // Handler for viewing a specific version
+  const handleViewVersion = useCallback(async (version: number) => {
+    if (!selectedPromptName) return;
+
+    const content = await fetchPromptContent(DEFAULT_USER_ID, selectedPromptName, version);
+    if (content) {
+      setViewingContent({
+        content,
+        version,
+        promptName: selectedPromptName,
+      });
+    }
+  }, [selectedPromptName]);
+
+  // Handler for comparing two versions
+  const handleCompare = useCallback(async (version1: number, version2: number) => {
+    if (!selectedPromptName) return;
+
+    // Fetch both versions' content
+    const [content1, content2] = await Promise.all([
+      fetchPromptContent(DEFAULT_USER_ID, selectedPromptName, version1),
+      fetchPromptContent(DEFAULT_USER_ID, selectedPromptName, version2),
+    ]);
+
+    if (content1 && content2) {
+      // Create a simple unified diff format
+      const lines1 = (content1 as string).split('\n');
+      const lines2 = (content2 as string).split('\n');
+      const diffLines: string[] = [];
+
+      // Simple line-by-line comparison
+      const maxLen = Math.max(lines1.length, lines2.length);
+      for (let i = 0; i < maxLen; i++) {
+        const line1 = lines1[i];
+        const line2 = lines2[i];
+        if (line1 === line2) {
+          diffLines.push(` ${line1 || ''}`);
+        } else {
+          if (line1 !== undefined) diffLines.push(`-${line1}`);
+          if (line2 !== undefined) diffLines.push(`+${line2}`);
+        }
+      }
+
+      setDiffState({
+        promptName: selectedPromptName,
+        oldVersion: version1,
+        newVersion: version2,
+        diff: diffLines.join('\n'),
+      });
+    }
+  }, [selectedPromptName]);
+
+  // Handler for rollback
+  const handleRollback = useCallback(async (version: number) => {
+    if (!selectedPromptName) return;
+
+    const result = await rollbackPrompt(DEFAULT_USER_ID, selectedPromptName, version);
+    if (result) {
+      // Close and reopen panel to refresh versions
+      setIsPanelOpen(false);
+      setTimeout(() => setIsPanelOpen(true), 100);
+    }
+  }, [selectedPromptName]);
+
   // Calculate layout when spans change
   const initialLayout = useMemo(
     () => calculateDAGLayout(spans),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [spanIds, spans] // spanIds needed to detect span additions/removals
+    [spanIds, spans]
   );
 
   // Convert to React Flow nodes
@@ -188,10 +281,10 @@ export default function TraceGraphClient({
         id: pos.span.span_id,
         type: "custom",
         position: { x: pos.x, y: pos.y },
-        data: { span: pos.span },
+        data: { span: pos.span, onPromptClick: handlePromptClick },
         draggable: true,
       })),
-    [initialLayout]
+    [initialLayout, handlePromptClick]
   );
 
   // Convert to React Flow edges
@@ -237,7 +330,7 @@ export default function TraceGraphClient({
   }, []);
 
   return (
-    <div className="w-full h-full">
+    <div className="w-full h-full relative">
       <ReactFlow
         key={spanIds}
         nodes={nodes}
@@ -295,6 +388,38 @@ export default function TraceGraphClient({
           maskColor="rgba(0, 0, 0, 0.05)"
         />
       </ReactFlow>
+
+      {/* Prompt Version Panel */}
+      <PromptVersionPanel
+        promptName={selectedPromptName}
+        isOpen={isPanelOpen}
+        onClose={() => {
+          setIsPanelOpen(false);
+          setSelectedPromptName(null);
+        }}
+        onView={handleViewVersion}
+        onCompare={handleCompare}
+        onRollback={handleRollback}
+      />
+
+      {/* Content Viewer Modal */}
+      <PromptContentViewer
+        isOpen={!!viewingContent}
+        onClose={() => setViewingContent(null)}
+        promptName={viewingContent?.promptName || ''}
+        versionNumber={viewingContent?.version || 0}
+        content={viewingContent?.content || ''}
+      />
+
+      {/* Diff Viewer Modal */}
+      <PromptDiffViewer
+        isOpen={!!diffState}
+        onClose={() => setDiffState(null)}
+        promptName={diffState?.promptName || ''}
+        version1={diffState?.oldVersion || 0}
+        version2={diffState?.newVersion || 0}
+        diff={diffState?.diff || ''}
+      />
     </div>
   );
 }

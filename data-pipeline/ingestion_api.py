@@ -32,10 +32,16 @@ class SpanIn(BaseModel):
     error_message: Optional[str] = None
     user_id: str
     agent_id: Optional[str] = None
+
     # Streaming fields
     is_streaming: Optional[bool] = False
     time_to_first_token: Optional[float] = None
     tokens_per_second: Optional[float] = None
+
+    # 🆕 new fields
+    prompt_id: Optional[str] = None
+    prompt_version: Optional[str] = None
+    prompt_hash: Optional[str] = None
 
 
 class EndTraceIn(BaseModel):
@@ -180,6 +186,10 @@ def validate_span(span: SpanIn) -> bool:
         
         # Streaming fields are optional
         if attr_name in ('is_streaming', 'time_to_first_token', 'tokens_per_second'):
+            continue
+        
+        # Prompt versioning fields are optional
+        if attr_name in ('prompt_id', 'prompt_version', 'prompt_hash'):
             continue
 
         if attr_value is None:
