@@ -50,6 +50,7 @@ class Span:
 
     # prompt versioning
     prompt_id: Optional[str] = None
+    prompt_name: Optional[str] = None
     prompt_version: Optional[str] = None
     prompt_hash: Optional[str] = None
 
@@ -90,6 +91,7 @@ class Span:
             "time_to_first_token": self.time_to_first_token,
             "tokens_per_second": self.tokens_per_second,
             "prompt_id": self.prompt_id,
+            "prompt_name": self.prompt_name,
             "prompt_version": self.prompt_version,
             "prompt_hash": self.prompt_hash,
         }

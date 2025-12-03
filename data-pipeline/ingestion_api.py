@@ -40,6 +40,7 @@ class SpanIn(BaseModel):
 
     # 🆕 new fields
     prompt_id: Optional[str] = None
+    prompt_name: Optional[str] = None
     prompt_version: Optional[str] = None
     prompt_hash: Optional[str] = None
 
@@ -189,7 +190,7 @@ def validate_span(span: SpanIn) -> bool:
             continue
         
         # Prompt versioning fields are optional
-        if attr_name in ('prompt_id', 'prompt_version', 'prompt_hash'):
+        if attr_name in ('prompt_id', 'prompt_name', 'prompt_version', 'prompt_hash'):
             continue
 
         if attr_value is None:
