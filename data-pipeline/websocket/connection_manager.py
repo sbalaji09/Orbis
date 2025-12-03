@@ -99,3 +99,11 @@ class ConnectionManager:
         
         for ws in conns:
             await self._safe_send_json(ws, message)
+
+    # sends a message to all connections associated with a certain trace_id
+    async def send_to_trace_subscribers(self, trace_id: str, message: dict) -> None:
+        async with self._lock:
+            conns = list(self._trace_connections.get(trace_id, []))
+        
+        for ws in conns:
+            await self._safe_send_json(ws, message)
