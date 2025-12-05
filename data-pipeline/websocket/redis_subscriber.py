@@ -75,8 +75,68 @@ class RedisSubscriber:
             logger.error(f"Failed to connect to Redis: {e}")
             await self._cleanup()
             return False
+    
+    # this is the main loop which connects, listens, and reconnects on failure
+    async def _run_forever(self) -> None:
+        while self._running:
+            try:
+                if not await self._connect():
+                    logger.warning(f"Reconnecting in {RECONNECT_DELAY}s...")
+                    await asyncio.sleep(RECONNECT_DELAY)
+                    continue
+
+                await self._listen()
+            
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Redis subscriber error: {e}", exc_info=True)
+                await self._cleanup()
+                if self._running:
+                    logger.warning(f"Reconnecting in {RECONNECT_DELAY}s...")
+                    await asyncio.sleep(RECONNECT_DELAY)
+    
+    # listens for Redis messages and routes them to the correct Websocket connection
+    async def _listen(self) -> None:
+        async for message in self._pubsub.listen():
+            if not self._running:
+                break
+
+            if message["type"] != "pmessage":
+                continue
+
+            try:
+                channel = message["channel"]
+                data = json.loads(message["data"])
+
+                await self._route_message(channel, data)
+
+            except json.JSONDecodeError as e:
+                logger.warning(f"Invalid JSON in Redis message: {e}")
+            except Exception as e:
+                logger.error(f"Error routing message: {e}", exc_info=True)
+    
+    async def _route_message(self, channel: str, data: dict) -> None:
+        trace_match = re.match(r"^trace:([^:]+)$", channel)
+        if trace_match:
+            trace_id = trace_match.group(1)
+            await self.connection_manager.send_to_trace_subscribers(trace_id, data)
+            return
         
+        user_match = re.match(r"^user:([^:]+):spans$", channel)
+        if user_match:
+            user_id = user_match.group(1)
+            await self.connection_manager.broadcast_to_user()
+            return
 
+        logger.debug(f"Unhandled channel pattern: {channel}")
 
-    
-    
+redis_subscriber: Optional[RedisSubscriber] = None
+
+def get_redis_subscriber() -> Optional[RedisSubscriber]:
+    return redis_subscriber
+
+def init_redis_subscriber(connection_manager: ConnectionManager) -> RedisSubscriber:
+    global redis_subscriber
+    redis_subscriber = RedisSubscriber(connection_manager)
+    return redis_subscriber
