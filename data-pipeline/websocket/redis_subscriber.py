@@ -22,6 +22,7 @@ class RedisSubscriber:
         self._running = False
         self._task: Optional[asyncio.Task] = None
     
+    # start the Redis subscriber running as a background task
     async def start(self) -> None:
         if self._running:
             return
@@ -30,6 +31,7 @@ class RedisSubscriber:
         self._task = asyncio.create_task(self._run_forever())
         logger.info("Redis subscriber started")
     
+    # stop the Redis subscriber and cleanup
     async def stop(self) -> None:
         self._running = False
         if self._task:
@@ -41,5 +43,40 @@ class RedisSubscriber:
         
         await self._cleanup()
         logger.info("Redis subscriber stopped")
+
+    # cleanup the Redis connection after you stop it
+    async def _cleanup(self) -> None:
+        if self._pubsub:
+            try:
+                await self._pubsub.punsubscribe("trace:*")
+                await self._pubsub.punsubscribe("user:*:spans")
+            except Exception as e:
+                logger.warning(f"Error closing pubsub: {e}")
+        
+        if self._redis:
+            try:
+                await self._redis.close()
+            except Exception as e:
+                logger.warning(f"Error closing redis: {e}")
+            self._redis = None
+    
+    # establish Redis connection and subscribe to patterns
+    async def _connect(self) -> bool:
+        try:
+            self._redis = aioredis.from_url(REDIS_URL, decode_responses=True)
+            self._pubsub = self._redis.pubsub()
+
+            await self._pubsub.psubscribe("trace:*")
+            await self._pubsub.psubscribe("user:*:spans")
+
+            logger.info("Redis subscriber connected and subscribed to patterns")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to connect to Redis: {e}")
+            await self._cleanup()
+            return False
+        
+
+
     
     
