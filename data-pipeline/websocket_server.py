@@ -7,8 +7,11 @@ from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
 from starlette.websockets import WebSocketState
 import asyncio
 import redis.asyncio as aioredis
+from websocket.connection_manager import ConnectionManager
+from websocket.redis_subscriber import init_redis_subscriber, get_redis_subscriber
 
 logger = logging.getLogger(__name__)
+connection_manager = ConnectionManager()
 
 # Redis connection for pub/sub
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
@@ -154,3 +157,14 @@ async def websocket_dashboard(websocket: WebSocket, user_id: str = Query(..., de
         if pubsub:
             await pubsub.unsubscribe(f"user:{user_id}:spans")
             await pubsub.close()
+
+@app.on_event("startup")
+async def startup_event():
+    subscriber = init_redis_subscriber(connection_manager)
+    await subscriber.start()
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    subscriber = get_redis_subscriber()
+    if subscriber:
+        await subscriber.stop()
