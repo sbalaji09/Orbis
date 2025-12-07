@@ -1,11 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import useSWRSubscription from "swr/subscription";
 import { Span } from "@/lib/types";
-import SpanModal from "./SpanModal";
 import PromptBadge from "./PromptBadge";
-import { Transition } from "@headlessui/react";
 
 interface GraphNodeProps {
   span: Span;
@@ -84,7 +83,7 @@ export default function GraphNode({
   isDragging,
   onPromptClick,
 }: DraggableGraphNodeProps) {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const router = useRouter();
   const [showTooltip, setShowTooltip] = useState(false);
 
   // SSE streaming for spans that are actively streaming
@@ -145,12 +144,11 @@ export default function GraphNode({
   };
 
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    // If no onDrag (React Flow handles dragging), just open modal on click
+    // If no onDrag (React Flow handles dragging), navigate to span detail page
     if (!onDrag) {
       e.stopPropagation();
       e.preventDefault();
-      console.log("GraphNode clicked, opening modal for:", currentSpan.name);
-      setIsModalOpen(true);
+      router.push(`/dashboard/span/${currentSpan.span_id}`);
       return;
     }
   };
@@ -183,9 +181,9 @@ export default function GraphNode({
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
 
-      // If didn't move much, open modal
+      // If didn't move much, navigate to span detail page
       if (!hasMoved) {
-        setIsModalOpen(true);
+        router.push(`/dashboard/span/${currentSpan.span_id}`);
       }
     };
 
@@ -368,11 +366,6 @@ export default function GraphNode({
           </div>
         )}
       </div>
-      <SpanModal
-        span={currentSpan}
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-      />
     </>
   );
 }

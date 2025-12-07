@@ -1,3 +1,4 @@
+from prompt_api import router as prompt_router
 from db_connection import db
 from fastapi import FastAPI, HTTPException, Query, Header
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,7 +13,6 @@ import asyncio
 # add parent directory to path
 sys.path.append(os.path.dirname(__file__))
 
-from prompt_api import router as prompt_router
 
 app = FastAPI(
     title="Orbis Query API",

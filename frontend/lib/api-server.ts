@@ -117,6 +117,29 @@ export async function getTrace(
   }
 }
 
+export async function getSpan(
+  spanId: string,
+  userId: string = DEFAULT_USER_ID
+): Promise<Span | null> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/spans/${spanId}`, {
+      headers: {
+        "X-User-ID": userId.toString(),
+      },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    return response.json();
+  } catch (error) {
+    console.error("Error fetching span:", error);
+    return null;
+  }
+}
+
 export async function getPromptsByAgent(
   agentId: string,
   userId: string = DEFAULT_USER_ID
