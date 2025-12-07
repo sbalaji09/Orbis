@@ -2,7 +2,7 @@ import React from "react";
 
 interface PromptBadgeProps {
   promptId: string | null;
-  promptVersion: number;
+  promptVersion: string;
   onClick?: () => void;
 }
 
@@ -24,7 +24,7 @@ export default function PromptBadge({
       <div
         onClick={onClick}
         className={`${baseClasses} ${interactiveClasses}`}
-        title={`Prompt ${promptId} v${promptVersion}`}
+        title={`Prompt ${promptId} ${promptVersion}`}
       >
         <svg
           className="w-3 h-3"
@@ -40,7 +40,7 @@ export default function PromptBadge({
           />
         </svg>
         <span className="truncate max-w-[80px]">{promptId}</span>
-        <span className="text-babyblue/60">v{promptVersion}</span>
+        <span className="text-babyblue/60">{promptVersion}</span>
       </div>
     );
   }

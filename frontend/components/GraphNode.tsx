@@ -85,7 +85,7 @@ export default function GraphNode({
 }: DraggableGraphNodeProps) {
   const router = useRouter();
   const [showTooltip, setShowTooltip] = useState(false);
-
+  console.log(span);
   // SSE streaming for spans that are actively streaming
   const { data: streamData } = useSWRSubscription(
     span.is_streaming ? `/spans/${span.span_id}/stream` : null,
@@ -265,10 +265,7 @@ export default function GraphNode({
               <div className="mb-2">
                 <PromptBadge
                   promptId={currentSpan.prompt_name}
-                  promptVersion={parseInt(
-                    currentSpan.prompt_version || "1",
-                    10
-                  )}
+                  promptVersion={currentSpan.prompt_version || "v1.0"}
                   onClick={() => {
                     if (onPromptClick && currentSpan.prompt_name) {
                       onPromptClick(currentSpan.prompt_name);
