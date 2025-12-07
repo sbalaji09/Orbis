@@ -1,21 +1,21 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import useSWRSubscription from 'swr/subscription';
-import { Tab, TabGroup, TabList, TabPanel, TabPanels } from '@headlessui/react';
-import { Span } from '@/lib/types';
+import { useState, useEffect } from "react";
+import useSWRSubscription from "swr/subscription";
+import { Tab, TabGroup, TabList, TabPanel, TabPanels } from "@headlessui/react";
+import { Span } from "@/lib/types";
 import {
   fetchPromptVersions,
   fetchPromptContent,
   rollbackPrompt,
   comparePrompts,
   PromptComparisonResult,
-} from '@/lib/prompt-api';
-import PromptAnalytics from '@/components/PromptAnalytics';
-import PromptContentViewer from '@/components/PromptContentViewer';
-import PromptComparisonView from '@/components/PromptComparisonView';
+} from "@/lib/prompt-api";
+import PromptAnalytics from "@/components/PromptAnalytics";
+import PromptContentViewer from "@/components/PromptContentViewer";
+import PromptComparisonView from "@/components/PromptComparisonView";
 
-const DEFAULT_USER_ID = 'user-1';
+const DEFAULT_USER_ID = "user-1";
 
 interface Version {
   prompt_id: string;
@@ -28,8 +28,8 @@ interface Version {
 
 // Skeleton component for loading states
 function Skeleton({
-  width = 'w-20',
-  height = 'h-4',
+  width = "w-20",
+  height = "h-4",
 }: {
   width?: string;
   height?: string;
@@ -40,48 +40,54 @@ function Skeleton({
 }
 
 function formatDuration(duration: number | null): string {
-  if (duration === null) return 'N/A';
+  if (duration === null) return "N/A";
   if (duration < 1) return `${duration.toFixed(2)}ms`;
   if (duration < 1000) return `${duration.toFixed(0)}ms`;
   return `${(duration / 1000).toFixed(3)}s`;
 }
 
 function formatCost(cost: number | null): string {
-  if (cost === null) return 'N/A';
+  if (cost === null) return "N/A";
   return `$${cost.toFixed(4)}`;
 }
 
 function formatDate(date: Date | null): string | null {
   if (!date) return null;
-  return new Date(date.toString() + 'Z').toLocaleString();
+  return new Date(date.toString() + "Z").toLocaleString();
 }
 
 interface SpanDetailClientProps {
   initialSpan: Span;
 }
 
-export default function SpanDetailClient({ initialSpan }: SpanDetailClientProps) {
+export default function SpanDetailClient({
+  initialSpan,
+}: SpanDetailClientProps) {
   const [selectedTab, setSelectedTab] = useState(0);
   const [versions, setVersions] = useState<Version[]>([]);
   const [versionsLoading, setVersionsLoading] = useState(false);
-  const [selectedVersions, setSelectedVersions] = useState<Set<number>>(new Set());
+  const [selectedVersions, setSelectedVersions] = useState<Set<number>>(
+    new Set()
+  );
   const [viewingContent, setViewingContent] = useState<{
     content: string;
     version: number;
   } | null>(null);
   const [comparisonOpen, setComparisonOpen] = useState(false);
-  const [comparisonVersions, setComparisonVersions] = useState<[number, number] | null>(null);
+  const [comparisonVersions, setComparisonVersions] = useState<
+    [number, number] | null
+  >(null);
   const [comparisonLoading, setComparisonLoading] = useState(false);
   const [comparisonError, setComparisonError] = useState<string | null>(null);
-  const [comparisonData, setComparisonData] = useState<PromptComparisonResult | null>(null);
+  const [comparisonData, setComparisonData] =
+    useState<PromptComparisonResult | null>(null);
   const [rollbackLoading, setRollbackLoading] = useState<number | null>(null);
 
   // SSE Subscription for real-time span updates (only if streaming)
   const { data: streamData } = useSWRSubscription<Span>(
     initialSpan.is_streaming ? `/spans/${initialSpan.span_id}/stream` : null,
     (key, { next }) => {
-      const apiUrl =
-        process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       const userId = DEFAULT_USER_ID;
       const url = `${apiUrl}${key}?user_id=${encodeURIComponent(userId)}`;
       const eventSource = new EventSource(url);
@@ -91,21 +97,21 @@ export default function SpanDetailClient({ initialSpan }: SpanDetailClientProps)
           const data = JSON.parse(event.data);
           next(null, data);
         } catch (err) {
-          console.error('Failed to parse SSE data:', err);
+          console.error("Failed to parse SSE data:", err);
         }
       };
 
-      eventSource.addEventListener('complete', () => {
+      eventSource.addEventListener("complete", () => {
         eventSource.close();
       });
 
-      eventSource.addEventListener('close', (event) => {
+      eventSource.addEventListener("close", (event) => {
         const data = JSON.parse(event.data);
-        console.log('SSE connection closed:', data.reason);
+        console.log("SSE connection closed:", data.reason);
         eventSource.close();
       });
 
-      eventSource.addEventListener('error', () => {
+      eventSource.addEventListener("error", () => {
         eventSource.close();
       });
 
@@ -131,7 +137,7 @@ export default function SpanDetailClient({ initialSpan }: SpanDetailClientProps)
       const data = await fetchPromptVersions(undefined, promptName);
       setVersions(data);
     } catch (err) {
-      console.error('Failed to load versions:', err);
+      console.error("Failed to load versions:", err);
     } finally {
       setVersionsLoading(false);
     }
@@ -139,7 +145,11 @@ export default function SpanDetailClient({ initialSpan }: SpanDetailClientProps)
 
   const handleView = async (version: number) => {
     if (!currentSpan?.prompt_name) return;
-    const content = await fetchPromptContent(undefined, currentSpan.prompt_name, version);
+    const content = await fetchPromptContent(
+      undefined,
+      currentSpan.prompt_name,
+      version
+    );
     if (content) {
       setViewingContent({ content, version });
     }
@@ -147,7 +157,7 @@ export default function SpanDetailClient({ initialSpan }: SpanDetailClientProps)
 
   const handleCompare = async () => {
     if (!currentSpan?.prompt_name || selectedVersions.size !== 2) return;
-    
+
     const [v1, v2] = Array.from(selectedVersions).sort((a, b) => b - a);
     const version1 = versions.find((v) => v.version_number === v1);
     const version2 = versions.find((v) => v.version_number === v2);
@@ -163,21 +173,27 @@ export default function SpanDetailClient({ initialSpan }: SpanDetailClientProps)
       const data = await comparePrompts(version1.prompt_id, version2.prompt_id);
       setComparisonData(data);
     } catch (err) {
-      setComparisonError(err instanceof Error ? err.message : 'Failed to load comparison');
+      setComparisonError(
+        err instanceof Error ? err.message : "Failed to load comparison"
+      );
     } finally {
       setComparisonLoading(false);
     }
   };
 
   const handleRollback = async (versionNumber: number) => {
-    if (!currentSpan?.prompt_name || !confirm(`Rollback to version ${versionNumber}?`)) return;
+    if (
+      !currentSpan?.prompt_name ||
+      !confirm(`Rollback to version ${versionNumber}?`)
+    )
+      return;
 
     setRollbackLoading(versionNumber);
     try {
       await rollbackPrompt(undefined, currentSpan.prompt_name, versionNumber);
       await loadVersions(currentSpan.prompt_name);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Rollback failed');
+      alert(err instanceof Error ? err.message : "Rollback failed");
     } finally {
       setRollbackLoading(null);
     }
@@ -194,17 +210,19 @@ export default function SpanDetailClient({ initialSpan }: SpanDetailClientProps)
   };
 
   const statusConfig = {
-    success: { bg: 'bg-emerald-50', text: 'text-success', dot: 'bg-success' },
-    failed: { bg: 'bg-red-50', text: 'text-error', dot: 'bg-error' },
-    running: { bg: 'bg-sky-50', text: 'text-babyblue', dot: 'bg-babyblue' },
-    pending: { bg: 'bg-amber-50', text: 'text-warning', dot: 'bg-warning' },
-    cancelled: { bg: 'bg-gray-50', text: 'text-muted', dot: 'bg-muted' },
+    success: { bg: "bg-emerald-50", text: "text-success", dot: "bg-success" },
+    failed: { bg: "bg-red-50", text: "text-error", dot: "bg-error" },
+    running: { bg: "bg-sky-50", text: "text-babyblue", dot: "bg-babyblue" },
+    pending: { bg: "bg-amber-50", text: "text-warning", dot: "bg-warning" },
+    cancelled: { bg: "bg-gray-50", text: "text-muted", dot: "bg-muted" },
   };
 
-  const status = statusConfig[currentSpan.status as keyof typeof statusConfig] || {
-    bg: 'bg-gray-50',
-    text: 'text-muted',
-    dot: 'bg-muted',
+  const status = statusConfig[
+    currentSpan.status as keyof typeof statusConfig
+  ] || {
+    bg: "bg-gray-50",
+    text: "text-muted",
+    dot: "bg-muted",
   };
 
   const hasPromptData = currentSpan.prompt_id || currentSpan.prompt_name;
@@ -218,8 +236,8 @@ export default function SpanDetailClient({ initialSpan }: SpanDetailClientProps)
             className={({ selected }) =>
               `px-4 py-2 text-sm font-medium border-2 transition-all focus:outline-none ${
                 selected
-                  ? 'bg-black text-mustard border-black'
-                  : 'bg-transparent text-black/60 border-transparent hover:text-foreground hover:bg-black/5'
+                  ? "bg-black text-mustard border-black"
+                  : "bg-transparent text-black/60 border-transparent hover:text-foreground hover:bg-black/5"
               }`
             }
           >
@@ -231,8 +249,8 @@ export default function SpanDetailClient({ initialSpan }: SpanDetailClientProps)
                 className={({ selected }) =>
                   `px-4 py-2 text-sm font-medium border-2 transition-all focus:outline-none ${
                     selected
-                      ? 'bg-black text-mustard border-black'
-                      : 'bg-transparent text-black/60 border-transparent hover:text-foreground hover:bg-black/5'
+                      ? "bg-black text-mustard border-black"
+                      : "bg-transparent text-black/60 border-transparent hover:text-foreground hover:bg-black/5"
                   }`
                 }
               >
@@ -242,8 +260,8 @@ export default function SpanDetailClient({ initialSpan }: SpanDetailClientProps)
                 className={({ selected }) =>
                   `px-4 py-2 text-sm font-medium border-2 transition-all focus:outline-none ${
                     selected
-                      ? 'bg-black text-mustard border-black'
-                      : 'bg-transparent text-black/60 border-transparent hover:text-foreground hover:bg-black/5'
+                      ? "bg-black text-mustard border-black"
+                      : "bg-transparent text-black/60 border-transparent hover:text-foreground hover:bg-black/5"
                   }`
                 }
               >
@@ -258,7 +276,9 @@ export default function SpanDetailClient({ initialSpan }: SpanDetailClientProps)
           <TabPanel>
             <div className="space-y-5 bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6">
               {/* Prompt Versioning Information */}
-              {(currentSpan.prompt_id || currentSpan.prompt_version || currentSpan.prompt_hash) && (
+              {(currentSpan.prompt_id ||
+                currentSpan.prompt_version ||
+                currentSpan.prompt_hash) && (
                 <div className="space-y-3">
                   <h4 className="text-xs font-semibold text-black/40 uppercase tracking-wide">
                     {`/* Prompt Version */`}
@@ -400,7 +420,8 @@ export default function SpanDetailClient({ initialSpan }: SpanDetailClientProps)
               )}
 
               {/* Token Information */}
-              {(currentSpan.prompt_tokens !== null || currentSpan.completion_tokens !== null) && (
+              {(currentSpan.prompt_tokens !== null ||
+                currentSpan.completion_tokens !== null) && (
                 <div className="space-y-3">
                   <h4 className="text-xs font-semibold text-black/40 uppercase tracking-wide">
                     {`/* Token Usage */`}
@@ -445,7 +466,8 @@ export default function SpanDetailClient({ initialSpan }: SpanDetailClientProps)
                           {currentSpan.prompt_tokens !== null &&
                           currentSpan.completion_tokens !== null ? (
                             (
-                              currentSpan.prompt_tokens + currentSpan.completion_tokens
+                              currentSpan.prompt_tokens +
+                              currentSpan.completion_tokens
                             ).toLocaleString()
                           ) : (
                             <Skeleton width="w-12" height="h-5" />
@@ -554,7 +576,9 @@ export default function SpanDetailClient({ initialSpan }: SpanDetailClientProps)
                 <PromptAnalytics promptName={currentSpan.prompt_name} />
               ) : (
                 <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-8 text-center">
-                  <p className="text-sm text-black/60">No prompt name available for analysis</p>
+                  <p className="text-sm text-black/60">
+                    No prompt name available for analysis
+                  </p>
                 </div>
               )}
             </TabPanel>
@@ -565,7 +589,9 @@ export default function SpanDetailClient({ initialSpan }: SpanDetailClientProps)
             <TabPanel>
               {!currentSpan.prompt_name ? (
                 <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-8 text-center">
-                  <p className="text-sm text-black/60">No prompt name available</p>
+                  <p className="text-sm text-black/60">
+                    No prompt name available
+                  </p>
                 </div>
               ) : versionsLoading ? (
                 <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-8">
@@ -627,14 +653,16 @@ export default function SpanDetailClient({ initialSpan }: SpanDetailClientProps)
                                 Version {version.version_number}
                               </h3>
                               {currentSpan.prompt_version &&
-                                parseInt(currentSpan.prompt_version) === version.version_number && (
+                                parseInt(currentSpan.prompt_version) ===
+                                  version.version_number && (
                                   <span className="px-2 py-0.5 text-[8px] font-bold uppercase tracking-wide bg-mustard text-white">
                                     Current
                                   </span>
                                 )}
                             </div>
                             <div className="text-[10px] text-black/40 mb-3">
-                              Created {new Date(version.created_at).toLocaleString()}
+                              Created{" "}
+                              {new Date(version.created_at).toLocaleString()}
                             </div>
                             <div className="text-xs text-black/60 font-mono mb-3">
                               Hash: {version.prompt_hash.substring(0, 12)}...
@@ -643,8 +671,12 @@ export default function SpanDetailClient({ initialSpan }: SpanDetailClientProps)
                           <div className="flex items-center gap-2 shrink-0">
                             <input
                               type="checkbox"
-                              checked={selectedVersions.has(version.version_number)}
-                              onChange={() => toggleVersionSelection(version.version_number)}
+                              checked={selectedVersions.has(
+                                version.version_number
+                              )}
+                              onChange={() =>
+                                toggleVersionSelection(version.version_number)
+                              }
                               disabled={
                                 !selectedVersions.has(version.version_number) &&
                                 selectedVersions.size >= 2
@@ -658,11 +690,15 @@ export default function SpanDetailClient({ initialSpan }: SpanDetailClientProps)
                               View
                             </button>
                             <button
-                              onClick={() => handleRollback(version.version_number)}
+                              onClick={() =>
+                                handleRollback(version.version_number)
+                              }
                               disabled={rollbackLoading !== null}
                               className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide border-2 border-error bg-error text-white hover:bg-error/90 disabled:opacity-50 transition-colors shadow-[2px_2px_0_rgba(0,0,0,0.1)]"
                             >
-                              {rollbackLoading === version.version_number ? '...' : 'Rollback'}
+                              {rollbackLoading === version.version_number
+                                ? "..."
+                                : "Rollback"}
                             </button>
                           </div>
                         </div>
@@ -683,7 +719,7 @@ export default function SpanDetailClient({ initialSpan }: SpanDetailClientProps)
           onClose={() => setViewingContent(null)}
           content={viewingContent.content}
           version={viewingContent.version}
-          promptName={currentSpan.prompt_name || 'Unknown'}
+          promptName={currentSpan.prompt_name || "Unknown"}
         />
       )}
 
@@ -696,7 +732,7 @@ export default function SpanDetailClient({ initialSpan }: SpanDetailClientProps)
             setComparisonData(null);
             setComparisonError(null);
           }}
-          promptName={currentSpan.prompt_name || 'Unknown'}
+          promptName={currentSpan.prompt_name || "Unknown"}
           version1={comparisonVersions[0]}
           version2={comparisonVersions[1]}
           comparisonData={comparisonData}
