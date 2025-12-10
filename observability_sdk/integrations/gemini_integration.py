@@ -9,6 +9,7 @@ import time
 from ..core.span import Span
 from ..collector.collector import get_collector
 from ..core.context import get_current_span, set_current_span
+from ..collector.config import get_config
 
 # Gemini pricing per 1M tokens (updated 11.19.25)
 GEMINI_PRICING = {
@@ -112,12 +113,14 @@ class GeminiInstrumentor:
         
         # Get parent context
         parent_span = get_current_span()
+
+        config = get_config()
         
         # Create span
         span = Span(
             name=f"gemini.{model_name}",
-            user_id="00000000-0000-0000-0000-000000000000",
-            agent_id="af913dc2-732e-42a6-a113-a80c694d71bf",
+            user_id=config.user_id or "11111111-1111-1111-1111-111111111111",
+            agent_id=config.project_id,
             model=model_name,
             prompt=prompt,
             is_streaming=is_streaming,
