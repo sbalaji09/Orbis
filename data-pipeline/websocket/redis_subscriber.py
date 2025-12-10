@@ -127,7 +127,7 @@ class RedisSubscriber:
         user_match = re.match(r"^user:([^:]+):spans$", channel)
         if user_match:
             user_id = user_match.group(1)
-            await self.connection_manager.broadcast_to_user()
+            await self.connection_manager.broadcast_to_user(user_id, data)
             return
 
         logger.debug(f"Unhandled channel pattern: {channel}")
