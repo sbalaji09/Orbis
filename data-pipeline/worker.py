@@ -594,6 +594,43 @@ class SpanWorker:
                 },
                 exc_info=True,
             )
+    
+    def publish_trace_completed(self, trace_id: str, user_id: str, trace_data: dict) -> None:
+        try:
+            if not trace_id and not user_id:
+                return
+            
+            message_dict = {
+                "event": "trace_completed",
+                "trace_id": trace_id,
+                "user_id": user_id,
+                "status": trace_data.get("status"),
+                "total_tokens": trace_data.get("total_tokens"),
+                "total_cost": trace_data.get("total_cost"),
+                "duration": trace_data.get("duration"),
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+
+            json_message = json.dumps(message_dict)
+
+            self.queue.redis_client.publish(f"trace:{trace_id}", json_message)
+            if user_id:
+                self.queue.redis_client.publish(f"user:{user_id}", json_message)
+            
+        except Exception as e:
+            self.logger.warning(
+                "Failed to publish trace update to Redis",
+                extra={
+                    "extra_data": {
+                        "trace_id": trace_id.get("trace_id"),
+                        "user_id": user_id,
+                        "worker_id": self.worker_id,
+                        "error": str(e),
+                    }
+                },
+                exc_info=True,
+            )
+
 
         
 def generate_hash_key(user_id: str, agent_id: str) -> str:
