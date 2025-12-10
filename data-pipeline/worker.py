@@ -518,6 +518,7 @@ class SpanWorker:
                 "total_cost": float(total_cost or 0)
             }
             db.update_trace(trace_id, update_data)
+            self.publish_trace_completed(trace_id, trace.get('user_id'), update_data)
             
             event = {
                 "type": "trace_completed",
