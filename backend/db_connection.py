@@ -973,8 +973,8 @@ class SupabaseDB:
                         COALESCE(AVG(s.duration), 0) AS avg_latency,
                         COUNT(DISTINCT CASE WHEN s.error_message IS NOT NULL THEN s.trace_id END) AS error_traces,
                         ROUND(
-                            COUNT(DISTINCT CASE WHEN s.error_message IS NOT NULL THEN s.trace_id END)::FLOAT
-                            / NULLIF(COUNT(DISTINCT s.trace_id), 0) * 100, 2
+                            (COUNT(DISTINCT CASE WHEN s.error_message IS NOT NULL THEN s.trace_id END)::NUMERIC
+                            / NULLIF(COUNT(DISTINCT s.trace_id), 0) * 100)::NUMERIC, 2
                         ) AS error_rate_pct
                     FROM prompt_versions pv
                     LEFT JOIN spans s ON s.prompt_id = pv.prompt_id
@@ -985,7 +985,9 @@ class SupabaseDB:
                 cur.execute(query, (prompt_name,))
                 rows = cur.fetchall()
 
-            return [dict(r) for r in rows]
+                # Convert rows to dicts using cursor description
+                col_names = [desc[0] for desc in cur.description]
+                return [dict(zip(col_names, row)) for row in rows]
         except Exception as e:
             raise Exception(f"Failed to get prompt analytics: {e}")
         finally:
@@ -1024,8 +1026,8 @@ class SupabaseDB:
                         COALESCE(AVG(s.duration), 0) AS avg_latency,
                         COUNT(DISTINCT CASE WHEN s.error_message IS NOT NULL THEN s.trace_id END) AS error_traces,
                         ROUND(
-                            COUNT(DISTINCT CASE WHEN s.error_message IS NOT NULL THEN s.trace_id END)::FLOAT
-                            / NULLIF(COUNT(DISTINCT s.trace_id), 0) * 100, 2
+                            (COUNT(DISTINCT CASE WHEN s.error_message IS NOT NULL THEN s.trace_id END)::NUMERIC
+                            / NULLIF(COUNT(DISTINCT s.trace_id), 0) * 100)::NUMERIC, 2
                         ) AS error_rate_pct
                     FROM prompt_versions pv
                     LEFT JOIN spans s ON s.prompt_id = pv.prompt_id
