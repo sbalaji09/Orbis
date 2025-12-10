@@ -63,4 +63,38 @@ export class WebSocketClient {
     get connectionState(): ConnectionState {
         return this.state
     }
+
+    on(type: WebSocketMessage["type"], listener: WebSocketListener): () => void {
+        if (!this.listeners.has(type)) {
+            this.listeners.set(type, new Set())
+        }
+        this.listeners.get(type)!.add(listener);
+
+        return () => {
+            this.off(type, listener)
+        };
+    }
+
+    off(type: WebSocketMessage["type"], listener: WebSocketListener): void {
+        const set = this.listeners.get(type);
+        if (!set) return;
+        set.delete(listener);
+        if (set.size == 0) {
+            this.listeners.delete(type);
+        }
+    }
+
+    // dispatch an incoming message to the right listeners
+    private emit(message: WebSocketMessage): void {
+        const set = this.listeners.get(message.type);
+        if (!set || set.size == 0) return;
+
+        for (const listener of set) {
+            try {
+                listener(message);
+            } catch (err) {
+                console.error("WebSocket listener error", err);
+            }
+        }
+    }
 }
