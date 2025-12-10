@@ -9,6 +9,7 @@ import asyncio
 import redis.asyncio as aioredis
 from websocket.connection_manager import ConnectionManager
 from websocket.redis_subscriber import init_redis_subscriber, get_redis_subscriber
+from auth.websocket_auth import validate_api_key, validate_trace_ownership
 
 logger = logging.getLogger(__name__)
 connection_manager = ConnectionManager()
@@ -67,25 +68,48 @@ class DashboardConnectionManager:
             await self.safe_send_json(ws, message)
 
 @app.websocket("/ws/traces/{trace_id}")
-async def websocket_trace(websocket: WebSocket, trace_id: str):
+async def websocket_trace(websocket: WebSocket, trace_id: str, api_key: str = Query(None, alias="api_key")):
+    if not api_key:
+        await websocket.close(code=4001, reason="Missing API key")
+    
+    user_id = await validate_api_key(api_key)
+    if not user_id:
+        await websocket.close(code=4401, reason="Invalid API key")
+        return
+    
+    if not await validate_trace_ownership(trace_id, user_id):
+        await websocket.close(code=4003, reason="Access denied - trace not found")
+    
     await connection_manager.connect(websocket, trace_id = trace_id)
+
     try:
-        await websocket.send_json({"event": "subscribed", "trace_id": trace_id})
+        await websocket.send_json({"event": "subscribed", "trace_id": trace_id, "user_id": trace_id})
         while True:
-            await websocket.receive_text()
+            data = await websocket.receive_text()
+            if data == "ping":
+                await websocket.send_json({"event": "pong"})
     except WebSocketDisconnect:
         pass
     finally:
         await connection_manager.disconnect(websocket)
 
+# stream real-time span updates for all traces belonging to a user
 @app.websocket("/ws/dashboard")
-async def websocket_dashboard(websocket: WebSocket, user_id: str = Query(..., description="User ID for dashboard subscription")):
-    """Stream real-time span updates for all traces belonging to a user."""
+async def websocket_dashboard(websocket: WebSocket, api_key: str = Query(None, alias="api-key")):
+    if not api_key:
+        await websocket.close(code=4001, reason="Missing API key")
+        return
+    
+    user_id = await validate_api_key(api_key)
+    if not user_id:
+        await websocket.close(code=4001, reason="Invalid API key")
+        return
+    
     await websocket.accept()
     pubsub = None
 
+    # background task to listen to Redis pub/sub messages
     async def redis_listener():
-        """Background task to listen for Redis pub/sub messages."""
         try:
             async for message in pubsub.listen():
                 if message["type"] == "message":
@@ -96,8 +120,8 @@ async def websocket_dashboard(websocket: WebSocket, user_id: str = Query(..., de
         except Exception as e:
             logger.error(f"Redis listener error for user {user_id}: {e}", exc_info=True)
 
+    # subscribe to user-specific Redis channel
     try:
-        # Subscribe to user-specific Redis channel
         pubsub = await get_redis_pubsub()
         await pubsub.subscribe(f"user:{user_id}:spans")
 
@@ -106,14 +130,13 @@ async def websocket_dashboard(websocket: WebSocket, user_id: str = Query(..., de
             "user_id": user_id,
         })
 
-        # Start Redis listener as background task
+        # start Redis listener as background task
         listener_task = asyncio.create_task(redis_listener())
 
-        # Handle incoming WebSocket messages (ping, filters, etc.)
+        # handle incoming WebSocket messages
         while True:
             try:
                 data = await websocket.receive_text()
-                # Handle ping/pong for keepalive
                 if data == "ping":
                     await websocket.send_json({"event": "pong"})
 
@@ -124,7 +147,7 @@ async def websocket_dashboard(websocket: WebSocket, user_id: str = Query(..., de
                 break
 
     finally:
-        # Cleanup: cancel listener and unsubscribe
+        # cancel listener and unsubscribe
         if 'listener_task' in locals():
             listener_task.cancel()
             try:
