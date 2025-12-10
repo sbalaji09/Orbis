@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 RECONNECT_DELAY = 5  # seconds to wait before reconnecting
 
+# centralized Redis pub/sub subscriber that routes messages to WebSocket connections via ConnectionManager
 class RedisSubscriber:
     def __init__(self, connection_manager: ConnectionManager) -> None:
         self.connection_manager = connection_manager

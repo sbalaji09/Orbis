@@ -66,40 +66,17 @@ class DashboardConnectionManager:
         for ws in conns:
             await self.safe_send_json(ws, message)
 
-
-connection_manager = DashboardConnectionManager()
-
-
 @app.websocket("/ws/traces/{trace_id}")
-async def websocket_trace_updates(websocket: WebSocket, trace_id: str):
-    """Stream real-time span updates for a specific trace."""
-    await websocket.accept()
-    pubsub = None
-
+async def websocket_trace(websocket: WebSocket, trace_id: str):
+    await connection_manager.connect(websocket, trace_id = trace_id)
     try:
-        # Subscribe to the trace-specific Redis channel
-        pubsub = await get_redis_pubsub()
-        await pubsub.subscribe(f"trace:{trace_id}")
-
-        await websocket.send_json({
-            "event": "subscribed",
-            "trace_id": trace_id,
-        })
-
-        # Listen for Redis messages and forward to WebSocket
-        async for message in pubsub.listen():
-            if message["type"] == "message":
-                data = json.loads(message["data"])
-                await websocket.send_json(data)
-
+        await websocket.send_json({"event": "subscribed", "trace_id": trace_id})
+        while True:
+            await websocket.receive_text()
     except WebSocketDisconnect:
-        logger.info(f"Client disconnected from trace {trace_id}")
-    except Exception as e:
-        logger.error(f"Error in trace WebSocket for {trace_id}: {e}", exc_info=True)
+        pass
     finally:
-        if pubsub:
-            await pubsub.unsubscribe(f"trace:{trace_id}")
-            await pubsub.close()
+        await connection_manager.disconnect(websocket)
 
 @app.websocket("/ws/dashboard")
 async def websocket_dashboard(websocket: WebSocket, user_id: str = Query(..., description="User ID for dashboard subscription")):
@@ -157,6 +134,8 @@ async def websocket_dashboard(websocket: WebSocket, user_id: str = Query(..., de
         if pubsub:
             await pubsub.unsubscribe(f"user:{user_id}:spans")
             await pubsub.close()
+
+connection_manager = DashboardConnectionManager()
 
 @app.on_event("startup")
 async def startup_event():
