@@ -530,7 +530,7 @@ class SpanWorker:
             }
 
             self.publish_event(f"trace:{trace_id}", event)
-            
+
             # cleanup Redis keys
             self.queue.redis_client.delete(
                 f"trace:{trace_id}:total_tokens",
@@ -562,7 +562,7 @@ class SpanWorker:
                 return
             
             message = {
-                "event": "span.inserted",
+                "event": "span_created",
                 "span_id": span_id,
                 "trace_id": trace_id,
                 "status": status,
