@@ -40,3 +40,27 @@ interface WebSocketClientOptions {
     maxReconnectAttempts?: number;
     baseDelay?: number; // ms
 }
+
+export class WebSocketClient {
+    private ws: WebSocket | null = null;
+    private url: string;
+    private apiKey: string;
+    private state: ConnectionState = "disconnected";
+    private reconnectAttemps = 0;
+    private maxReconnectAttemps: number;
+    private baseDelay: number;
+    private listeners: Map<string, Set<WebSocketListener>> = new Map();
+    private reconnectTimeout: NodeJS.Timeout | null = null;
+
+    constructor(url: string, apiKey: string, options: WebSocketClientOptions = {}) {
+        this.url = url;
+        this.apiKey = apiKey;
+        this.maxReconnectAttemps = options.maxReconnectAttempts ?? 10;
+        this.baseDelay = options.baseDelay ?? 1000;
+    }
+
+    // expose current connection state (read-only)
+    get connectionState(): ConnectionState {
+        return this.state
+    }
+}
