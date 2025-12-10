@@ -509,15 +509,28 @@ class SpanWorker:
                 duration = 0
             
             # update the trace in the database
+            end_time_iso = datetime.now(timezone.utc).isoformat()
             update_data = {
                 "status": "completed",
-                "end_time": datetime.now(timezone.utc).isoformat(),
+                "end_time": end_time_iso,
                 "duration": duration,
                 "total_tokens": int(float(total_tokens or 0)),
                 "total_cost": float(total_cost or 0)
             }
             db.update_trace(trace_id, update_data)
+            
+            event = {
+                "type": "trace_completed",
+                "trace_id": trace_id,
+                "status": update_data["status"],
+                "total_tokens": update_data["total_tokens"],
+                "total_cost": update_data["total_cost"],
+                "duration": update_data["duration"],
+                "timestamp": end_time_iso,
+            }
 
+            self.publish_event(f"trace:{trace_id}", event)
+            
             # cleanup Redis keys
             self.queue.redis_client.delete(
                 f"trace:{trace_id}:total_tokens",
@@ -535,6 +548,9 @@ class SpanWorker:
             }})
         except Exception as e:
             self.logger.error(f"Failed to finalize trace {trace_id}: {e}")
+    
+    def publish_event(self, channel: str, event: dict):
+        self.queue.redis_client.publish(channel, json.dumps(event))
     
     def publish_span_to_redis(self, span_data: dict, user_id: str | None = None) -> None:
         try:
