@@ -46,3 +46,10 @@ async def validate_api_key(api_key: str) -> Optional[str]:
             return user_id
     
     return None
+
+# check if a trace belongs to the given user
+async def validate_trace_ownership(trace_id: str, user_id: str) -> bool:
+    trace = db.get_trace_by_id(trace_id)
+    if not trace:
+        return False
+    return trace.get('user_id') == user_id
