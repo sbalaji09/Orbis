@@ -9,6 +9,7 @@ import functools
 from ..core.span import Span
 from ..collector.collector import get_collector
 from ..core.context import get_current_span, set_current_span
+from ..collector.config import get_config
 
 
 # openai pricing per 1M tokens (updated 11.12.25)
@@ -184,6 +185,9 @@ class OpenAIInstrumentor:
     
     # wrap an openai api call with span tracking
     def _trace_openai_call(self, original_func, *args, **kwargs):
+        
+        config = get_config() 
+        
         model = kwargs.get("model", "unknown")
         messages = kwargs.get("messages", [])
         is_streaming = kwargs.get("stream", False)
@@ -194,8 +198,8 @@ class OpenAIInstrumentor:
         # create span
         span = Span(
             name=f"openai.{model}",
-            user_id="00000000-0000-0000-0000-000000000000",
-            agent_id="af913dc2-732e-42a6-a113-a80c694d71bf",
+            user_id=config.user_id or "00000000-0000-0000-0000-000000000000",
+            agent_id=config.project_id,  # ← CHANGE THIS LINE
             model=model,
             prompt=extract_prompt_from_messages(messages),
             is_streaming=is_streaming,

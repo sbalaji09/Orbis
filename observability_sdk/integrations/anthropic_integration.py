@@ -8,6 +8,7 @@ import functools
 from ..core.span import Span
 from ..collector.collector import get_collector
 from ..core.context import get_current_span, set_current_span
+from ..collector.config import get_config
 import time
 
 # anthropic pricing per 1M tokens (updated 11.16.25)
@@ -190,12 +191,14 @@ class AnthropicInstrumentor:
 
         # Get parent context
         parent_span = get_current_span()
+
+        config = get_config()
         
         # create span
         span = Span(
             name=f"anthropic.{model}",
-            user_id="00000000-0000-0000-0000-000000000000",
-            agent_id="af913dc2-732e-42a6-a113-a80c694d71bf",
+            user_id=config.user_id or "00000000-0000-0000-0000-000000000000",
+            agent_id=config.project_id,
             model=model,
             prompt=extract_prompt_from_messages(messages),
             is_streaming=is_streaming,
