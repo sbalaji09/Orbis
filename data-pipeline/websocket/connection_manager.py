@@ -40,8 +40,8 @@ class ConnectionManager:
             # adds the current WebSocket connection to the dict for traces
             if trace_id:
                 if trace_id not in self._trace_connections:
-                    self._user_connections[user_id] = set()
-                self._user_connections[user_id].add(websocket)
+                    self._user_connections[trace_id] = set()
+                self._user_connections[trace_id].add(websocket)
 
             # stores the metadata for the WebSocket connection in the dict
             self._ws_meta[websocket] = {
