@@ -46,16 +46,16 @@ export class WebSocketClient {
     private url: string;
     private apiKey: string;
     private state: ConnectionState = "disconnected";
-    private reconnectAttemps = 0;
-    private maxReconnectAttemps: number;
+    private reconnectAttempts = 0;
+    private maxReconnectAttempts: number;
     private baseDelay: number;
     private listeners: Map<string, Set<WebSocketListener>> = new Map();
     private reconnectTimeout: NodeJS.Timeout | null = null;
 
-    constructor(url: string, apiKey: string, options: WebSocketClientOptions = {}) {
-        this.url = url;
+    constructor(baseUrl: string, apiKey: string, options: WebSocketClientOptions = {}) {
+        this.url = baseUrl;
         this.apiKey = apiKey;
-        this.maxReconnectAttemps = options.maxReconnectAttempts ?? 10;
+        this.maxReconnectAttempts = options.maxReconnectAttempts ?? 10;
         this.baseDelay = options.baseDelay ?? 1000;
     }
 
@@ -97,4 +97,81 @@ export class WebSocketClient {
             }
         }
     }
+
+    public connect() {
+        if (this.ws && (this.ws.readyState == WebSocket.OPEN || this.ws.readyState == WebSocket.CONNECTING)) {
+            return;
+        }
+
+        this.setState("connecting");
+        
+        const wsUrl = `${this.url}?api_key=${encodeURIComponent(this.apiKey)}`
+        this.ws = new WebSocket(wsUrl);
+
+        this.ws.onopen = () => {
+            this.setState("connected")
+            this.reconnectAttempts = 0;
+        };
+
+        this.ws.onclose = () => {
+            this.setState("disconnected");
+            this.ws = null;
+            this.scheduleReconnect();
+        };
+
+        this.ws.onerror = () => {
+            this.setState("error");
+        };
+
+        this.ws.onmessage = (event) => {
+            try {
+              const parsed = JSON.parse(event.data);
+              if (parsed && parsed.type) {
+                this.emit(parsed as WebSocketMessage);
+              }
+            } catch (e) {
+              console.error("Failed to parse WebSocket message:", e);
+            }
+        };
+    }
+
+    public disconnect() {
+        if (this.reconnectTimeout) {
+            clearTimeout(this.reconnectTimeout)
+            this.reconnectTimeout = null;
+        }
+
+        if (this.ws) {
+            this.ws.close();
+            this.ws = null;
+        }
+
+        this.reconnectAttempts = 0;
+        this.setState("disconnected")
+    }
+
+    private scheduleReconnect() {
+        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+            console.warn("Max reconnect attempts reached. Not reconnecting")
+            return;
+        }
+
+        this.reconnectAttempts++;
+
+        const delay = Math.min(
+            this.baseDelay * Math.pow(2, this.reconnectAttempts - 1),
+            15000
+        );
+
+        this.reconnectTimeout = setTimeout(() => {
+            this.connect();
+        },  delay);
+
+    }
+
+    private setState(newState: ConnectionState) {
+        this.state = newState;
+    }
+
+
 }
