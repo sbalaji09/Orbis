@@ -51,6 +51,7 @@ export class WebSocketClient {
     private baseDelay: number;
     private listeners: Map<string, Set<WebSocketListener>> = new Map();
     private reconnectTimeout: NodeJS.Timeout | null = null;
+    private pingInterval: NodeJS.Timeout | null = null;
 
     constructor(baseUrl: string, apiKey: string, options: WebSocketClientOptions = {}) {
         this.url = baseUrl;
@@ -141,6 +142,11 @@ export class WebSocketClient {
             this.reconnectTimeout = null;
         }
 
+        if (this.pingInterval) {
+            clearInterval(this.pingInterval);
+            this.pingInterval = null;
+        }
+
         if (this.ws) {
             this.ws.close();
             this.ws = null;
@@ -173,5 +179,32 @@ export class WebSocketClient {
         this.state = newState;
     }
 
+    private handleMessage(event: MessageEvent) {
+        let data: any;
+        try {
+            data = JSON.parse(event.data);
+        } catch (err) {
+            console.error("Failed to parse WebSocket message", err, event.data);
+            return;
+        }
 
+        if (!data.type) {
+            console.warn("Received message without type field", data);
+            return;
+        }
+
+        this.emit(data as WebSocketMessage);
+    }
+
+    private send(payload: any) {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+            return;
+        }
+
+        try {
+            this.ws.send(JSON.stringify(payload));
+        } catch (err) {
+            console.error("Failed to send WebSocket message", err, payload);
+        }
+    }
 }
