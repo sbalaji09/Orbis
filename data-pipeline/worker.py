@@ -616,14 +616,14 @@ class SpanWorker:
 
             self.queue.redis_client.publish(f"trace:{trace_id}", json_message)
             if user_id:
-                self.queue.redis_client.publish(f"user:{user_id}", json_message)
+                self.queue.redis_client.publish(f"user:{user_id}:spans", json_message)
             
         except Exception as e:
             self.logger.warning(
                 "Failed to publish trace update to Redis",
                 extra={
                     "extra_data": {
-                        "trace_id": trace_id.get("trace_id"),
+                        "trace_id": trace_id,
                         "user_id": user_id,
                         "worker_id": self.worker_id,
                         "error": str(e),

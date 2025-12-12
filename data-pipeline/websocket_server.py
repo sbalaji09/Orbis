@@ -71,6 +71,7 @@ class DashboardConnectionManager:
 async def websocket_trace(websocket: WebSocket, trace_id: str, api_key: str = Query(None, alias="api_key")):
     if not api_key:
         await websocket.close(code=4001, reason="Missing API key")
+        return
     
     user_id = await validate_api_key(api_key)
     if not user_id:
@@ -79,11 +80,12 @@ async def websocket_trace(websocket: WebSocket, trace_id: str, api_key: str = Qu
     
     if not await validate_trace_ownership(trace_id, user_id):
         await websocket.close(code=4003, reason="Access denied - trace not found")
+        return
     
     await connection_manager.connect(websocket, trace_id = trace_id)
 
     try:
-        await websocket.send_json({"event": "subscribed", "trace_id": trace_id, "user_id": trace_id})
+        await websocket.send_json({"event": "subscribed", "trace_id": trace_id, "user_id": user_id})
         while True:
             data = await websocket.receive_text()
             if data == "ping":
@@ -95,7 +97,7 @@ async def websocket_trace(websocket: WebSocket, trace_id: str, api_key: str = Qu
 
 # stream real-time span updates for all traces belonging to a user
 @app.websocket("/ws/dashboard")
-async def websocket_dashboard(websocket: WebSocket, api_key: str = Query(None, alias="api-key")):
+async def websocket_dashboard(websocket: WebSocket, api_key: str = Query(None, alias="api_key")):
     if not api_key:
         await websocket.close(code=4001, reason="Missing API key")
         return

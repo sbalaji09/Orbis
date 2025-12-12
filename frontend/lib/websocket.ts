@@ -1,14 +1,14 @@
 type ConnectionState = "connecting" | "connected" | "disconnected" | "error"
 
 export interface SpanCreatedMessage {
-    type: "span_created";
+    event: "span_created";
     trace_id: string;
     span_id: string;
     [key: string]: any;
 }
 
 export interface TraceCompletedMessage {
-    type: "trace_completed";
+    event: "trace_completed";
     trace_id: string;
     status: string;
     total_tokens: number;
@@ -19,12 +19,12 @@ export interface TraceCompletedMessage {
 }
 
 export interface ConnectionEstablishedMessage {
-    type: "connection_established";
+    event: "connection_established";
     [key: string]: any;
 }
 
 export interface PongMessage {
-    type: "pong";
+    event: "pong";
     [key: string]: any;
 }
 
@@ -65,29 +65,29 @@ export class WebSocketClient {
         return this.state
     }
 
-    on(type: WebSocketMessage["type"], listener: WebSocketListener): () => void {
-        if (!this.listeners.has(type)) {
-            this.listeners.set(type, new Set())
+    on(event: WebSocketMessage["event"], listener: WebSocketListener): () => void {
+        if (!this.listeners.has(event)) {
+            this.listeners.set(event, new Set())
         }
-        this.listeners.get(type)!.add(listener);
+        this.listeners.get(event)!.add(listener);
 
         return () => {
-            this.off(type, listener)
+            this.off(event, listener)
         };
     }
 
-    off(type: WebSocketMessage["type"], listener: WebSocketListener): void {
-        const set = this.listeners.get(type);
+    off(event: WebSocketMessage["event"], listener: WebSocketListener): void {
+        const set = this.listeners.get(event);
         if (!set) return;
         set.delete(listener);
         if (set.size == 0) {
-            this.listeners.delete(type);
+            this.listeners.delete(event);
         }
     }
 
     // dispatch an incoming message to the right listeners
     private emit(message: WebSocketMessage): void {
-        const set = this.listeners.get(message.type);
+        const set = this.listeners.get(message.event);
         if (!set || set.size == 0) return;
 
         for (const listener of set) {
@@ -127,7 +127,7 @@ export class WebSocketClient {
         this.ws.onmessage = (event) => {
             try {
               const parsed = JSON.parse(event.data);
-              if (parsed && parsed.type) {
+              if (parsed && parsed.event) {
                 this.emit(parsed as WebSocketMessage);
               }
             } catch (e) {
@@ -188,8 +188,8 @@ export class WebSocketClient {
             return;
         }
 
-        if (!data.type) {
-            console.warn("Received message without type field", data);
+        if (!data.event) {
+            console.warn("Received message without event field", data);
             return;
         }
 
