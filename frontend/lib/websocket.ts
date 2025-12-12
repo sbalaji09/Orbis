@@ -112,11 +112,20 @@ export class WebSocketClient {
         this.ws.onopen = () => {
             this.setState("connected")
             this.reconnectAttempts = 0;
+            this.startPingInterval();
         };
 
-        this.ws.onclose = () => {
+        this.ws.onclose = (event: CloseEvent) => {
             this.setState("disconnected");
+            this.stopPingInterval();
             this.ws = null;
+
+            // Don't reconnect on auth errors (4001 = missing/invalid key, 4003 = access denied)
+            if (event.code === 4001 || event.code === 4003 || event.code === 4401) {
+                console.error(`WebSocket auth error (${event.code}): ${event.reason}`);
+                return;
+            }
+
             this.scheduleReconnect();
         };
 
@@ -164,19 +173,35 @@ export class WebSocketClient {
 
         this.reconnectAttempts++;
 
-        const delay = Math.min(
-            this.baseDelay * Math.pow(2, this.reconnectAttempts - 1),
-            15000
-        );
+        // Exponential backoff with jitter
+        const exponentialDelay = this.baseDelay * Math.pow(2, this.reconnectAttempts - 1);
+        const jitter = Math.random() * 1000; // 0-1000ms random jitter
+        const delay = Math.min(exponentialDelay + jitter, 30000);
+
+        console.log(`Reconnecting in ${Math.round(delay)}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
 
         this.reconnectTimeout = setTimeout(() => {
             this.connect();
-        },  delay);
-
+        }, delay);
     }
 
     private setState(newState: ConnectionState) {
         this.state = newState;
+    }
+
+    private startPingInterval() {
+        this.stopPingInterval();
+        // Send ping every 30 seconds to keep connection alive
+        this.pingInterval = setInterval(() => {
+            this.send("ping");
+        }, 30000);
+    }
+
+    private stopPingInterval() {
+        if (this.pingInterval) {
+            clearInterval(this.pingInterval);
+            this.pingInterval = null;
+        }
     }
 
     private handleMessage(event: MessageEvent) {
