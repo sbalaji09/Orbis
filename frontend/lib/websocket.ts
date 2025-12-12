@@ -41,8 +41,11 @@ interface WebSocketClientOptions {
     baseDelay?: number; // ms
 }
 
+type SubscriptionType = "trace" | "dashboard" | null;
+
 export class WebSocketClient {
     private ws: WebSocket | null = null;
+    private baseUrl: string;
     private url: string;
     private apiKey: string;
     private state: ConnectionState = "disconnected";
@@ -53,11 +56,16 @@ export class WebSocketClient {
     private reconnectTimeout: NodeJS.Timeout | null = null;
     private pingInterval: NodeJS.Timeout | null = null;
 
+    private currentSubscription: SubscriptionType = null;
+    private currentTraceId: string | null = null;
+
     constructor(baseUrl: string, apiKey: string, options: WebSocketClientOptions = {}) {
-        this.url = baseUrl;
+        this.baseUrl = baseUrl;
         this.apiKey = apiKey;
         this.maxReconnectAttempts = options.maxReconnectAttempts ?? 10;
         this.baseDelay = options.baseDelay ?? 1000;
+
+        this.url = `${this.baseUrl}/ws`
     }
 
     // expose current connection state (read-only)
@@ -99,14 +107,21 @@ export class WebSocketClient {
         }
     }
 
-    public connect() {
+    public connect(urlOverride?: string) {
+        if (urlOverride) {
+            this.url = urlOverride;
+        }
+
         if (this.ws && (this.ws.readyState == WebSocket.OPEN || this.ws.readyState == WebSocket.CONNECTING)) {
             return;
         }
 
         this.setState("connecting");
         
-        const wsUrl = `${this.url}?api_key=${encodeURIComponent(this.apiKey)}`
+        const wsUrl = this.url.includes("api_key=")
+            ? this.url
+            : `${this.url}?api_key=${encodeURIComponent(this.apiKey)}`;
+            
         this.ws = new WebSocket(wsUrl);
 
         this.ws.onopen = () => {
@@ -231,5 +246,13 @@ export class WebSocketClient {
         } catch (err) {
             console.error("Failed to send WebSocket message", err, payload);
         }
+    }
+
+    public subscribeToTrace(traceId: string) {
+        this.currentSubscription = "trace";
+        this.currentTraceId = traceId;
+
+        const url = `${this.baseUrl}/ws/traces/${encodeURIComponent(traceId)}?api_key=${encodeURIComponent(this.apiKey)}`;
+        this.connect(url);
     }
 }
