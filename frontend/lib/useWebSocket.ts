@@ -18,5 +18,34 @@ interface UseWebSocketResult {
 }
 
 export function useWebSocket(params: UseWebSocketParams): UseWebSocketResult {
-    
+    const {type, traceId, apiKey} = params;
+
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (!baseUrl) {
+        console.error("NEXT_PUBLIC_API_URL is not defined");
+    }
+
+    const [state, setState] = useState<ConnectionState>("disconnected");
+    const clientRef = useRef<WebSocketClient | null>(null);
+
+    useEffect(() => {
+        if (!baseUrl) {
+            return;
+        }
+
+        if (type == "trace" && !traceId) {
+            console.error("useWebSocket: traceId is required when type === 'trace'")
+            return;
+        }
+
+        const client = new WebSocketClient(baseUrl, apiKey);
+        clientRef.current = client;
+        setState(client.connectionState);
+
+        if (type === "trace" && traceId) {
+            client.subscribeToTrace(traceId);
+        } else if (type === "dashboard") {
+            client.subscribeToDashboard();
+        }
+    })
 }
