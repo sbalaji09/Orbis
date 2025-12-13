@@ -23,7 +23,11 @@ async def create_prompt(agent_id: str, name: str, content: str):
         aws_region = os.getenv('AWS_REGION')
 
         version_number = db.max_version_prompt_number(name)["Version number"]
-        s3URL = upload_prompt_to_s3(content, bucket_name, name, version_number, aws_region)
+
+        if bucket_name:
+            s3URL = upload_prompt_to_s3(content, bucket_name, name, version_number, aws_region)
+        else:
+            s3URL = None
 
         prompt_version = db.insert_prompt_row(name, version_number, s3URL, agent_id,
                                               content_hash, content[:min(500, len(content))])
