@@ -255,4 +255,9 @@ export class WebSocketClient {
         const url = `${this.baseUrl}/ws/traces/${encodeURIComponent(traceId)}?api_key=${encodeURIComponent(this.apiKey)}`;
         this.connect(url);
     }
+
+    public subscribeToDashboard() {
+        const url = `${this.baseUrl}/ws/dashboard?api_key=${encodeURIComponent(this.apiKey)}`;
+        this.connect(url);
+    }
 }
