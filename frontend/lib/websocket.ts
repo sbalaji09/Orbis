@@ -1,4 +1,4 @@
-type ConnectionState = "connecting" | "connected" | "disconnected" | "error"
+export type ConnectionState = "connecting" | "connected" | "disconnected" | "error"
 
 export interface SpanCreatedMessage {
     event: "span_created";
@@ -49,6 +49,7 @@ export class WebSocketClient {
     private url: string;
     private apiKey: string;
     private state: ConnectionState = "disconnected";
+    private stateListeners: Set<(state: ConnectionState) => void> = new Set();
     private reconnectAttempts = 0;
     private maxReconnectAttempts: number;
     private baseDelay: number;
@@ -71,6 +72,16 @@ export class WebSocketClient {
     // expose current connection state (read-only)
     get connectionState(): ConnectionState {
         return this.state
+    }
+
+    public onStateChange(listener: (state: ConnectionState) => void): () => void {
+        this.stateListeners.add(listener);
+
+        listener(this.state);
+
+        return () => {
+            this.stateListeners.delete(listener);
+        }
     }
 
     on(event: WebSocketMessage["event"], listener: WebSocketListener): () => void {
@@ -149,14 +160,7 @@ export class WebSocketClient {
         };
 
         this.ws.onmessage = (event) => {
-            try {
-              const parsed = JSON.parse(event.data);
-              if (parsed && parsed.event) {
-                this.emit(parsed as WebSocketMessage);
-              }
-            } catch (e) {
-              console.error("Failed to parse WebSocket message:", e);
-            }
+            this.handleMessage(event);
         };
     }
 
@@ -201,7 +205,17 @@ export class WebSocketClient {
     }
 
     private setState(newState: ConnectionState) {
+        if (this.state === newState) return;
+
         this.state = newState;
+
+        for (const listener of this.stateListeners) {
+            try {
+                listener(newState);
+            } catch (err) {
+                console.error("WebSocket state listener error", err);
+            }
+        }
     }
 
     private startPingInterval() {

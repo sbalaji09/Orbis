@@ -40,13 +40,22 @@ export function useWebSocket(params: UseWebSocketParams): UseWebSocketResult {
 
         const client = new WebSocketClient(baseUrl, apiKey);
         clientRef.current = client;
-        setState(client.connectionState);
+
+        const unsubscribeState = client.onStateChange((next) => {
+            setState(next);
+        });
 
         if (type === "trace" && traceId) {
             client.subscribeToTrace(traceId);
         } else if (type === "dashboard") {
             client.subscribeToDashboard();
         }
+
+        return () => {
+            unsubscribeState();
+            client.disconnect();
+            clientRef.current = null;
+        };
     }, [type, traceId, apiKey, baseUrl]);
 
     const subscribe = useCallback(

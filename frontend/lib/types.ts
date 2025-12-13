@@ -90,5 +90,5 @@ export interface TraceCompletedMessage {
 
 export interface ConnectionEstablishedMessage {
   event: "connection_established";
-  user_id: "string";
+  user_id: string;
 }
