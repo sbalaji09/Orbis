@@ -260,4 +260,8 @@ export class WebSocketClient {
         const url = `${this.baseUrl}/ws/dashboard?api_key=${encodeURIComponent(this.apiKey)}`;
         this.connect(url);
     }
+
+    public getState() {
+        return this.connectionState;
+    }
 }
