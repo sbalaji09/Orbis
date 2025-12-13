@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {WebSocketClient, WebSocketMessage } from "./websocket";
 
 type WebSocketType = "trace" | "dashboard";
@@ -47,5 +47,25 @@ export function useWebSocket(params: UseWebSocketParams): UseWebSocketResult {
         } else if (type === "dashboard") {
             client.subscribeToDashboard();
         }
-    })
+    }, [type, traceId, apiKey, baseUrl]);
+
+    const subscribe = useCallback(
+        (event: string, callback: (msg: WebSocketMessage) => void) => {
+            const client = clientRef.current;
+            if (!client) {
+                console.warn("useWebSocket: subscribe is called before client is ready");
+
+                return () => {};
+            }
+
+            const unsubscribe = client.on(event as WebSocketMessage["event"], callback);
+            return unsubscribe;
+        }, []
+    );
+
+    return {
+        state,
+        client: clientRef.current,
+        subscribe
+    }
 }
