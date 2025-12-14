@@ -1,9 +1,9 @@
 import time
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, WebSocket
 from pydantic import BaseModel
 from datetime import datetime, timezone
 from uuid import UUID
-from typing import Optional
+from typing import Optional, Set
 import os
 import sys
 from queues.redis_queue import queue
@@ -75,6 +75,38 @@ class WebSocketMetrics:
     def reset(self) -> None:
         self.total_messages = 0
         self._last_reset = time.time()
+
+ws_metrics = WebSocketMetrics()
+
+class ConnectionManager:
+    def __init__(self) -> None:
+        self.active_connections: Set[WebSocket] = set()
+
+    async def connect(self, websocket: WebSocket) -> None:
+        await websocket.accept()
+        self.active_connections.add(websocket)
+        ws_metrics.connection_opened()
+
+    def disconnect(self, websocket: WebSocket) -> None:
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+            ws_metrics.connection_closed()
+
+    async def send_json(self, websocket: WebSocket, data: dict) -> None:
+        await websocket.send_json(data)
+        # you can count outbound messages here if you want total traffic instead
+        # ws_metrics.message_received()
+
+    async def broadcast_json(self, data: dict) -> None:
+        for ws in list(self.active_connections):
+            try:
+                await ws.send_json(data)
+            except Exception:
+                # drop broken connections
+                self.disconnect(ws)
+
+
+ws_manager = ConnectionManager()
 
 class EndTraceIn(BaseModel):
     trace_id: str
