@@ -65,3 +65,30 @@ export interface PromptFamily {
   versions: PromptVersion[];
   total_traces: number;
 }
+
+export interface WebSocketMessage {
+  event: string;
+}
+
+export interface SpanCreatedMessage {
+  event: "span_created";
+  span_id: string;
+  trace_id: string;
+  status: string;
+  timestamp: string;
+}
+
+export interface TraceCompletedMessage {
+  event: "trace_completed";
+  trace_id: string;
+  status: string;
+  total_tokens: number;
+  total_cost: number;
+  duration: number;
+  timestamp: string;
+}
+
+export interface ConnectionEstablishedMessage {
+  event: "connection_established";
+  user_id: string;
+}

@@ -1,8 +1,9 @@
-from fastapi import FastAPI, Request, HTTPException
+import time
+from fastapi import FastAPI, Request, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 from datetime import datetime, timezone
 from uuid import UUID
-from typing import Optional
+from typing import Optional, Set
 import os
 import sys
 from queues.redis_queue import queue
@@ -44,6 +45,69 @@ class SpanIn(BaseModel):
     prompt_version: Optional[str] = None
     prompt_hash: Optional[str] = None
 
+class WebSocketMetrics:
+    def __init__(self) -> None:
+        self.active_connections: int = 0
+        self.total_messages: int = 0
+        self._last_reset: float = time.time()
+        self._last_message_ts: float | None = None
+
+    def connection_opened(self) -> None:
+        self.active_connections += 1
+
+    def connection_closed(self) -> None:
+        if self.active_connections > 0:
+            self.active_connections -= 1
+
+    def message_received(self) -> None:
+        self.total_messages += 1
+        self._last_message_ts = time.time()
+
+    @property
+    def messages_per_second(self) -> float:
+        now = time.time()
+        elapsed = max(now - self._last_reset, 1.0)
+        return self.total_messages / elapsed
+
+    @property
+    def last_message_ts(self) -> float | None:
+        return self._last_message_ts
+
+    def reset(self) -> None:
+        self.total_messages = 0
+        self._last_reset = time.time()
+
+ws_metrics = WebSocketMetrics()
+
+class ConnectionManager:
+    def __init__(self) -> None:
+        self.active_connections: Set[WebSocket] = set()
+
+    async def connect(self, websocket: WebSocket) -> None:
+        await websocket.accept()
+        self.active_connections.add(websocket)
+        ws_metrics.connection_opened()
+
+    def disconnect(self, websocket: WebSocket) -> None:
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+            ws_metrics.connection_closed()
+
+    async def send_json(self, websocket: WebSocket, data: dict) -> None:
+        await websocket.send_json(data)
+        # you can count outbound messages here if you want total traffic instead
+        # ws_metrics.message_received()
+
+    async def broadcast_json(self, data: dict) -> None:
+        for ws in list(self.active_connections):
+            try:
+                await ws.send_json(data)
+            except Exception:
+                # drop broken connections
+                self.disconnect(ws)
+
+
+ws_manager = ConnectionManager()
 
 class EndTraceIn(BaseModel):
     trace_id: str
@@ -163,6 +227,20 @@ async def health_check():
 @app.get("/metrics")
 async def metrics():
     return get_metrics()
+
+@app.websocket("/ws/dashboard")
+async def dashboard_ws(websocket: WebSocket):
+    await ws_manager.connect(websocket)
+    try:
+        while True:
+            message = await websocket.receive_text()
+            ws_metrics.message_received()
+    except WebSocketDisconnect:
+        ws_manager.disconnect(websocket)
+    except Exception:
+        ws_manager.disconnect(websocket)
+        raise
+    
 
 # validates the uuid (user id) that belongs to a specific span
 def is_valid_uuid(val: str) -> bool:
