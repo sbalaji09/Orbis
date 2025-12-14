@@ -665,7 +665,7 @@ class SupabaseDB:
     def check_identical_hash(self, hash_val: str, agent_id: str) -> Optional[bool]:
         conn = self.get_connection()
         try:
-            with conn.cursor() as cur:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 query = """
                     SELECT * FROM prompt_versions
                     WHERE prompt_hash = %s
