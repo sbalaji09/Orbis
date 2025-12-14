@@ -201,3 +201,35 @@ async def websocket_health():
         content=asdict(health_status),
         status_code=status_code,
     )
+
+# metrics endpoint for monitoring dashboards
+@app.get("/ws/metrics")
+async def websocket_metrics():
+    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+    subscriber = get_redis_subscriber()
+
+    health_status = await health_monitor.get_health_status(
+        connection_manager=connection_manager,
+        redis_subscriber=subscriber,
+        redis_url=redis_url,
+    )
+
+    return {
+        "websocket": {
+            "connections_total": health_status.active_connections,
+            "connections_trace": health_status.connections_by_type.get("trace", 0),
+            "connections_user": health_status.connections_by_type.get("user", 0),
+        },
+        "redis_pubsub": {
+            "connected": health_status.redis_pubsub_connected,
+            "subscriptions": health_status.redis_pubsub_subscriptions,
+            "subscriber_running": health_status.subscriber_task_running,
+        },
+        "throughput": {
+            "messages_per_second": health_status.messages_per_second,
+            "total_messages": health_status.total_messages_received,
+            "last_message_at": health_status.last_message_at,
+        },
+        "uptime_seconds": health_status.uptime_seconds,
+        "timestamp": health_status.timestamp,
+    }
