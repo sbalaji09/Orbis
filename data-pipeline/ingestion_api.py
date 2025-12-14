@@ -1,5 +1,5 @@
 import time
-from fastapi import FastAPI, Request, HTTPException, WebSocket
+from fastapi import FastAPI, Request, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 from datetime import datetime, timezone
 from uuid import UUID
@@ -226,6 +226,19 @@ async def health_check():
 @app.get("/metrics")
 async def metrics():
     return get_metrics()
+
+@app.websocket("/ws/dashboard")
+async def dashboard_ws(websocket: WebSocket):
+    await ws_manager.connect(websocket)
+    try:
+        while True:
+            message = await websocket.receive_text()
+            ws_metrics.message_received()
+    except WebSocketDisconnect:
+        ws_manager.disconnect(websocket)
+    except Exception:
+        ws_manager.disconnect(websocket)
+        raise
     
 
 # validates the uuid (user id) that belongs to a specific span
