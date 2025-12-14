@@ -9,6 +9,8 @@ import redis.asyncio as aioredis
 
 from websocket.connection_manager import ConnectionManager
 
+from websocket.health import health_monitor
+
 logger = logging.getLogger(__name__)
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
@@ -118,6 +120,8 @@ class RedisSubscriber:
                 logger.error(f"Error routing message: {e}", exc_info=True)
     
     async def _route_message(self, channel: str, data: dict) -> None:
+        health_monitor.record_message()
+
         trace_match = re.match(r"^trace:([^:]+)$", channel)
         if trace_match:
             trace_id = trace_match.group(1)
