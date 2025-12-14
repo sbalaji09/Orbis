@@ -25,7 +25,11 @@ async def create_prompt(agent_id: str, name: str, content: str):
         version_number = db.max_version_prompt_number(name)["Version number"]
 
         if bucket_name:
-            s3URL = upload_prompt_to_s3(content, bucket_name, name, version_number, aws_region)
+            try:
+                s3URL = upload_prompt_to_s3(content, bucket_name, name, version_number, aws_region)
+            except Exception as e:
+                print(f"S3 upload failed: {e}, using None")
+                s3URL = None
         else:
             s3URL = None
 

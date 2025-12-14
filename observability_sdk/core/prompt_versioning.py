@@ -138,7 +138,7 @@ class PromptRegistry:
 
             # Persist to backend if credentials provided
             if agent_id and api_key:
-                prompt_version.persist_to_backend(agent_id, api_key)
+                prompt_version.persist_to_backend(agent_id, api_key, api_url="http://localhost:8000")
         
         return self._prompts[key]
     
