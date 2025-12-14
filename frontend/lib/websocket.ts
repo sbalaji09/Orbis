@@ -1,4 +1,15 @@
-export type ConnectionState = "connecting" | "connected" | "disconnected" | "error"
+// "failed" = max reconnect attempts exceeded, should fall back to polling
+export type ConnectionState = "connecting" | "connected" | "disconnected" | "error" | "failed"
+
+// Connection metrics for monitoring
+export interface ConnectionMetrics {
+    connectAttempts: number;
+    successfulConnections: number;
+    failedConnections: number;
+    lastConnectedAt: Date | null;
+    lastDisconnectedAt: Date | null;
+    totalConnectionTime: number; // ms
+}
 
 export interface SpanCreatedMessage {
     event: "span_created";
@@ -60,6 +71,17 @@ export class WebSocketClient {
     private currentSubscription: SubscriptionType = null;
     private currentTraceId: string | null = null;
 
+    // Connection metrics for monitoring
+    private metrics: ConnectionMetrics = {
+        connectAttempts: 0,
+        successfulConnections: 0,
+        failedConnections: 0,
+        lastConnectedAt: null,
+        lastDisconnectedAt: null,
+        totalConnectionTime: 0,
+    };
+    private connectionStartTime: number | null = null;
+
     constructor(baseUrl: string, apiKey: string, options: WebSocketClientOptions = {}) {
         this.baseUrl = baseUrl;
         this.apiKey = apiKey;
@@ -67,6 +89,16 @@ export class WebSocketClient {
         this.baseDelay = options.baseDelay ?? 1000;
 
         this.url = `${this.baseUrl}/ws`
+    }
+
+    // Check if WebSocket has permanently failed and should fall back to polling
+    public hasFailed(): boolean {
+        return this.state === "failed";
+    }
+
+    // Get connection metrics for monitoring
+    public getMetrics(): ConnectionMetrics {
+        return { ...this.metrics };
     }
 
     // expose current connection state (read-only)
@@ -136,22 +168,41 @@ export class WebSocketClient {
         this.ws = new WebSocket(wsUrl);
 
         this.ws.onopen = () => {
-            this.setState("connected")
+            this.setState("connected");
             this.reconnectAttempts = 0;
             this.startPingInterval();
+
+            // Update metrics
+            this.metrics.successfulConnections++;
+            this.metrics.lastConnectedAt = new Date();
+            this.connectionStartTime = Date.now();
+
+            this.logMetric("websocket_connected", {
+                attempts: this.metrics.connectAttempts,
+                subscription: this.currentSubscription,
+            });
         };
 
         this.ws.onclose = (event: CloseEvent) => {
-            this.setState("disconnected");
             this.stopPingInterval();
-            this.ws = null;
+
+            // Update metrics
+            this.metrics.lastDisconnectedAt = new Date();
+            if (this.connectionStartTime) {
+                this.metrics.totalConnectionTime += Date.now() - this.connectionStartTime;
+                this.connectionStartTime = null;
+            }
 
             // Don't reconnect on auth errors (4001 = missing/invalid key, 4003 = access denied)
             if (event.code === 4001 || event.code === 4003 || event.code === 4401) {
                 console.error(`WebSocket auth error (${event.code}): ${event.reason}`);
+                this.metrics.failedConnections++;
+                this.setState("failed");
+                this.logMetric("websocket_auth_failed", { code: event.code, reason: event.reason });
                 return;
             }
 
+            this.setState("disconnected");
             this.scheduleReconnect();
         };
 
@@ -186,7 +237,13 @@ export class WebSocketClient {
 
     private scheduleReconnect() {
         if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-            console.warn("Max reconnect attempts reached. Not reconnecting")
+            console.warn("Max reconnect attempts reached. Falling back to polling.");
+            this.metrics.failedConnections++;
+            this.setState("failed");
+            this.logMetric("websocket_max_retries_exceeded", {
+                attempts: this.reconnectAttempts,
+                subscription: this.currentSubscription,
+            });
             return;
         }
 
@@ -202,6 +259,15 @@ export class WebSocketClient {
         this.reconnectTimeout = setTimeout(() => {
             this.connect();
         }, delay);
+    }
+
+    // Log metrics for monitoring (can be extended to send to analytics)
+    private logMetric(event: string, data: Record<string, unknown>) {
+        console.log(`[WebSocket Metric] ${event}`, {
+            ...data,
+            timestamp: new Date().toISOString(),
+            metrics: this.getMetrics(),
+        });
     }
 
     private setState(newState: ConnectionState) {
