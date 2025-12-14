@@ -596,8 +596,6 @@ class SpanWorker:
                     extra={"extra_data": {"error": str(e), "span_id": span_id}}
                 )
 
-
-
         except Exception as e:
             self.logger.warning(
                 "Failed to publish span update to Redis",
@@ -614,6 +612,9 @@ class SpanWorker:
             )
     
     def publish_trace_completed(self, trace_id: str, user_id: str, trace_data: dict) -> None:
+        if os.getenv("REALTIME_UPDATES_ENABLED", "true").lower() == "false":
+            return
+        
         try:
             if not trace_id and not user_id:
                 return
@@ -631,9 +632,29 @@ class SpanWorker:
 
             json_message = json.dumps(message_dict)
 
-            self.queue.redis_client.publish(f"trace:{trace_id}", json_message)
-            if user_id:
-                self.queue.redis_client.publish(f"user:{user_id}:spans", json_message)
+            try:
+                self.queue.redis_client.publish(f"trace:{trace_id}", json_message)
+
+                if user_id:
+                    self.queue.redis_client.publish(f"user:{user_id}:spans", json_message)
+            except (redis.ConnectionError, redis.TimeoutError) as e:
+                self.logger.warning(
+                    "Redis pub/sub unavailable for trace completion",
+                    extra={"extra_data": {"error": str(e), "trace_id": trace_id}}
+                )
+            except Exception as e:
+                self.logger.warning(
+                    "Failed to publish trace update to Redis",
+                    extra={
+                        "extra_data": {
+                            "trace_id": trace_id,
+                            "user_id": user_id,
+                            "worker_id": self.worker_id,
+                            "error": str(e),
+                        }
+                    },
+                    exc_info=True,
+                )
             
         except Exception as e:
             self.logger.warning(
