@@ -2,6 +2,8 @@ import logging
 import json
 import os
 from typing import *
+
+from fastapi.responses import JSONResponse
 from ingestion_api import app
 from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
 from starlette.websockets import WebSocketState
@@ -10,6 +12,9 @@ import redis.asyncio as aioredis
 from websocket.connection_manager import ConnectionManager
 from websocket.redis_subscriber import init_redis_subscriber, get_redis_subscriber
 from auth.websocket_auth import validate_api_key, validate_trace_ownership
+
+from dataclasses import asdict
+from websocket.health import health_monitor, WebSocketHealthStatus
 
 logger = logging.getLogger(__name__)
 connection_manager = ConnectionManager()
@@ -172,3 +177,27 @@ async def shutdown_event():
     subscriber = get_redis_subscriber()
     if subscriber:
         await subscriber.stop()
+
+# health check for websocket
+# returns: status, active_connections, connections_by_type, the reachability of the pub sub, etc.
+@app.get("/ws/health")
+async def websocket_health():
+    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+    subscriber = get_redis_subscriber()
+
+    health_status = await health_monitor.get_health_status(
+        connection_manager=connection_manager,
+        redis_subscriber=subscriber,
+        redis_url=redis_url,
+    )
+
+    status_code = 200
+    if health_status.status == "degraded":
+        status_code = 200
+    elif health_status.status == "unhealthy":
+        status_code = 503
+
+    return JSONResponse(
+        content=asdict(health_status),
+        status_code=status_code,
+    )
