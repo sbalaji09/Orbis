@@ -1,3 +1,4 @@
+import time
 from fastapi import FastAPI, Request, HTTPException
 from pydantic import BaseModel
 from datetime import datetime, timezone
@@ -43,6 +44,37 @@ class SpanIn(BaseModel):
     prompt_version: Optional[str] = None
     prompt_hash: Optional[str] = None
 
+class WebSocketMetrics:
+    def __init__(self) -> None:
+        self.active_connections: int = 0
+        self.total_messages: int = 0
+        self._last_reset: float = time.time()
+        self._last_message_ts: float | None = None
+
+    def connection_opened(self) -> None:
+        self.active_connections += 1
+
+    def connection_closed(self) -> None:
+        if self.active_connections > 0:
+            self.active_connections -= 1
+
+    def message_received(self) -> None:
+        self.total_messages += 1
+        self._last_message_ts = time.time()
+
+    @property
+    def messages_per_second(self) -> float:
+        now = time.time()
+        elapsed = max(now - self._last_reset, 1.0)
+        return self.total_messages / elapsed
+
+    @property
+    def last_message_ts(self) -> float | None:
+        return self._last_message_ts
+
+    def reset(self) -> None:
+        self.total_messages = 0
+        self._last_reset = time.time()
 
 class EndTraceIn(BaseModel):
     trace_id: str
@@ -162,6 +194,7 @@ async def health_check():
 @app.get("/metrics")
 async def metrics():
     return get_metrics()
+    
 
 # validates the uuid (user id) that belongs to a specific span
 def is_valid_uuid(val: str) -> bool:
