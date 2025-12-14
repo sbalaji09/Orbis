@@ -9,6 +9,7 @@ interface UseWebSocketParams {
     type: WebSocketType;
     traceId?: string;     // required if type === "trace"
     apiKey: string;
+    disabled: boolean;
 }
 
 interface UseWebSocketResult {
@@ -18,7 +19,7 @@ interface UseWebSocketResult {
 }
 
 export function useWebSocket(params: UseWebSocketParams): UseWebSocketResult {
-    const {type, traceId, apiKey} = params;
+    const {type, traceId, apiKey, disabled = false} = params;
 
     const baseUrl = process.env.NEXT_PUBLIC_API_URL;
     if (!baseUrl) {
@@ -29,7 +30,7 @@ export function useWebSocket(params: UseWebSocketParams): UseWebSocketResult {
     const clientRef = useRef<WebSocketClient | null>(null);
 
     useEffect(() => {
-        if (!baseUrl) {
+        if (!baseUrl || disabled) {
             return;
         }
 
@@ -56,7 +57,7 @@ export function useWebSocket(params: UseWebSocketParams): UseWebSocketResult {
             client.disconnect();
             clientRef.current = null;
         };
-    }, [type, traceId, apiKey, baseUrl]);
+    }, [type, traceId, apiKey, baseUrl, disabled]);
 
     const subscribe = useCallback(
         (event: string, callback: (msg: WebSocketMessage) => void) => {

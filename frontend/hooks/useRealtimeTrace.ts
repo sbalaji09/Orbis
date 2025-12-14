@@ -7,9 +7,13 @@ import { SpanCreatedMessage, WebSocketMessage } from "../lib/websocket";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const DEFAULT_USER_ID = "00000000-0000-0000-0000-000000000000";
 
+const REALTIME_ENABLED = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const POLLING_INTERVAL = 2000;
+
 export interface UseRealtimeTraceResult {
     spans: Span[];
     isConnected: boolean;
+    isPolling: boolean;
     error: Error | null;
     isLoading: boolean;
 }
@@ -18,6 +22,7 @@ export interface UseRealtimeTraceParams {
     traceId: string;
     apiKey: string;
     initialSpans?: Span[];
+    disableRealtime?: boolean;
 }
 
 // fetches the spans using SWR
@@ -63,12 +68,15 @@ const mergeSpans = (existing: Span[], incoming: Span): Span[] => {
 };
 
 // webhook that calls these two functions above
-export function useRealtimeTrace(
-    params: UseRealtimeTraceParams
-): UseRealtimeTraceResult {
-    const { traceId, apiKey, initialSpans } = params;
+export function useRealtimeTrace(params: UseRealtimeTraceParams): UseRealtimeTraceResult {
+    const { traceId, apiKey, initialSpans, disableRealtime = false } = params;
 
     const [wsError, setWsError] = useState<Error | null>(null);
+    const [usePollingFallback, setUsePollingFallback] = useState(false);
+
+    const realtimeDisabled = !REALTIME_ENABLED || disableRealtime;
+
+    const shouldPoll = realtimeDisabled || usePollingFallback;
 
     const {
         data: swrSpans,
@@ -82,7 +90,8 @@ export function useRealtimeTrace(
             fallbackData: initialSpans,
             revalidateOnFocus: false,
             revalidateOnReconnect: false,
-            dedupingInterval: 5000,
+            dedupingInterval: shouldPoll ? 1000 : 5000,
+            refreshInterval: shouldPoll ? POLLING_INTERVAL : 0,  // Enable polling as fallback
         }
     );
 
@@ -91,9 +100,17 @@ export function useRealtimeTrace(
         type: "trace",
         traceId,
         apiKey,
+        disabled: realtimeDisabled,
     });
 
     const isConnected = wsState === "connected";
+
+    useEffect(() => {
+        if (wsState === "failed") {
+            console.log("WebSocket failed, falling back to polling");
+            setUsePollingFallback(true);
+        }
+    }, [wsState]);
 
     useEffect(() => {
         if (wsState === "error") {
@@ -105,6 +122,8 @@ export function useRealtimeTrace(
 
     // handle incoming span_created eents
     useEffect(() => {
+        if (realtimeDisabled || usePollingFallback) return;
+
         const unsubscribe = subscribe("span_created", async (msg: WebSocketMessage) => {
             const spanMsg = msg as SpanCreatedMessage;
 
@@ -131,13 +150,14 @@ export function useRealtimeTrace(
         });
 
         return unsubscribe;
-    }, [subscribe, traceId, mutate]);
+    }, [subscribe, traceId, mutate, realtimeDisabled, usePollingFallback]);
 
     const error = swrError ?? wsError;
 
     return {
         spans: swrSpans ?? initialSpans ?? [],
         isConnected,
+        isPolling: shouldPoll,
         error,
         isLoading: swrLoading,
     };
