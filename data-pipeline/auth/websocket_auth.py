@@ -3,11 +3,13 @@ import sys
 import bcrypt
 from typing import Optional, Tuple
 import redis.asyncio as aioredis
+from auth.secure_cache import hash_api_key_for_cache
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 from backend.db_connection import db
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+API_KEY_CACHE_TTL = int(os.getenv("API_KEY_CACHE_TTL", 3600))
 
 # create async Redis client for auth lookups
 _redis_client: Optional[aioredis.Redis] = None
@@ -32,6 +34,9 @@ async def validate_api_key(api_key: str) -> Optional[str]:
         return None
     
     redis = await get_redis()
+
+    cache_key = f"api_key_cache:{hash_api_key_for_cache(api_key)}"
+
     user_id = await redis.get(f"api_key:{api_key}")
 
     if user_id:
@@ -42,7 +47,7 @@ async def validate_api_key(api_key: str) -> Optional[str]:
         if verify_api_key_against_hash(api_key, agent['api_key']):
             user_id = str(agent['user_id'])
 
-            await redis.set(f"api_key:{api_key}", user_id)
+            await redis.setex(cache_key, API_KEY_CACHE_TTL, user_id)
             return user_id
     
     return None
