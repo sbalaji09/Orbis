@@ -65,3 +65,9 @@ def remove_api_key(api_key: str):
     redis_key = f"api_key:{api_key}"
     queue.redis_client.delete(redis_key)
     return True
+
+# called when an API key is revoked or rotated
+def invalidate_api_key_cache(api_key: str):
+    cache_key=f"api_key_cache:{hash_api_key_for_cache(api_key)}"
+    queue.redis_client.delete(cache_key)
+    return True
