@@ -132,6 +132,14 @@ async def websocket_dashboard(websocket: WebSocket, api_key: str = Query(None, a
         await websocket.close(code=4001, reason="Invalid API key")
         return
     
+    allowed, reason = await check_ws_connection_limit(user_id)
+    if not allowed:
+        await websocket.close(code=4029, reason=reason)
+        return
+    
+    connection_id = str(uuid.uuid4())
+    await register_ws_connection(user_id, connection_id)
+    
     await websocket.accept()
     pubsub = None
 
