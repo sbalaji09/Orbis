@@ -113,12 +113,31 @@ class SpanWorker:
                 "cost": span.get('total_cost'),
                 "status": span.get('status'),
                 "error_message": span.get('error_message'),
-                "is_streaming": span.get('is_streaming', False), 
+                "is_streaming": span.get('is_streaming', False),
                 "time_to_first_token": span.get('time_to_first_token'),
                 "tokens_per_second": span.get('tokens_per_second'),
                 "prompt_id": span.get("prompt_id"),
+                "prompt_name": span.get("prompt_name"),
                 "prompt_version": span.get("prompt_version"),
                 "prompt_hash": span.get("prompt_hash"),
+                # Tool tracking fields
+                "span_type": span.get('span_type', 'function'),
+                "tool_metadata": span.get('tool_metadata'),
+                "http_method": span.get('http_method'),
+                "http_url": span.get('http_url'),
+                "http_status_code": span.get('http_status_code'),
+                "api_name": span.get('api_name'),
+                "db_type": span.get('db_type'),
+                "db_operation": span.get('db_operation'),
+                "db_query": span.get('db_query'),
+                "software_name": span.get('software_name'),
+                "software_type": span.get('software_type'),
+                "cli_command": span.get('cli_command'),
+                "cli_exit_code": span.get('cli_exit_code'),
+                "cli_stdout": span.get('cli_stdout'),
+                "cli_stderr": span.get('cli_stderr'),
+                "tool_name": span.get('tool_name'),
+                "tool_category": span.get('tool_category'),
             }
             
             # Accumulate token/cost/duration in Redis for trace-level aggregation
@@ -292,11 +311,29 @@ class SpanWorker:
             "prompt_id": span.get('prompt_id'),
             "prompt_name": span.get('prompt_name'),
             "prompt_version": span.get('prompt_version'),
-            "prompt_hash": span.get('prompt_hash')
+            "prompt_hash": span.get('prompt_hash'),
+            # Tool tracking fields
+            "span_type": span.get('span_type', 'function'),
+            "tool_metadata": span.get('tool_metadata'),
+            "http_method": span.get('http_method'),
+            "http_url": span.get('http_url'),
+            "http_status_code": span.get('http_status_code'),
+            "api_name": span.get('api_name'),
+            "db_type": span.get('db_type'),
+            "db_operation": span.get('db_operation'),
+            "db_query": span.get('db_query'),
+            "software_name": span.get('software_name'),
+            "software_type": span.get('software_type'),
+            "cli_command": span.get('cli_command'),
+            "cli_exit_code": span.get('cli_exit_code'),
+            "cli_stdout": span.get('cli_stdout'),
+            "cli_stderr": span.get('cli_stderr'),
+            "tool_name": span.get('tool_name'),
+            "tool_category": span.get('tool_category'),
         }
 
         print(f"🔍 DEBUG prepared_data prompt_name: {prepared_data.get('prompt_name')}")
-        
+
         return prepared_data
 
     # this function is the main worker loop that pops from the queue and processes each popped task

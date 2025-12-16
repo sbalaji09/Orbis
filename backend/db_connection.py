@@ -158,7 +158,13 @@ class SupabaseDB:
                         output_preview, output_blob_url,
                         llm_model, prompt_tokens, completion_tokens,
                         cost, status, error_message, prompt_id,
-                        prompt_name, prompt_version, prompt_hash
+                        prompt_name, prompt_version, prompt_hash,
+                        span_type, tool_metadata,
+                        http_method, http_url, http_status_code, api_name,
+                        db_type, db_operation, db_query,
+                        software_name, software_type,
+                        cli_command, cli_exit_code, cli_stdout, cli_stderr,
+                        tool_name, tool_category
                     ) VALUES (
                         %s, %s, %s::uuid[], %s,
                         %s, %s, %s,
@@ -166,7 +172,13 @@ class SupabaseDB:
                         %s, %s,
                         %s, %s, %s,
                         %s, %s, %s,
-                        %s, %s, %s, %s
+                        %s, %s, %s, %s,
+                        %s, %s,
+                        %s, %s, %s, %s,
+                        %s, %s, %s,
+                        %s, %s,
+                        %s, %s, %s, %s,
+                        %s, %s
                     )
                     RETURNING span_id
                 """
@@ -191,7 +203,25 @@ class SupabaseDB:
                     span_data.get('prompt_id'),
                     span_data.get('prompt_name'),
                     span_data.get('prompt_version'),
-                    span_data.get('prompt_hash')
+                    span_data.get('prompt_hash'),
+                    # Tool tracking fields
+                    span_data.get('span_type', 'llm'),
+                    json.dumps(span_data.get('tool_metadata')) if span_data.get('tool_metadata') else None,
+                    span_data.get('http_method'),
+                    span_data.get('http_url'),
+                    span_data.get('http_status_code'),
+                    span_data.get('api_name'),
+                    span_data.get('db_type'),
+                    span_data.get('db_operation'),
+                    span_data.get('db_query'),
+                    span_data.get('software_name'),
+                    span_data.get('software_type'),
+                    span_data.get('cli_command'),
+                    span_data.get('cli_exit_code'),
+                    span_data.get('cli_stdout'),
+                    span_data.get('cli_stderr'),
+                    span_data.get('tool_name'),
+                    span_data.get('tool_category')
                 ))
                 result = cur.fetchone()
                 conn.commit()
@@ -625,7 +655,13 @@ class SupabaseDB:
                         output_blob_url, llm_model, prompt_tokens, completion_tokens,
                         cost, status, error_message,
                         is_streaming, time_to_first_token, tokens_per_second,
-                        prompt_id, prompt_name, prompt_version, prompt_hash
+                        prompt_id, prompt_name, prompt_version, prompt_hash,
+                        span_type, tool_metadata,
+                        http_method, http_url, http_status_code, api_name,
+                        db_type, db_operation, db_query,
+                        software_name, software_type,
+                        cli_command, cli_exit_code, cli_stdout, cli_stderr,
+                        tool_name, tool_category
                     ) VALUES %s
                     RETURNING span_id
                 """
@@ -645,13 +681,31 @@ class SupabaseDB:
                         span.get('prompt_id'),
                         span.get('prompt_name'),
                         span.get('prompt_version'),
-                        span.get('prompt_hash')
+                        span.get('prompt_hash'),
+                        # Tool tracking fields
+                        span.get('span_type', 'llm'),
+                        json.dumps(span.get('tool_metadata')) if span.get('tool_metadata') else None,
+                        span.get('http_method'),
+                        span.get('http_url'),
+                        span.get('http_status_code'),
+                        span.get('api_name'),
+                        span.get('db_type'),
+                        span.get('db_operation'),
+                        span.get('db_query'),
+                        span.get('software_name'),
+                        span.get('software_type'),
+                        span.get('cli_command'),
+                        span.get('cli_exit_code'),
+                        span.get('cli_stdout'),
+                        span.get('cli_stderr'),
+                        span.get('tool_name'),
+                        span.get('tool_category')
                     )
                     for span in spans
                 ]
 
-                # Use explicit UUID casting in template
-                template = "(%s, %s, %s::uuid[], %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                # Use explicit UUID casting in template (41 values total)
+                template = "(%s, %s, %s::uuid[], %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
                 execute_values(cur, query, values, template=template, fetch=True)
 
                 conn.commit()

@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
 import uuid
 import time
@@ -22,6 +22,9 @@ class Span:
     parent_span_id: List[str] = field(default_factory=list)
     
     error_message: Optional[str] = None
+
+    # span type classification (llm, tool, http, database, cli, browser, function)
+    span_type: str = "function"
 
     # LLM specific fields
     model: Optional[str] = None
@@ -53,6 +56,46 @@ class Span:
     prompt_name: Optional[str] = None
     prompt_version: Optional[str] = None
     prompt_hash: Optional[str] = None
+
+    # HTTP/API call fields
+    http_method: Optional[str] = None  # GET, POST, PUT, DELETE, etc.
+    http_url: Optional[str] = None
+    http_status_code: Optional[int] = None
+    http_headers: Optional[Dict[str, str]] = None
+    api_name: Optional[str] = None  # e.g., "stripe", "github", "slack"
+    rate_limit_remaining: Optional[int] = None
+
+    # Database operation fields
+    db_type: Optional[str] = None  # postgresql, mongodb, pinecone, redis, etc.
+    db_operation: Optional[str] = None  # SELECT, INSERT, UPDATE, DELETE, QUERY
+    db_query: Optional[str] = None
+    db_rows_affected: Optional[int] = None
+    db_host: Optional[str] = None
+
+    # CLI/Software fields
+    software_name: Optional[str] = None  # git, docker, npm, kubectl, etc.
+    software_type: Optional[str] = None  # cli_tool, desktop_app, browser_automation
+    software_version: Optional[str] = None
+    cli_command: Optional[str] = None
+    cli_exit_code: Optional[int] = None
+    cli_stdout: Optional[str] = None
+    cli_stderr: Optional[str] = None
+
+    # Browser automation fields
+    browser_type: Optional[str] = None  # chromium, firefox, webkit
+    browser_url: Optional[str] = None
+    browser_actions: Optional[List[Dict[str, Any]]] = None  # list of actions performed
+    screenshots: Optional[List[str]] = None  # S3 URLs to screenshots
+
+    # Custom tool fields
+    tool_name: Optional[str] = None
+    tool_category: Optional[str] = None  # search, calculator, custom, etc.
+    tool_input: Optional[Dict[str, Any]] = None
+    tool_output: Optional[Dict[str, Any]] = None
+
+    # General metadata for any span type (flexible JSONB storage)
+    tool_metadata: Optional[Dict[str, Any]] = None
+
 
     # mark the span as complete
     def complete(self, status: str = "success") -> None:
@@ -94,6 +137,26 @@ class Span:
             "prompt_name": self.prompt_name,
             "prompt_version": self.prompt_version,
             "prompt_hash": self.prompt_hash,
+            "span_type": self.span_type,
+            "http_method": self.http_method,
+            "http_url": self.http_url,
+            "http_status_code": self.http_status_code,
+            "api_name": self.api_name,
+            "db_type": self.db_type,
+            "db_operation": self.db_operation,
+            "db_query": self.db_query,
+            "software_name": self.software_name,
+            "software_type": self.software_type,
+            "cli_command": self.cli_command,
+            "cli_exit_code": self.cli_exit_code,
+            "cli_stdout": self.cli_stdout,
+            "cli_stderr": self.cli_stderr,
+            "tool_name": self.tool_name,
+            "tool_category": self.tool_category,
+            "tool_input": self.tool_input,
+            "tool_output": self.tool_output,
+            "tool_metadata": self.tool_metadata,
+
         }
 
     def __str__(self):

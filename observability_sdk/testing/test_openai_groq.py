@@ -13,11 +13,10 @@ import time
 
 # Configure observability
 configure(
-    api_key="sk_live_Vy41Kdajw0Nigty3A3HrJlCx0ZXGXSqovDHCre6zU3Y",
-    api_url="http://localhost:8080",
-    project_id="11111111-1111-1111-1111-111111111111",
+    api_key="test-tool-tracking-key-123",
+    project_id="616d8f4e-8b03-4112-a40c-a61164977cb5",
     user_id="00000000-0000-0000-0000-000000000000",
-    debug=True
+    api_url="http://localhost:8080",
 )
 
 instrument_all()

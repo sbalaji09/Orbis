@@ -26,12 +26,12 @@ class SpanIn(BaseModel):
     start_time: str
     end_time: str
     duration: float
-    input_data: str = ""  
-    output_data: str = ""  
-    model: str = ""  
-    input_tokens: int = 0  
-    output_tokens: int = 0 
-    total_cost: float = 0.0  
+    input_data: str = ""
+    output_data: str = ""
+    model: str = ""
+    input_tokens: int = 0
+    output_tokens: int = 0
+    total_cost: float = 0.0
     status: str
     error_message: Optional[str] = None
     user_id: str
@@ -42,11 +42,40 @@ class SpanIn(BaseModel):
     time_to_first_token: Optional[float] = None
     tokens_per_second: Optional[float] = None
 
-    # 🆕 new fields
+    # Prompt versioning fields
     prompt_id: Optional[str] = None
     prompt_name: Optional[str] = None
     prompt_version: Optional[str] = None
     prompt_hash: Optional[str] = None
+
+    # Tool tracking fields
+    span_type: Optional[str] = "function"
+    tool_metadata: Optional[dict] = None
+
+    # HTTP/API fields
+    http_method: Optional[str] = None
+    http_url: Optional[str] = None
+    http_status_code: Optional[int] = None
+    api_name: Optional[str] = None
+
+    # Database fields
+    db_type: Optional[str] = None
+    db_operation: Optional[str] = None
+    db_query: Optional[str] = None
+
+    # Software/CLI fields
+    software_name: Optional[str] = None
+    software_type: Optional[str] = None
+    cli_command: Optional[str] = None
+    cli_exit_code: Optional[int] = None
+    cli_stdout: Optional[str] = None
+    cli_stderr: Optional[str] = None
+
+    # Tool fields
+    tool_name: Optional[str] = None
+    tool_category: Optional[str] = None
+    tool_input: Optional[dict] = None
+    tool_output: Optional[dict] = None
 
 class WebSocketMetrics:
     def __init__(self) -> None:
@@ -273,6 +302,13 @@ def validate_span(span: SpanIn) -> bool:
         
         # Prompt versioning fields are optional
         if attr_name in ('prompt_id', 'prompt_name', 'prompt_version', 'prompt_hash'):
+            continue
+
+        # Tool tracking fields are optional
+        if attr_name in ('span_type', 'tool_metadata', 'http_method', 'http_url', 'http_status_code',
+                        'api_name', 'db_type', 'db_operation', 'db_query', 'software_name',
+                        'software_type', 'cli_command', 'cli_exit_code', 'cli_stdout', 'cli_stderr',
+                        'tool_name', 'tool_category', 'tool_input', 'tool_output'):
             continue
 
         if attr_value is None:
