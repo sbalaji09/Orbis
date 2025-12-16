@@ -12,6 +12,9 @@ import asyncio
 
 # add parent directory to path
 sys.path.append(os.path.dirname(__file__))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
+from shared.cors_config import get_cors_config
 
 
 app = FastAPI(
@@ -24,13 +27,7 @@ app = FastAPI(
 app.include_router(prompt_router)
 
 # CORS - allows your frontend to call this API
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # In production, specify your frontend URL
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app.add_middleware(CORSMiddleware, **get_cors_config())
 
 # health check endpoint
 

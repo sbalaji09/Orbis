@@ -1,8 +1,9 @@
-from fastapi import FastAPI, Request, HTTPException
+import time
+from fastapi import FastAPI, Request, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 from datetime import datetime, timezone
 from uuid import UUID
-from typing import Optional
+from typing import Optional, Set
 import os
 import sys
 from queues.redis_queue import queue
@@ -22,12 +23,12 @@ class SpanIn(BaseModel):
     start_time: str
     end_time: str
     duration: float
-    input_data: str = ""  
-    output_data: str = ""  
-    model: str = ""  
-    input_tokens: int = 0  
-    output_tokens: int = 0 
-    total_cost: float = 0.0  
+    input_data: str = ""
+    output_data: str = ""
+    model: str = ""
+    input_tokens: int = 0
+    output_tokens: int = 0
+    total_cost: float = 0.0
     status: str
     error_message: Optional[str] = None
     user_id: str
@@ -38,11 +39,104 @@ class SpanIn(BaseModel):
     time_to_first_token: Optional[float] = None
     tokens_per_second: Optional[float] = None
 
-    # 🆕 new fields
+    # Prompt versioning fields
     prompt_id: Optional[str] = None
+    prompt_name: Optional[str] = None
     prompt_version: Optional[str] = None
     prompt_hash: Optional[str] = None
 
+    # Tool tracking fields
+    span_type: Optional[str] = "function"
+    tool_metadata: Optional[dict] = None
+
+    # HTTP/API fields
+    http_method: Optional[str] = None
+    http_url: Optional[str] = None
+    http_status_code: Optional[int] = None
+    api_name: Optional[str] = None
+
+    # Database fields
+    db_type: Optional[str] = None
+    db_operation: Optional[str] = None
+    db_query: Optional[str] = None
+
+    # Software/CLI fields
+    software_name: Optional[str] = None
+    software_type: Optional[str] = None
+    cli_command: Optional[str] = None
+    cli_exit_code: Optional[int] = None
+    cli_stdout: Optional[str] = None
+    cli_stderr: Optional[str] = None
+
+    # Tool fields
+    tool_name: Optional[str] = None
+    tool_category: Optional[str] = None
+    tool_input: Optional[dict] = None
+    tool_output: Optional[dict] = None
+
+class WebSocketMetrics:
+    def __init__(self) -> None:
+        self.active_connections: int = 0
+        self.total_messages: int = 0
+        self._last_reset: float = time.time()
+        self._last_message_ts: float | None = None
+
+    def connection_opened(self) -> None:
+        self.active_connections += 1
+
+    def connection_closed(self) -> None:
+        if self.active_connections > 0:
+            self.active_connections -= 1
+
+    def message_received(self) -> None:
+        self.total_messages += 1
+        self._last_message_ts = time.time()
+
+    @property
+    def messages_per_second(self) -> float:
+        now = time.time()
+        elapsed = max(now - self._last_reset, 1.0)
+        return self.total_messages / elapsed
+
+    @property
+    def last_message_ts(self) -> float | None:
+        return self._last_message_ts
+
+    def reset(self) -> None:
+        self.total_messages = 0
+        self._last_reset = time.time()
+
+ws_metrics = WebSocketMetrics()
+
+class ConnectionManager:
+    def __init__(self) -> None:
+        self.active_connections: Set[WebSocket] = set()
+
+    async def connect(self, websocket: WebSocket) -> None:
+        await websocket.accept()
+        self.active_connections.add(websocket)
+        ws_metrics.connection_opened()
+
+    def disconnect(self, websocket: WebSocket) -> None:
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+            ws_metrics.connection_closed()
+
+    async def send_json(self, websocket: WebSocket, data: dict) -> None:
+        await websocket.send_json(data)
+        # you can count outbound messages here if you want total traffic instead
+        # ws_metrics.message_received()
+
+    async def broadcast_json(self, data: dict) -> None:
+        for ws in list(self.active_connections):
+            try:
+                await ws.send_json(data)
+            except Exception:
+                # drop broken connections
+                self.disconnect(ws)
+
+
+ws_manager = ConnectionManager()
 
 class EndTraceIn(BaseModel):
     trace_id: str
@@ -163,6 +257,20 @@ async def health_check():
 async def metrics():
     return get_metrics()
 
+@app.websocket("/ws/dashboard")
+async def dashboard_ws(websocket: WebSocket):
+    await ws_manager.connect(websocket)
+    try:
+        while True:
+            message = await websocket.receive_text()
+            ws_metrics.message_received()
+    except WebSocketDisconnect:
+        ws_manager.disconnect(websocket)
+    except Exception:
+        ws_manager.disconnect(websocket)
+        raise
+    
+
 # validates the uuid (user id) that belongs to a specific span
 def is_valid_uuid(val: str) -> bool:
     try:
@@ -189,7 +297,14 @@ def validate_span(span: SpanIn) -> bool:
             continue
         
         # Prompt versioning fields are optional
-        if attr_name in ('prompt_id', 'prompt_version', 'prompt_hash'):
+        if attr_name in ('prompt_id', 'prompt_name', 'prompt_version', 'prompt_hash'):
+            continue
+
+        # Tool tracking fields are optional
+        if attr_name in ('span_type', 'tool_metadata', 'http_method', 'http_url', 'http_status_code',
+                        'api_name', 'db_type', 'db_operation', 'db_query', 'software_name',
+                        'software_type', 'cli_command', 'cli_exit_code', 'cli_stdout', 'cli_stderr',
+                        'tool_name', 'tool_category', 'tool_input', 'tool_output'):
             continue
 
         if attr_value is None:

@@ -158,7 +158,13 @@ class SupabaseDB:
                         output_preview, output_blob_url,
                         llm_model, prompt_tokens, completion_tokens,
                         cost, status, error_message, prompt_id,
-                        prompt_name, prompt_version, prompt_hash
+                        prompt_name, prompt_version, prompt_hash,
+                        span_type, tool_metadata,
+                        http_method, http_url, http_status_code, api_name,
+                        db_type, db_operation, db_query,
+                        software_name, software_type,
+                        cli_command, cli_exit_code, cli_stdout, cli_stderr,
+                        tool_name, tool_category
                     ) VALUES (
                         %s, %s, %s::uuid[], %s,
                         %s, %s, %s,
@@ -166,7 +172,13 @@ class SupabaseDB:
                         %s, %s,
                         %s, %s, %s,
                         %s, %s, %s,
-                        %s, %s, %s, %s
+                        %s, %s, %s, %s,
+                        %s, %s,
+                        %s, %s, %s, %s,
+                        %s, %s, %s,
+                        %s, %s,
+                        %s, %s, %s, %s,
+                        %s, %s
                     )
                     RETURNING span_id
                 """
@@ -191,7 +203,25 @@ class SupabaseDB:
                     span_data.get('prompt_id'),
                     span_data.get('prompt_name'),
                     span_data.get('prompt_version'),
-                    span_data.get('prompt_hash')
+                    span_data.get('prompt_hash'),
+                    # Tool tracking fields
+                    span_data.get('span_type', 'llm'),
+                    json.dumps(span_data.get('tool_metadata')) if span_data.get('tool_metadata') else None,
+                    span_data.get('http_method'),
+                    span_data.get('http_url'),
+                    span_data.get('http_status_code'),
+                    span_data.get('api_name'),
+                    span_data.get('db_type'),
+                    span_data.get('db_operation'),
+                    span_data.get('db_query'),
+                    span_data.get('software_name'),
+                    span_data.get('software_type'),
+                    span_data.get('cli_command'),
+                    span_data.get('cli_exit_code'),
+                    span_data.get('cli_stdout'),
+                    span_data.get('cli_stderr'),
+                    span_data.get('tool_name'),
+                    span_data.get('tool_category')
                 ))
                 result = cur.fetchone()
                 conn.commit()
@@ -625,7 +655,13 @@ class SupabaseDB:
                         output_blob_url, llm_model, prompt_tokens, completion_tokens,
                         cost, status, error_message,
                         is_streaming, time_to_first_token, tokens_per_second,
-                        prompt_id, prompt_name, prompt_version, prompt_hash
+                        prompt_id, prompt_name, prompt_version, prompt_hash,
+                        span_type, tool_metadata,
+                        http_method, http_url, http_status_code, api_name,
+                        db_type, db_operation, db_query,
+                        software_name, software_type,
+                        cli_command, cli_exit_code, cli_stdout, cli_stderr,
+                        tool_name, tool_category
                     ) VALUES %s
                     RETURNING span_id
                 """
@@ -645,13 +681,31 @@ class SupabaseDB:
                         span.get('prompt_id'),
                         span.get('prompt_name'),
                         span.get('prompt_version'),
-                        span.get('prompt_hash')
+                        span.get('prompt_hash'),
+                        # Tool tracking fields
+                        span.get('span_type', 'llm'),
+                        json.dumps(span.get('tool_metadata')) if span.get('tool_metadata') else None,
+                        span.get('http_method'),
+                        span.get('http_url'),
+                        span.get('http_status_code'),
+                        span.get('api_name'),
+                        span.get('db_type'),
+                        span.get('db_operation'),
+                        span.get('db_query'),
+                        span.get('software_name'),
+                        span.get('software_type'),
+                        span.get('cli_command'),
+                        span.get('cli_exit_code'),
+                        span.get('cli_stdout'),
+                        span.get('cli_stderr'),
+                        span.get('tool_name'),
+                        span.get('tool_category')
                     )
                     for span in spans
                 ]
 
-                # Use explicit UUID casting in template
-                template = "(%s, %s, %s::uuid[], %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                # Use explicit UUID casting in template (41 values total)
+                template = "(%s, %s, %s::uuid[], %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
                 execute_values(cur, query, values, template=template, fetch=True)
 
                 conn.commit()
@@ -665,7 +719,7 @@ class SupabaseDB:
     def check_identical_hash(self, hash_val: str, agent_id: str) -> Optional[bool]:
         conn = self.get_connection()
         try:
-            with conn.cursor() as cur:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 query = """
                     SELECT * FROM prompt_versions
                     WHERE prompt_hash = %s
@@ -973,7 +1027,7 @@ class SupabaseDB:
                         COALESCE(AVG(s.duration), 0) AS avg_latency,
                         COUNT(DISTINCT CASE WHEN s.error_message IS NOT NULL THEN s.trace_id END) AS error_traces,
                         ROUND(
-                            COUNT(DISTINCT CASE WHEN s.error_message IS NOT NULL THEN s.trace_id END)::FLOAT
+                            COUNT(DISTINCT CASE WHEN s.error_message IS NOT NULL THEN s.trace_id END)::NUMERIC
                             / NULLIF(COUNT(DISTINCT s.trace_id), 0) * 100, 2
                         ) AS error_rate_pct
                     FROM prompt_versions pv
@@ -985,7 +1039,9 @@ class SupabaseDB:
                 cur.execute(query, (prompt_name,))
                 rows = cur.fetchall()
 
-            return [dict(r) for r in rows]
+                # Convert rows to dicts using cursor description
+                col_names = [desc[0] for desc in cur.description]
+                return [dict(zip(col_names, row)) for row in rows]
         except Exception as e:
             raise Exception(f"Failed to get prompt analytics: {e}")
         finally:
@@ -1024,7 +1080,7 @@ class SupabaseDB:
                         COALESCE(AVG(s.duration), 0) AS avg_latency,
                         COUNT(DISTINCT CASE WHEN s.error_message IS NOT NULL THEN s.trace_id END) AS error_traces,
                         ROUND(
-                            COUNT(DISTINCT CASE WHEN s.error_message IS NOT NULL THEN s.trace_id END)::FLOAT
+                            COUNT(DISTINCT CASE WHEN s.error_message IS NOT NULL THEN s.trace_id END)::NUMERIC
                             / NULLIF(COUNT(DISTINCT s.trace_id), 0) * 100, 2
                         ) AS error_rate_pct
                     FROM prompt_versions pv

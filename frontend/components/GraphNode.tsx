@@ -143,8 +143,8 @@ export default function GraphNode({
     dot: "bg-muted",
   };
 
-  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    // If no onDrag (React Flow handles dragging), navigate to span detail page
+  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // If no onDrag (React Flow handles dragging), just open modal on click
     if (!onDrag) {
       e.stopPropagation();
       e.preventDefault();
@@ -153,7 +153,7 @@ export default function GraphNode({
     }
   };
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLButtonElement>) => {
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     // Only use mouse tracking if onDrag is provided (not in React Flow)
     if (!onDrag) return;
 
@@ -203,7 +203,7 @@ export default function GraphNode({
             </div>
           </div>
         )} */}
-        <button
+        <div
           className={`group relative w-60 border-2 border-foreground bg-white text-left overflow-hidden
             focus:outline-none focus:ring-2 focus:ring-mustard focus:ring-offset-2
             ${
@@ -211,11 +211,19 @@ export default function GraphNode({
                 ? "shadow-[8px_8px_0_rgba(0,0,0,0.2)] scale-[1.02]"
                 : "hover:shadow-[6px_6px_0_rgba(0,0,0,0.2)] shadow-[4px_4px_0_rgba(0,0,0,0.15)]"
             }
-            transition-all duration-300 ease-in-out`}
+            transition-all duration-300 ease-in-out cursor-pointer`}
           onClick={handleClick}
           onMouseDown={handleMouseDown}
           onMouseEnter={() => setShowTooltip(true)}
           onMouseLeave={() => setShowTooltip(false)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              handleClick(e as any);
+            }
+          }}
         >
           {/* Terminal-style colored top bar - draggable handle (remove nodrag from this) */}
           <div
@@ -350,7 +358,7 @@ export default function GraphNode({
               </div>
             )}
           </div>
-        </button>
+        </div>
 
         {/* Tooltip */}
         {showTooltip && !isDragging && (

@@ -2,13 +2,22 @@ import logging
 import json
 import os
 from typing import *
+
+from fastapi.responses import JSONResponse
 from ingestion_api import app
 from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
 from starlette.websockets import WebSocketState
 import asyncio
 import redis.asyncio as aioredis
+from websocket.connection_manager import ConnectionManager
+from websocket.redis_subscriber import init_redis_subscriber, get_redis_subscriber
+from auth.websocket_auth import validate_api_key, validate_trace_ownership
+
+from dataclasses import asdict
+from websocket.health import health_monitor, WebSocketHealthStatus
 
 logger = logging.getLogger(__name__)
+connection_manager = ConnectionManager()
 
 # Redis connection for pub/sub
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
@@ -63,49 +72,51 @@ class DashboardConnectionManager:
         for ws in conns:
             await self.safe_send_json(ws, message)
 
-
-connection_manager = DashboardConnectionManager()
-
-
 @app.websocket("/ws/traces/{trace_id}")
-async def websocket_trace_updates(websocket: WebSocket, trace_id: str):
-    """Stream real-time span updates for a specific trace."""
-    await websocket.accept()
-    pubsub = None
+async def websocket_trace(websocket: WebSocket, trace_id: str, api_key: str = Query(None, alias="api_key")):
+    if not api_key:
+        await websocket.close(code=4001, reason="Missing API key")
+        return
+    
+    user_id = await validate_api_key(api_key)
+    if not user_id:
+        await websocket.close(code=4401, reason="Invalid API key")
+        return
+    
+    if not await validate_trace_ownership(trace_id, user_id):
+        await websocket.close(code=4003, reason="Access denied - trace not found")
+        return
+    
+    await connection_manager.connect(websocket, trace_id = trace_id)
 
     try:
-        # Subscribe to the trace-specific Redis channel
-        pubsub = await get_redis_pubsub()
-        await pubsub.subscribe(f"trace:{trace_id}")
-
-        await websocket.send_json({
-            "event": "subscribed",
-            "trace_id": trace_id,
-        })
-
-        # Listen for Redis messages and forward to WebSocket
-        async for message in pubsub.listen():
-            if message["type"] == "message":
-                data = json.loads(message["data"])
-                await websocket.send_json(data)
-
+        await websocket.send_json({"event": "subscribed", "trace_id": trace_id, "user_id": user_id})
+        while True:
+            data = await websocket.receive_text()
+            if data == "ping":
+                await websocket.send_json({"event": "pong"})
     except WebSocketDisconnect:
-        logger.info(f"Client disconnected from trace {trace_id}")
-    except Exception as e:
-        logger.error(f"Error in trace WebSocket for {trace_id}: {e}", exc_info=True)
+        pass
     finally:
-        if pubsub:
-            await pubsub.unsubscribe(f"trace:{trace_id}")
-            await pubsub.close()
+        await connection_manager.disconnect(websocket)
 
+# stream real-time span updates for all traces belonging to a user
 @app.websocket("/ws/dashboard")
-async def websocket_dashboard(websocket: WebSocket, user_id: str = Query(..., description="User ID for dashboard subscription")):
-    """Stream real-time span updates for all traces belonging to a user."""
+async def websocket_dashboard(websocket: WebSocket, api_key: str = Query(None, alias="api_key")):
+    if not api_key:
+        await websocket.close(code=4001, reason="Missing API key")
+        return
+    
+    user_id = await validate_api_key(api_key)
+    if not user_id:
+        await websocket.close(code=4001, reason="Invalid API key")
+        return
+    
     await websocket.accept()
     pubsub = None
 
+    # background task to listen to Redis pub/sub messages
     async def redis_listener():
-        """Background task to listen for Redis pub/sub messages."""
         try:
             async for message in pubsub.listen():
                 if message["type"] == "message":
@@ -116,8 +127,8 @@ async def websocket_dashboard(websocket: WebSocket, user_id: str = Query(..., de
         except Exception as e:
             logger.error(f"Redis listener error for user {user_id}: {e}", exc_info=True)
 
+    # subscribe to user-specific Redis channel
     try:
-        # Subscribe to user-specific Redis channel
         pubsub = await get_redis_pubsub()
         await pubsub.subscribe(f"user:{user_id}:spans")
 
@@ -126,14 +137,13 @@ async def websocket_dashboard(websocket: WebSocket, user_id: str = Query(..., de
             "user_id": user_id,
         })
 
-        # Start Redis listener as background task
+        # start Redis listener as background task
         listener_task = asyncio.create_task(redis_listener())
 
-        # Handle incoming WebSocket messages (ping, filters, etc.)
+        # handle incoming WebSocket messages
         while True:
             try:
                 data = await websocket.receive_text()
-                # Handle ping/pong for keepalive
                 if data == "ping":
                     await websocket.send_json({"event": "pong"})
 
@@ -144,7 +154,7 @@ async def websocket_dashboard(websocket: WebSocket, user_id: str = Query(..., de
                 break
 
     finally:
-        # Cleanup: cancel listener and unsubscribe
+        # cancel listener and unsubscribe
         if 'listener_task' in locals():
             listener_task.cancel()
             try:
@@ -154,3 +164,72 @@ async def websocket_dashboard(websocket: WebSocket, user_id: str = Query(..., de
         if pubsub:
             await pubsub.unsubscribe(f"user:{user_id}:spans")
             await pubsub.close()
+
+connection_manager = DashboardConnectionManager()
+
+@app.on_event("startup")
+async def startup_event():
+    subscriber = init_redis_subscriber(connection_manager)
+    await subscriber.start()
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    subscriber = get_redis_subscriber()
+    if subscriber:
+        await subscriber.stop()
+
+# health check for websocket
+# returns: status, active_connections, connections_by_type, the reachability of the pub sub, etc.
+@app.get("/ws/health")
+async def websocket_health():
+    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+    subscriber = get_redis_subscriber()
+
+    health_status = await health_monitor.get_health_status(
+        connection_manager=connection_manager,
+        redis_subscriber=subscriber,
+        redis_url=redis_url,
+    )
+
+    status_code = 200
+    if health_status.status == "degraded":
+        status_code = 200
+    elif health_status.status == "unhealthy":
+        status_code = 503
+
+    return JSONResponse(
+        content=asdict(health_status),
+        status_code=status_code,
+    )
+
+# metrics endpoint for monitoring dashboards
+@app.get("/ws/metrics")
+async def websocket_metrics():
+    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+    subscriber = get_redis_subscriber()
+
+    health_status = await health_monitor.get_health_status(
+        connection_manager=connection_manager,
+        redis_subscriber=subscriber,
+        redis_url=redis_url,
+    )
+
+    return {
+        "websocket": {
+            "connections_total": health_status.active_connections,
+            "connections_trace": health_status.connections_by_type.get("trace", 0),
+            "connections_user": health_status.connections_by_type.get("user", 0),
+        },
+        "redis_pubsub": {
+            "connected": health_status.redis_pubsub_connected,
+            "subscriptions": health_status.redis_pubsub_subscriptions,
+            "subscriber_running": health_status.subscriber_task_running,
+        },
+        "throughput": {
+            "messages_per_second": health_status.messages_per_second,
+            "total_messages": health_status.total_messages_received,
+            "last_message_at": health_status.last_message_at,
+        },
+        "uptime_seconds": health_status.uptime_seconds,
+        "timestamp": health_status.timestamp,
+    }

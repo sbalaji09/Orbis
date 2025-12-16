@@ -38,6 +38,40 @@ class PromptVersion:
             "metadata": self.metadata,
             "created_at": self.created_at.isoformat()
         }
+
+    def persist_to_backend(self, agent_id: str, api_key: str, api_url: str = "http://localhost:8000") -> bool:
+        """
+        Persist this prompt version to the backend database.
+        Called automatically when registering a prompt.
+        """
+        try:
+            import requests
+            
+            response = requests.post(
+                f"{api_url}/prompts/prompts",
+                params={
+                    "agent_id": agent_id,
+                    "name": self.prompt_id,
+                    "content": self.prompt_text
+                },
+                headers={
+                    "X-API-Key": api_key,
+                    "Content-Type": "application/json"
+                },
+                timeout=5.0
+            )
+            
+            if response.status_code in [200, 201]:
+                print(f"✓ Prompt persisted to backend: {self.prompt_id} v{self.version}")
+                return True
+            else:
+                print(f"⚠ Failed to persist prompt: {response.status_code}")
+                print(f"⚠ Error details: {response.text}")  # ← ADD THIS LINE
+                return False
+        
+        except Exception as e:
+            print(f"⚠ Error persisting prompt: {e}")
+            return False
     
     def __str__(self) -> str:
         return f"PromptVersion(id='{self.prompt_id}', version='{self.version}', hash='{self.prompt_hash[:8]}...')"
@@ -61,12 +95,15 @@ class PromptRegistry:
         self._prompts: Dict[str, PromptVersion] = {}
         self._prompt_families: Dict[str, List[PromptVersion]] = {}
     
+    
     def register_prompt(
         self,
         prompt_id: str,
         version: str,
         prompt_text: str,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
+        agent_id: Optional[str] = None,
+        api_key: Optional[str] = None,
     ) -> PromptVersion:
         """
         Register a new prompt version.
@@ -98,6 +135,10 @@ class PromptRegistry:
             self._prompt_families[prompt_id].append(prompt_version)
             
             print(f"✓ Registered prompt: {prompt_version}")
+
+            # Persist to backend if credentials provided
+            if agent_id and api_key:
+                prompt_version.persist_to_backend(agent_id, api_key, api_url="http://localhost:8000")
         
         return self._prompts[key]
     

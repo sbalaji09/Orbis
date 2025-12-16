@@ -6,6 +6,8 @@ import sys
 import time
 from datetime import datetime, timezone
 import uuid
+
+import redis
 from queues.redis_queue import RedisQueue
 from dotenv import load_dotenv
 from data_processing.prompt_upload import upload_input, upload_output
@@ -111,12 +113,31 @@ class SpanWorker:
                 "cost": span.get('total_cost'),
                 "status": span.get('status'),
                 "error_message": span.get('error_message'),
-                "is_streaming": span.get('is_streaming', False), 
+                "is_streaming": span.get('is_streaming', False),
                 "time_to_first_token": span.get('time_to_first_token'),
                 "tokens_per_second": span.get('tokens_per_second'),
                 "prompt_id": span.get("prompt_id"),
+                "prompt_name": span.get("prompt_name"),
                 "prompt_version": span.get("prompt_version"),
                 "prompt_hash": span.get("prompt_hash"),
+                # Tool tracking fields
+                "span_type": span.get('span_type', 'function'),
+                "tool_metadata": span.get('tool_metadata'),
+                "http_method": span.get('http_method'),
+                "http_url": span.get('http_url'),
+                "http_status_code": span.get('http_status_code'),
+                "api_name": span.get('api_name'),
+                "db_type": span.get('db_type'),
+                "db_operation": span.get('db_operation'),
+                "db_query": span.get('db_query'),
+                "software_name": span.get('software_name'),
+                "software_type": span.get('software_type'),
+                "cli_command": span.get('cli_command'),
+                "cli_exit_code": span.get('cli_exit_code'),
+                "cli_stdout": span.get('cli_stdout'),
+                "cli_stderr": span.get('cli_stderr'),
+                "tool_name": span.get('tool_name'),
+                "tool_category": span.get('tool_category'),
             }
             
             # Accumulate token/cost/duration in Redis for trace-level aggregation
@@ -288,10 +309,31 @@ class SpanWorker:
             "time_to_first_token": span.get('time_to_first_token'),
             "tokens_per_second": span.get('tokens_per_second'),
             "prompt_id": span.get('prompt_id'),
+            "prompt_name": span.get('prompt_name'),
             "prompt_version": span.get('prompt_version'),
-            "prompt_hash": span.get('prompt_hash')
+            "prompt_hash": span.get('prompt_hash'),
+            # Tool tracking fields
+            "span_type": span.get('span_type', 'function'),
+            "tool_metadata": span.get('tool_metadata'),
+            "http_method": span.get('http_method'),
+            "http_url": span.get('http_url'),
+            "http_status_code": span.get('http_status_code'),
+            "api_name": span.get('api_name'),
+            "db_type": span.get('db_type'),
+            "db_operation": span.get('db_operation'),
+            "db_query": span.get('db_query'),
+            "software_name": span.get('software_name'),
+            "software_type": span.get('software_type'),
+            "cli_command": span.get('cli_command'),
+            "cli_exit_code": span.get('cli_exit_code'),
+            "cli_stdout": span.get('cli_stdout'),
+            "cli_stderr": span.get('cli_stderr'),
+            "tool_name": span.get('tool_name'),
+            "tool_category": span.get('tool_category'),
         }
-        
+
+        print(f"🔍 DEBUG prepared_data prompt_name: {prepared_data.get('prompt_name')}")
+
         return prepared_data
 
     # this function is the main worker loop that pops from the queue and processes each popped task
@@ -509,14 +551,28 @@ class SpanWorker:
                 duration = 0
             
             # update the trace in the database
+            end_time_iso = datetime.now(timezone.utc).isoformat()
             update_data = {
                 "status": "completed",
-                "end_time": datetime.now(timezone.utc).isoformat(),
+                "end_time": end_time_iso,
                 "duration": duration,
                 "total_tokens": int(float(total_tokens or 0)),
                 "total_cost": float(total_cost or 0)
             }
             db.update_trace(trace_id, update_data)
+            self.publish_trace_completed(trace_id, trace.get('user_id'), update_data)
+            
+            event = {
+                "type": "trace_completed",
+                "trace_id": trace_id,
+                "status": update_data["status"],
+                "total_tokens": update_data["total_tokens"],
+                "total_cost": update_data["total_cost"],
+                "duration": update_data["duration"],
+                "timestamp": end_time_iso,
+            }
+
+            self.publish_event(f"trace:{trace_id}", event)
 
             # cleanup Redis keys
             self.queue.redis_client.delete(
@@ -536,7 +592,13 @@ class SpanWorker:
         except Exception as e:
             self.logger.error(f"Failed to finalize trace {trace_id}: {e}")
     
+    def publish_event(self, channel: str, event: dict):
+        self.queue.redis_client.publish(channel, json.dumps(event))
+    
     def publish_span_to_redis(self, span_data: dict, user_id: str | None = None) -> None:
+        if os.getenv("REALTIME_UPDATES_ENABLED", "true").lower() == "false":
+            return
+        
         try:
             trace_id = span_data.get("trace_id")
             span_id = span_data.get("span_id")
@@ -546,7 +608,7 @@ class SpanWorker:
                 return
             
             message = {
-                "event": "span.inserted",
+                "event": "span_created",
                 "span_id": span_id,
                 "trace_id": trace_id,
                 "status": status,
@@ -557,12 +619,22 @@ class SpanWorker:
             payload = json.dumps(message)
 
             # specific channel for the traces
-            self.queue.redis_client.publish(f"trace:{trace_id}", payload)
+            try:
+                self.queue.redis_client.publish(f"trace:{trace_id}", payload)
 
-            # specific channel based on users
-            if user_id:
-                self.queue.redis_client.publish(f"user:{user_id}:spans", payload)
-
+                # specific channel for users
+                if user_id:
+                    self.queue.redis_client.publish(f"user:{user_id}:spans", payload)
+            except redis.ConnectionError as e:
+                self.logger.warning(
+                    "Redis pub/sub unavailable, skipping publish",
+                    extra={"extra_data": {"error": str(e), "span_id": span_id}}
+                )
+            except redis.TimeoutError as e:
+                self.logger.warning(
+                    "Redis pub/sub timeout, skipping publish",
+                    extra={"extra_data": {"error": str(e), "span_id": span_id}}
+                )
 
         except Exception as e:
             self.logger.warning(
@@ -578,6 +650,66 @@ class SpanWorker:
                 },
                 exc_info=True,
             )
+    
+    def publish_trace_completed(self, trace_id: str, user_id: str, trace_data: dict) -> None:
+        if os.getenv("REALTIME_UPDATES_ENABLED", "true").lower() == "false":
+            return
+        
+        try:
+            if not trace_id and not user_id:
+                return
+            
+            message_dict = {
+                "event": "trace_completed",
+                "trace_id": trace_id,
+                "user_id": user_id,
+                "status": trace_data.get("status"),
+                "total_tokens": trace_data.get("total_tokens"),
+                "total_cost": trace_data.get("total_cost"),
+                "duration": trace_data.get("duration"),
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+
+            json_message = json.dumps(message_dict)
+
+            try:
+                self.queue.redis_client.publish(f"trace:{trace_id}", json_message)
+
+                if user_id:
+                    self.queue.redis_client.publish(f"user:{user_id}:spans", json_message)
+            except (redis.ConnectionError, redis.TimeoutError) as e:
+                self.logger.warning(
+                    "Redis pub/sub unavailable for trace completion",
+                    extra={"extra_data": {"error": str(e), "trace_id": trace_id}}
+                )
+            except Exception as e:
+                self.logger.warning(
+                    "Failed to publish trace update to Redis",
+                    extra={
+                        "extra_data": {
+                            "trace_id": trace_id,
+                            "user_id": user_id,
+                            "worker_id": self.worker_id,
+                            "error": str(e),
+                        }
+                    },
+                    exc_info=True,
+                )
+            
+        except Exception as e:
+            self.logger.warning(
+                "Failed to publish trace update to Redis",
+                extra={
+                    "extra_data": {
+                        "trace_id": trace_id,
+                        "user_id": user_id,
+                        "worker_id": self.worker_id,
+                        "error": str(e),
+                    }
+                },
+                exc_info=True,
+            )
+
 
         
 def generate_hash_key(user_id: str, agent_id: str) -> str:
