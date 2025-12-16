@@ -71,3 +71,13 @@ async def unregister_ws_connection(user_id: str, connection_id: str) -> None:
         logger.debug(f"Unregistered WS connection {connection_id} for user {user_id}")
     except Exception as e:
         logger.error(f"Failed to unregister WS connection: {e}")
+
+# gets the current number of WebSocket connections for a user
+async def get_user_connection_count(user_id: str) -> int:
+    redis = await get_redis()
+    conn_key = f"ws_connections:{user_id}"
+
+    try:
+        return await redis.scard(conn_key)
+    except Exception:
+        return 0
