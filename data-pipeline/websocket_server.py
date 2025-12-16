@@ -13,6 +13,13 @@ from websocket.connection_manager import ConnectionManager
 from websocket.redis_subscriber import init_redis_subscriber, get_redis_subscriber
 from auth.websocket_auth import validate_api_key, validate_trace_ownership
 
+import uuid
+from rate_limiter_ws import (
+    check_ws_connection_limit,
+    register_ws_connection,
+    unregister_ws_connection,
+)
+
 from dataclasses import asdict
 from websocket.health import health_monitor, WebSocketHealthStatus
 
@@ -87,6 +94,18 @@ async def websocket_trace(websocket: WebSocket, trace_id: str, api_key: str = Qu
         await websocket.close(code=4003, reason="Access denied - trace not found")
         return
     
+    allowed, reason = await check_ws_connection_limit(user_id)
+    if not allowed:
+        await websocket.close(code=4029, reason=reason)
+        return
+    
+    if not await validate_trace_ownership(trace_id, user_id):
+        await websocket.close(code=4003, reason="Access denied - trace not found")
+        return
+    
+    connection_id = str(uuid.uuid4())
+    await register_ws_connection(user_id, connection_id)
+
     await connection_manager.connect(websocket, trace_id = trace_id)
 
     try:
@@ -98,6 +117,7 @@ async def websocket_trace(websocket: WebSocket, trace_id: str, api_key: str = Qu
     except WebSocketDisconnect:
         pass
     finally:
+        await unregister_ws_connection(user_id, connection_id)
         await connection_manager.disconnect(websocket)
 
 # stream real-time span updates for all traces belonging to a user
