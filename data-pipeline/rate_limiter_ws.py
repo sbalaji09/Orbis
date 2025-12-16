@@ -12,3 +12,39 @@ WS_MAX_CONNECTIONS_PER_USER = int(os.getenv("WS_MAX_CONNECTIONS_PER_USER", 10))
 WS_CONNECTION_ATTEMPTS_PER_MINUTE = int(os.getenv("WS_CONNECTION_ATTEMPTS_PER_MINUTE", 30))
 
 _redis_client: Optional[aioredis.Redis] = None
+
+# get the Redis client
+async def get_redis() -> aioredis.Redis:
+    global _redis_client
+    if _redis_client is None:
+        _redis_client = aioredis.from_url(REDIS_URL, decode_responses=True)
+    return _redis_client
+
+async def check_ws_connection_limit(user_id: str) -> Tuple[bool, str]:
+    redis = await get_redis()
+    current_minute = int(time.time() // 60)
+
+    # connection attempt rate limit
+    attempt_key = f"ws_attempts:{user_id}:{current_minute}"
+    try:
+        attempts = await redis.incr(attempt_key)
+        if attempts == 1:
+            await redis.expire(attempt_key, 60)
+        
+        if attempts > WS_CONNECTION_ATTEMPTS_PER_MINUTE:
+            logger.warning(f"User {user_id} exceeded WS connection attempt rate limit")
+            return False, "Too many connection attempts. Try again later."
+    except Exception as e:
+        logger.error(f"Redis error in connection attempt check: {e}")
+    
+    # manages the amount of concurrent WebSocket connections connected to one user
+    conn_key = f"ws_connections:{user_id}"
+    try:
+        current_connections = await redis.scard(conn_key)
+        if current_connections >= WS_MAX_CONNECTIONS_PER_USER:
+            logger.warning(f"User {user_id} at max WebSocket connections ({current_connections})")
+            return False, f"Maximum connections ({WS_MAX_CONNECTIONS_PER_USER}) reached."
+    except Exception as e:
+        logger.error(f"Redis error in connection limit check: {e}")
+    
+    return True, ""
