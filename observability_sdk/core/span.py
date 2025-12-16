@@ -24,7 +24,7 @@ class Span:
     error_message: Optional[str] = None
 
     # span type classification (llm, tool, http, database, cli, browser, function)
-    span_type: str = "llm"
+    span_type: str = "function"
 
     # LLM specific fields
     model: Optional[str] = None

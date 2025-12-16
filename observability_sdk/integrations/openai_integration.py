@@ -198,6 +198,7 @@ class OpenAIInstrumentor:
         # create span
         span = Span(
             name=f"openai.{model}",
+            span_type="llm",
             user_id=config.user_id or "00000000-0000-0000-0000-000000000000",
             agent_id=config.project_id,  # ← CHANGE THIS LINE
             model=model,

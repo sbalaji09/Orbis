@@ -121,7 +121,7 @@ class SpanWorker:
                 "prompt_version": span.get("prompt_version"),
                 "prompt_hash": span.get("prompt_hash"),
                 # Tool tracking fields
-                "span_type": span.get('span_type', 'llm'),
+                "span_type": span.get('span_type', 'function'),
                 "tool_metadata": span.get('tool_metadata'),
                 "http_method": span.get('http_method'),
                 "http_url": span.get('http_url'),
@@ -313,7 +313,7 @@ class SpanWorker:
             "prompt_version": span.get('prompt_version'),
             "prompt_hash": span.get('prompt_hash'),
             # Tool tracking fields
-            "span_type": span.get('span_type', 'llm'),
+            "span_type": span.get('span_type', 'function'),
             "tool_metadata": span.get('tool_metadata'),
             "http_method": span.get('http_method'),
             "http_url": span.get('http_url'),

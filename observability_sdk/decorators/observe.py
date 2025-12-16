@@ -17,20 +17,6 @@ def observe(
         metadata: Optional[Dict[str, Any]] = None):
     """
     Decorator to automatically track function execution as a span.
-    
-    Usage:
-        @observe()
-        def my_function():
-            # Your code here
-            pass
-        
-        @observe(name="custom_name")
-        def another_function():
-            pass
-    
-    Args:
-        name: Optional custom name for the span (defaults to function name)
-        trace_id: Optional trace_id to group related spans together
     """
     def decorator(func: Callable) -> Callable:
         @wraps(func)
@@ -53,6 +39,9 @@ def observe(
                 trace_id=trace_id or (parent_span.trace_id if parent_span else Span.__dataclass_fields__['trace_id'].default_factory()),
                 prompt=input_str
             )
+
+            # ✅ FIX: Set span_type to "function" for @observe decorator
+            span.span_type = "function"
 
             # add prompt versioning metadata
             if prompt_id:
@@ -86,7 +75,7 @@ def observe(
                 result = func(*args, **kwargs)
                 
                 # Capture output
-                span.output = str(result) if result is not None else ""  # ← ADD THIS: Capture output
+                span.output = str(result) if result is not None else ""
                 
                 # mark span as successful
                 span.complete(status="success")

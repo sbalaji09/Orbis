@@ -46,7 +46,7 @@ class SpanIn(BaseModel):
     prompt_hash: Optional[str] = None
 
     # Tool tracking fields
-    span_type: Optional[str] = "llm"
+    span_type: Optional[str] = "function"
     tool_metadata: Optional[dict] = None
 
     # HTTP/API fields
