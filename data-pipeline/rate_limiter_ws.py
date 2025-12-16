@@ -48,3 +48,26 @@ async def check_ws_connection_limit(user_id: str) -> Tuple[bool, str]:
         logger.error(f"Redis error in connection limit check: {e}")
     
     return True, ""
+
+# register a new WebSocket connection for tracking
+async def register_ws_connection(user_id: str, connection_id: str) -> None:
+    redis = await get_redis()
+    conn_key = f"ws_connections:{user_id}"
+
+    try:
+        await redis.sadd(conn_key, connection_id)
+        await redis.expire(conn_key, 86400)
+        logger.debug(f"Registered WS connection {connection_id} for user {user_id}")
+    except Exception as e:
+        logger.error(f"Failed to register WS connection: {e}")
+
+# remove a WebSocket connection from tracking
+async def unregister_ws_connection(user_id: str, connection_id: str) -> None:
+    redis = await get_redis()
+    conn_key = f"ws_connections:{user_id}"
+
+    try:
+        await redis.srem(conn_key, connection_id)
+        logger.debug(f"Unregistered WS connection {connection_id} for user {user_id}")
+    except Exception as e:
+        logger.error(f"Failed to unregister WS connection: {e}")
