@@ -139,7 +139,7 @@ async def websocket_dashboard(websocket: WebSocket, api_key: str = Query(None, a
     
     connection_id = str(uuid.uuid4())
     await register_ws_connection(user_id, connection_id)
-    
+
     await websocket.accept()
     pubsub = None
 
@@ -182,6 +182,7 @@ async def websocket_dashboard(websocket: WebSocket, api_key: str = Query(None, a
                 break
 
     finally:
+        await unregister_ws_connection(user_id, connection_id)
         # cancel listener and unsubscribe
         if 'listener_task' in locals():
             listener_task.cancel()
