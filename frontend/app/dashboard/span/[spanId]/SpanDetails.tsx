@@ -35,29 +35,6 @@ interface SpanDetailsProps {
 }
 
 export default function SpanDetails({ span: currentSpan }: SpanDetailsProps) {
-  //   const statusConfig: Record<string, { label: string; className: string }> = {
-  //     pending: {
-  //       label: "Pending",
-  //       className: "bg-warning/20 text-warning border-2 border-warning",
-  //     },
-  //     processing: {
-  //       label: "Processing",
-  //       className: "bg-babyblue/20 text-babyblue border-2 border-babyblue",
-  //     },
-  //     completed: {
-  //       label: "Complete",
-  //       className: "bg-success/20 text-success border-2 border-success",
-  //     },
-  //     error: {
-  //       label: "Error",
-  //       className: "bg-error/20 text-error border-2 border-error",
-  //     },
-  //     streaming: {
-  //       label: "Streaming",
-  //       className: "bg-babyblue/20 text-babyblue border-2 border-babyblue",
-  //     },
-  //   };
-
   return (
     <div className="space-y-5 bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6">
       {/* Prompt Versioning Information */}
@@ -126,7 +103,9 @@ export default function SpanDetails({ span: currentSpan }: SpanDetailsProps) {
         {(() => {
           const typeConfig = getSpanTypeConfig(currentSpan.span_type);
           return (
-            <div className={`inline-flex items-center gap-2 px-3 py-2 ${typeConfig.color} ${typeConfig.textColor} border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.1)]`}>
+            <div
+              className={`inline-flex items-center gap-2 px-3 py-2 ${typeConfig.color} ${typeConfig.textColor} border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.1)]`}
+            >
               <span className="text-lg">{typeConfig.icon}</span>
               <span className="font-bold">{typeConfig.label}</span>
             </div>
@@ -138,22 +117,38 @@ export default function SpanDetails({ span: currentSpan }: SpanDetailsProps) {
           <div className="grid grid-cols-2 gap-3 mt-3">
             {currentSpan.http_method && (
               <div className="flex flex-col gap-1 p-3 bg-white border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.1)]">
-                <span className="text-[10px] font-medium text-black/60 uppercase">Method</span>
-                <span className="font-mono font-bold">{currentSpan.http_method}</span>
+                <span className="text-[10px] font-medium text-black/60 uppercase">
+                  Method
+                </span>
+                <span className="font-mono font-bold">
+                  {currentSpan.http_method}
+                </span>
               </div>
             )}
             {currentSpan.http_status_code && (
               <div className="flex flex-col gap-1 p-3 bg-white border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.1)]">
-                <span className="text-[10px] font-medium text-black/60 uppercase">Status</span>
-                <span className={`font-mono font-bold ${currentSpan.http_status_code >= 400 ? 'text-error' : 'text-success'}`}>
+                <span className="text-[10px] font-medium text-black/60 uppercase">
+                  Status
+                </span>
+                <span
+                  className={`font-mono font-bold ${
+                    currentSpan.http_status_code >= 400
+                      ? "text-error"
+                      : "text-success"
+                  }`}
+                >
                   {currentSpan.http_status_code}
                 </span>
               </div>
             )}
             {currentSpan.http_url && (
               <div className="col-span-2 flex flex-col gap-1 p-3 bg-white border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.1)]">
-                <span className="text-[10px] font-medium text-black/60 uppercase">URL</span>
-                <span className="font-mono text-xs break-all">{currentSpan.http_url}</span>
+                <span className="text-[10px] font-medium text-black/60 uppercase">
+                  URL
+                </span>
+                <span className="font-mono text-xs break-all">
+                  {currentSpan.http_url}
+                </span>
               </div>
             )}
           </div>
@@ -164,18 +159,31 @@ export default function SpanDetails({ span: currentSpan }: SpanDetailsProps) {
           <div className="space-y-3 mt-3">
             {currentSpan.cli_command && (
               <div className="flex flex-col gap-1 p-3 bg-black border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.1)]">
-                <span className="text-[10px] font-medium text-white/60 uppercase">Command</span>
-                <code className="font-mono text-xs text-green-400 break-all">{currentSpan.cli_command}</code>
-              </div>
-            )}
-            {currentSpan.cli_exit_code !== null && currentSpan.cli_exit_code !== undefined && (
-              <div className="flex flex-col gap-1 p-3 bg-white border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.1)] w-fit">
-                <span className="text-[10px] font-medium text-black/60 uppercase">Exit Code</span>
-                <span className={`font-mono font-bold ${currentSpan.cli_exit_code === 0 ? 'text-success' : 'text-error'}`}>
-                  {currentSpan.cli_exit_code}
+                <span className="text-[10px] font-medium text-white/60 uppercase">
+                  Command
                 </span>
+                <code className="font-mono text-xs text-green-400 break-all">
+                  {currentSpan.cli_command}
+                </code>
               </div>
             )}
+            {currentSpan.cli_exit_code !== null &&
+              currentSpan.cli_exit_code !== undefined && (
+                <div className="flex flex-col gap-1 p-3 bg-white border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.1)] w-fit">
+                  <span className="text-[10px] font-medium text-black/60 uppercase">
+                    Exit Code
+                  </span>
+                  <span
+                    className={`font-mono font-bold ${
+                      currentSpan.cli_exit_code === 0
+                        ? "text-success"
+                        : "text-error"
+                    }`}
+                  >
+                    {currentSpan.cli_exit_code}
+                  </span>
+                </div>
+              )}
           </div>
         )}
 
@@ -184,13 +192,19 @@ export default function SpanDetails({ span: currentSpan }: SpanDetailsProps) {
           <div className="grid grid-cols-2 gap-3 mt-3">
             {currentSpan.tool_name && (
               <div className="flex flex-col gap-1 p-3 bg-white border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.1)]">
-                <span className="text-[10px] font-medium text-black/60 uppercase">Tool Name</span>
-                <span className="font-mono font-semibold">{currentSpan.tool_name}</span>
+                <span className="text-[10px] font-medium text-black/60 uppercase">
+                  Tool Name
+                </span>
+                <span className="font-mono font-semibold">
+                  {currentSpan.tool_name}
+                </span>
               </div>
             )}
             {currentSpan.tool_category && (
               <div className="flex flex-col gap-1 p-3 bg-white border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.1)]">
-                <span className="text-[10px] font-medium text-black/60 uppercase">Category</span>
+                <span className="text-[10px] font-medium text-black/60 uppercase">
+                  Category
+                </span>
                 <span className="font-mono">{currentSpan.tool_category}</span>
               </div>
             )}
@@ -342,7 +356,8 @@ export default function SpanDetails({ span: currentSpan }: SpanDetailsProps) {
           </div>
         </div>
       )}
-      {(currentSpan.input_preview !== null || currentSpan.output_preview !== null) && (
+      {(currentSpan.input_preview !== null ||
+        currentSpan.output_preview !== null) && (
         <div className="grid grid-cols-2 gap-3">
           {/* Input Preview */}
           {currentSpan.input_preview !== null && (

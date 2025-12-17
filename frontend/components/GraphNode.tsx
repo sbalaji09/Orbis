@@ -107,7 +107,7 @@ export default function GraphNode({
 
   const statusConfig = {
     success: { bg: "bg-emerald-50", text: "text-success", dot: "bg-success" },
-    failed: { bg: "bg-red-50", text: "text-error", dot: "bg-error" },
+    error: { bg: "bg-red-50", text: "text-error", dot: "bg-error" },
     running: { bg: "bg-sky-50", text: "text-babyblue", dot: "bg-babyblue" },
     pending: { bg: "bg-amber-50", text: "text-warning", dot: "bg-warning" },
     cancelled: { bg: "bg-gray-50", text: "text-muted", dot: "bg-muted" },

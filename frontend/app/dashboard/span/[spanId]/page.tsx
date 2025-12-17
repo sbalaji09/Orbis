@@ -31,7 +31,7 @@ export default async function SpanDetailPage({
 
   const statusConfig = {
     success: { bg: "bg-emerald-50", text: "text-success", dot: "bg-success" },
-    failed: { bg: "bg-red-50", text: "text-error", dot: "bg-error" },
+    error: { bg: "bg-red-50", text: "text-error", dot: "bg-error" },
     running: { bg: "bg-sky-50", text: "text-babyblue", dot: "bg-babyblue" },
     pending: { bg: "bg-amber-50", text: "text-warning", dot: "bg-warning" },
     cancelled: { bg: "bg-gray-50", text: "text-muted", dot: "bg-muted" },
@@ -82,11 +82,18 @@ export default async function SpanDetailPage({
             )}
           </div>
           <div
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg ${status.bg} shrink-0`}
+            className={`flex items-center gap-1.5 px-4 py-2 border-2 ${
+              status.bg
+            } ${status.dot.replace(
+              "bg-",
+              "border-"
+            )} shrink-0 transition-transform duration-200`}
           >
-            <div className={`w-2 h-2 rounded-full ${status.dot}`} />
-            <span className={`text-sm font-semibold ${status.text}`}>
-              {span.status || "unknown"}
+            <div className={`w-2 h-2 ${status.dot}`} />
+            <span
+              className={`text-sm font-bold uppercase tracking-wide ${status.text}`}
+            >
+              {span.status}
             </span>
           </div>
         </div>
