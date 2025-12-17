@@ -237,11 +237,11 @@ export default function SpanDetailClient({
       {/* Tabs */}
       <TabGroup selectedIndex={selectedTab} onChange={setSelectedTab}>
         {hasPromptData && (
-          <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] mb-6 overflow-hidden">
+          <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] mb-3 overflow-hidden">
             <TabList className="flex border-b-2 border-black">
               <Tab
                 className={({ selected }) =>
-                  `flex-1 px-6 py-3 text-xs font-bold uppercase tracking-wide transition-all focus:outline-none relative ${
+                  `flex-1 px-6 py-3 text-xs font-bold uppercase tracking-wide transition-all focus:outline-none relative cursor-pointer ${
                     selected
                       ? "bg-black text-mustard"
                       : "bg-background text-black/60 hover:bg-black/5 hover:text-black"
@@ -259,7 +259,7 @@ export default function SpanDetailClient({
               </Tab>
               <Tab
                 className={({ selected }) =>
-                  `flex-1 px-6 py-3 text-xs font-bold uppercase tracking-wide transition-all focus:outline-none border-l-2 border-black relative ${
+                  `flex-1 px-6 py-3 text-xs font-bold uppercase tracking-wide transition-all focus:outline-none border-l-2 border-black relative cursor-pointer ${
                     selected
                       ? "bg-black text-mustard"
                       : "bg-background text-black/60 hover:bg-black/5 hover:text-black"
@@ -277,7 +277,7 @@ export default function SpanDetailClient({
               </Tab>
               <Tab
                 className={({ selected }) =>
-                  `flex-1 px-6 py-3 text-xs font-bold uppercase tracking-wide transition-all focus:outline-none border-l-2 border-black relative ${
+                  `flex-1 px-6 py-3 text-xs font-bold uppercase tracking-wide transition-all cursor-pointer focus:outline-none border-l-2 border-black relative ${
                     selected
                       ? "bg-black text-mustard"
                       : "bg-background text-black/60 hover:bg-black/5 hover:text-black"
