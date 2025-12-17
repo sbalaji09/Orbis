@@ -100,28 +100,120 @@ export default function PromptComparisonView({
     return { value: delta, direction };
   };
 
-  // Parse diff for display
+  // Parse diff for display with word-level differences
   const parseDiff = (diffRaw: string) => {
     const lines = typeof diffRaw === "string" ? diffRaw.split("\n") : [];
-    return lines.map((line, idx) => {
-      if (line.startsWith("+") && !line.startsWith("+++")) {
-        return {
-          type: "added" as const,
-          content: line.substring(1),
-          lineNum: idx + 1,
-        };
-      } else if (line.startsWith("-") && !line.startsWith("---")) {
-        return {
-          type: "removed" as const,
-          content: line.substring(1),
-          lineNum: idx + 1,
-        };
-      } else if (line.startsWith("@@")) {
-        return { type: "header" as const, content: line, lineNum: idx + 1 };
-      } else {
-        return { type: "unchanged" as const, content: line, lineNum: idx + 1 };
+    const result: Array<{
+      type: "added" | "removed" | "unchanged";
+      content: string;
+      oldLineNum?: number;
+      newLineNum?: number;
+      wordDiffs?: Array<{
+        type: "added" | "removed" | "unchanged";
+        text: string;
+      }>;
+    }> = [];
+
+    let oldLineNum = 1;
+    let newLineNum = 1;
+
+    for (const line of lines) {
+      // Skip file headers (---, +++)
+      if (line.startsWith("---") || line.startsWith("+++")) {
+        continue;
       }
-    });
+
+      // Skip hunk headers (@@)
+      if (line.startsWith("@@")) {
+        // Extract line numbers from hunk header like @@ -1,4 +1,4 @@
+        const match = line.match(/@@ -(\d+),?\d* \+(\d+),?\d* @@/);
+        if (match) {
+          oldLineNum = parseInt(match[1]);
+          newLineNum = parseInt(match[2]);
+        }
+        continue;
+      }
+
+      if (line.startsWith("+")) {
+        result.push({
+          type: "added",
+          content: line.substring(1),
+          newLineNum: newLineNum++,
+        });
+      } else if (line.startsWith("-")) {
+        result.push({
+          type: "removed",
+          content: line.substring(1),
+          oldLineNum: oldLineNum++,
+        });
+      } else if (line.startsWith(" ")) {
+        result.push({
+          type: "unchanged",
+          content: line.substring(1),
+          oldLineNum: oldLineNum++,
+          newLineNum: newLineNum++,
+        });
+      }
+    }
+
+    // Add word-level diffs for consecutive removed/added pairs
+    const enhanced: typeof result = [];
+    for (let i = 0; i < result.length; i++) {
+      const current = result[i];
+      const next = result[i + 1];
+
+      if (current.type === "removed" && next?.type === "added") {
+        // Calculate word-level diff
+        const oldWords = current.content.split(/(\s+)/);
+        const newWords = next.content.split(/(\s+)/);
+
+        enhanced.push({
+          ...current,
+          wordDiffs: getWordDiff(oldWords, newWords, "removed"),
+        });
+        enhanced.push({
+          ...next,
+          wordDiffs: getWordDiff(oldWords, newWords, "added"),
+        });
+        i++; // Skip next since we processed it
+      } else {
+        enhanced.push(current);
+      }
+    }
+
+    return enhanced;
+  };
+
+  // Helper function to get word-level differences
+  const getWordDiff = (
+    oldWords: string[],
+    newWords: string[],
+    lineType: "removed" | "added"
+  ) => {
+    const result: Array<{
+      type: "added" | "removed" | "unchanged";
+      text: string;
+    }> = [];
+    const maxLen = Math.max(oldWords.length, newWords.length);
+
+    for (let i = 0; i < maxLen; i++) {
+      const oldWord = oldWords[i];
+      const newWord = newWords[i];
+
+      if (oldWord === newWord) {
+        result.push({ type: "unchanged", text: oldWord || "" });
+      } else if (lineType === "removed") {
+        if (oldWord !== undefined) {
+          result.push({ type: "removed", text: oldWord });
+        }
+      } else {
+        if (newWord !== undefined) {
+          result.push({ type: "added", text: newWord });
+        }
+      }
+    }
+
+    return result;
   };
 
   return (
@@ -382,42 +474,110 @@ export default function PromptComparisonView({
                       {/* Diff View */}
                       {activeTab === "diff" && (
                         <div className="h-full overflow-auto">
-                          {parseDiff(comparisonData.diff?.raw || "").map(
-                            (line, idx) => (
+                          {(() => {
+                            // Handle both diff.raw and diff.diff.raw structures
+                            const diffRaw =
+                              comparisonData.diff?.raw ||
+                              (comparisonData.diff as any)?.diff?.raw ||
+                              "";
+                            if (!diffRaw || diffRaw.trim() === "") {
+                              return (
+                                <div className="flex items-center justify-center h-full">
+                                  <div className="text-center">
+                                    <p className="text-xs text-black/40 mb-2">
+                                      No differences found between these
+                                      versions
+                                    </p>
+                                    <p className="text-[10px] text-black/30">
+                                      The prompts may be identical
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            }
+                            const parsedLines = parseDiff(diffRaw);
+                            if (parsedLines.length === 0) {
+                              return (
+                                <div className="flex items-center justify-center h-full">
+                                  <p className="text-xs text-black/40">
+                                    Unable to parse diff data
+                                  </p>
+                                </div>
+                              );
+                            }
+                            return parsedLines.map((line, idx) => (
                               <div
                                 key={idx}
-                                className={`flex px-4 py-1 text-xs leading-5 border-b border-black/5 font-mono ${
+                                className={`flex px-2 py-0.5 text-xs leading-relaxed border-b border-black/5 font-mono ${
                                   line.type === "added"
-                                    ? "bg-success/10 text-success"
+                                    ? "bg-success/10"
                                     : line.type === "removed"
-                                    ? "bg-error/10 text-error"
-                                    : line.type === "header"
-                                    ? "bg-babyblue/10 text-babyblue font-semibold"
-                                    : "text-foreground/80"
+                                    ? "bg-error/10"
+                                    : "hover:bg-black/[0.01]"
                                 }`}
                               >
-                                <span className="w-8 text-right text-black/30 pr-3 select-none shrink-0">
-                                  {line.lineNum}
+                                {/* Line number */}
+                                <span className="w-12 text-center pr-3 select-none shrink-0 text-[11px] text-black/30">
+                                  {line.type === "unchanged"
+                                    ? line.oldLineNum
+                                    : line.type === "removed"
+                                    ? line.oldLineNum
+                                    : line.newLineNum}
                                 </span>
-                                <span className="w-4 text-center shrink-0">
+                                {/* Change indicator */}
+                                <span
+                                  className={`w-5 text-center shrink-0 font-bold ${
+                                    line.type === "added"
+                                      ? "text-success"
+                                      : line.type === "removed"
+                                      ? "text-error"
+                                      : "text-black/20"
+                                  }`}
+                                >
                                   {line.type === "added"
                                     ? "+"
                                     : line.type === "removed"
                                     ? "-"
-                                    : " "}
+                                    : ""}
                                 </span>
-                                <span
-                                  className={
-                                    line.type === "removed"
-                                      ? "line-through"
-                                      : ""
-                                  }
-                                >
-                                  {line.content || "\u00A0"}
+                                {/* Content with word-level highlighting */}
+                                <span className="flex-1 whitespace-pre-wrap break-all">
+                                  {line.wordDiffs ? (
+                                    line.wordDiffs.map((word, widx) => (
+                                      <span
+                                        key={widx}
+                                        className={
+                                          word.type === "added"
+                                            ? "bg-success/30 text-success font-semibold"
+                                            : word.type === "removed"
+                                            ? "bg-error/30 text-error font-semibold"
+                                            : line.type === "added"
+                                            ? "text-success"
+                                            : line.type === "removed"
+                                            ? "text-error"
+                                            : "text-foreground/80"
+                                        }
+                                      >
+                                        {word.text}
+                                      </span>
+                                    ))
+                                  ) : (
+                                    <span
+                                      className={
+                                        line.type === "added"
+                                          ? "text-success"
+                                          : line.type === "removed"
+                                          ? "text-error"
+                                          : "text-foreground/80"
+                                      }
+                                    >
+                                      {line.content || "\u00A0"}
+                                    </span>
+                                  )}
                                 </span>
                               </div>
-                            )
-                          )}
+                            ));
+                          })()}
                         </div>
                       )}
 
