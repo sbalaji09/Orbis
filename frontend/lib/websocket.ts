@@ -194,7 +194,7 @@ export class WebSocketClient {
             }
 
             // Don't reconnect on auth errors (4001 = missing/invalid key, 4003 = access denied)
-            if (event.code === 4001 || event.code === 4003 || event.code === 4401) {
+            if (event.code == 4029 || event.code === 4001 || event.code === 4003 || event.code === 4401) {
                 console.error(`WebSocket auth error (${event.code}): ${event.reason}`);
                 this.metrics.failedConnections++;
                 this.setState("failed");

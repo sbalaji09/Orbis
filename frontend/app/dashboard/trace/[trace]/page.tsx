@@ -4,6 +4,8 @@ import TraceGraphServer from "@/components/TraceGraphServer";
 import TraceOverviewClient from "./TraceOverviewClient";
 import { getTrace } from "@/lib/api-server";
 
+// TODO: In production, get from auth/session
+const DEFAULT_USER_ID = "00000000-0000-0000-0000-000000000000";
 
 // Revalidate every 10 seconds
 export const revalidate = 10;
@@ -19,7 +21,7 @@ export default async function TraceOverview({params,}: {params: Promise<{ trace:
   }
 
   const cookieStore = cookies();
-  const apiKey = (await cookieStore).get("X-User-ID")?.value ?? "";
+  const apiKey = (await cookieStore).get("X-User-ID")?.value ?? DEFAULT_USER_ID;
 
   return (
     <TraceOverviewClient

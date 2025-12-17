@@ -10,8 +10,11 @@ from queues.redis_queue import queue
 from auth.auth_middleware import check_api_key
 from rate_limiter import check_rate_limit
 
+
 # Add backend to path for database access
+from fastapi.middleware.cors import CORSMiddleware
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from shared.cors_config import get_cors_config
 from backend.db_connection import db
 
 
@@ -144,6 +147,7 @@ class EndTraceIn(BaseModel):
     status: str = "completed"  # or "failed"
 
 app = FastAPI()
+app.add_middleware(CORSMiddleware, **get_cors_config())
 
 # post endpoint from the SDK to the backend infra that now uses the message queu
 # instead of sending to the database automatically

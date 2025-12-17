@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import {WebSocketClient, WebSocketMessage } from "./websocket";
+import {WebSocketClient, WebSocketMessage, ConnectionState } from "./websocket";
 
 type WebSocketType = "trace" | "dashboard";
-
-type ConnectionState = "connecting" | "connected" | "disconnected" | "error";
 
 interface UseWebSocketParams {
     type: WebSocketType;
@@ -21,9 +19,9 @@ interface UseWebSocketResult {
 export function useWebSocket(params: UseWebSocketParams): UseWebSocketResult {
     const {type, traceId, apiKey, disabled = false} = params;
 
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const baseUrl = process.env.NEXT_PUBLIC_WS_URL || process.env.NEXT_PUBLIC_API_URL;
     if (!baseUrl) {
-        console.error("NEXT_PUBLIC_API_URL is not defined");
+        console.error("NEXT_PUBLIC_WS_URL or NEXT_PUBLIC_API_URL is not defined");
     }
 
     const [state, setState] = useState<ConnectionState>("disconnected");
