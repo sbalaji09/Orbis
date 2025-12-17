@@ -15,3 +15,23 @@ class ValidationError(HTTPException):
             }
         )
 
+# checks if a string is in the valid UUID format
+def is_valid_uuid(val: str) -> bool:
+    if not val:
+        return False
+    
+    try:
+        UUID(val)
+        return True
+    except (ValueError, TypeError):
+        return False
+
+# validate that a string is a valid UUID and returns the validated string
+def validate_uuid(val: str, field_name: str = "id") -> str:
+    if not val:
+        raise ValidationError(field_name, f"{field_name} is required")
+    
+    if not is_valid_uuid(val):
+        raise ValidationError(field_name, f"{field_name} must be a valid UUID format")
+
+    return val
