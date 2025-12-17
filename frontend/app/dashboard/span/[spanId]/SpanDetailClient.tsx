@@ -33,7 +33,7 @@ interface Version {
 
 interface SpanDetailClientProps {
   initialSpan: Span;
-  initialVersions?: any[];
+  initialVersions?: Version[];
   initialAnalytics?: PromptVersionAnalytics[];
 }
 
