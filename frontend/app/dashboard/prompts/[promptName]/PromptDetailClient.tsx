@@ -77,8 +77,10 @@ export default function PromptDetailClient({
 
     if (content1 && content2) {
       // Ensure older version is on the left
-      const [older, newer] = version1 < version2 ? [version1, version2] : [version2, version1];
-      const [olderContent, newerContent] = version1 < version2 ? [content1, content2] : [content2, content1];
+      const [older, newer] =
+        version1 < version2 ? [version1, version2] : [version2, version1];
+      const [olderContent, newerContent] =
+        version1 < version2 ? [content1, content2] : [content2, content1];
 
       setDiffState({
         oldContent: olderContent,
@@ -98,9 +100,10 @@ export default function PromptDetailClient({
     setRollingBack(null);
   };
 
-  const latestVersion = versions.length > 0
-    ? Math.max(...versions.map((v) => v.version_number))
-    : 0;
+  const latestVersion =
+    versions.length > 0
+      ? Math.max(...versions.map((v) => v.version_number))
+      : 0;
 
   return (
     <div className="h-full overflow-y-auto bg-background">
@@ -111,8 +114,18 @@ export default function PromptDetailClient({
             href="/dashboard/prompts"
             className="inline-flex items-center gap-1 text-xs text-black/40 hover:text-babyblue transition-colors"
           >
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            <svg
+              className="w-3 h-3"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 19l-7-7 7-7"
+              />
             </svg>
             Back to Prompts
           </Link>
@@ -123,7 +136,8 @@ export default function PromptDetailClient({
           <div className="flex items-start justify-between">
             <div>
               <h1 className="text-2xl font-semibold tracking-tight mb-1">
-                <span className="text-black/40">{`> `}</span>{promptName}
+                <span className="text-black/40">{`> `}</span>
+                {promptName}
               </h1>
               <p className="text-sm text-black/60">
                 {`// ${versions.length} versions • Latest: v${latestVersion}`}
@@ -246,7 +260,8 @@ export default function PromptDetailClient({
                               )}
                             </div>
                             <p className="text-[10px] text-black/40 font-mono">
-                              Created: {new Date(version.created_at).toLocaleString()}
+                              Created:{" "}
+                              {new Date(version.created_at).toLocaleString()}
                             </p>
                             {version.content_preview && (
                               <p className="text-xs text-black/60 mt-2 line-clamp-2 font-mono">
@@ -265,29 +280,43 @@ export default function PromptDetailClient({
                             </button>
                             <button
                               onClick={() => {
-                                if (selectedVersion && selectedVersion !== version.version_number) {
-                                  handleCompare(selectedVersion, version.version_number);
+                                if (
+                                  selectedVersion &&
+                                  selectedVersion !== version.version_number
+                                ) {
+                                  handleCompare(
+                                    selectedVersion,
+                                    version.version_number
+                                  );
                                 } else {
                                   setSelectedVersion(version.version_number);
                                 }
                               }}
                               className={`px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide border-2 transition-colors shadow-[2px_2px_0_rgba(0,0,0,0.1)] ${
-                                selectedVersion && selectedVersion !== version.version_number
+                                selectedVersion &&
+                                selectedVersion !== version.version_number
                                   ? "border-mustard bg-mustard text-black hover:bg-mustard/90"
                                   : "border-black bg-white hover:bg-black/5"
                               }`}
                             >
-                              {selectedVersion && selectedVersion !== version.version_number
+                              {selectedVersion &&
+                              selectedVersion !== version.version_number
                                 ? "Compare"
                                 : "Select"}
                             </button>
                             {version.version_number !== latestVersion && (
                               <button
-                                onClick={() => handleRollback(version.version_number)}
-                                disabled={rollingBack === version.version_number}
+                                onClick={() =>
+                                  handleRollback(version.version_number)
+                                }
+                                disabled={
+                                  rollingBack === version.version_number
+                                }
                                 className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide border-2 border-error bg-error text-white hover:bg-error/90 disabled:opacity-50 transition-colors shadow-[2px_2px_0_rgba(0,0,0,0.1)]"
                               >
-                                {rollingBack === version.version_number ? "..." : "Rollback"}
+                                {rollingBack === version.version_number
+                                  ? "..."
+                                  : "Rollback"}
                               </button>
                             )}
                           </div>
@@ -302,7 +331,11 @@ export default function PromptDetailClient({
 
         {/* Analytics Tab */}
         {!loading && activeTab === "analytics" && (
-          <PromptAnalytics promptName={promptName} />
+          <PromptAnalytics
+            promptName={promptName}
+            analytics={[]}
+            loading={false}
+          />
         )}
       </div>
 
@@ -318,8 +351,18 @@ export default function PromptDetailClient({
               onClick={() => setViewingContent(null)}
               className="absolute -top-2 -right-2 z-10 p-2 bg-white border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.2)] hover:bg-black/5"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
             <div className="mb-3">
@@ -349,8 +392,18 @@ export default function PromptDetailClient({
               onClick={() => setDiffState(null)}
               className="absolute -top-2 -right-2 z-10 p-2 bg-white border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.2)] hover:bg-black/5"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
             <div className="mb-3">

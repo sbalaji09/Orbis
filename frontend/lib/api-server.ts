@@ -164,3 +164,59 @@ export async function getPromptsByAgent(
     return [];
   }
 }
+
+export async function getPromptVersions(
+  promptName: string,
+  userId: string = DEFAULT_USER_ID
+) {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/prompts/${encodeURIComponent(promptName)}/versions`,
+      {
+        headers: {
+          "X-User-ID": userId,
+        },
+        cache: "no-store",
+      }
+    );
+
+    if (!response.ok) {
+      console.error(`Failed to fetch prompt versions: ${response.statusText}`);
+      return [];
+    }
+
+    const data = await response.json();
+    return data.versions || [];
+  } catch (error) {
+    console.error("Error fetching prompt versions:", error);
+    return [];
+  }
+}
+
+export async function getPromptAnalytics(
+  promptName: string,
+  userId: string = DEFAULT_USER_ID
+) {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/prompts/analytics/${encodeURIComponent(promptName)}`,
+      {
+        headers: {
+          "X-User-ID": userId,
+        },
+        cache: "no-store",
+      }
+    );
+
+    if (!response.ok) {
+      console.error(`Failed to fetch prompt analytics: ${response.statusText}`);
+      return [];
+    }
+
+    const data = await response.json();
+    return data.versions || [];
+  } catch (error) {
+    console.error("Error fetching prompt analytics:", error);
+    return [];
+  }
+}

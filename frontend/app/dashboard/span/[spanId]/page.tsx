@@ -1,6 +1,10 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getSpan } from "@/lib/api-server";
+import {
+  getSpan,
+  getPromptVersions,
+  getPromptAnalytics,
+} from "@/lib/api-server";
 import SpanDetailClient from "./SpanDetailClient";
 
 export default async function SpanDetailPage({
@@ -13,6 +17,16 @@ export default async function SpanDetailPage({
 
   if (!span) {
     notFound();
+  }
+
+  // Fetch prompt versions and analytics server-side if prompt_name exists
+  let initialVersions = [];
+  let initialAnalytics = [];
+  if (span.prompt_name) {
+    [initialVersions, initialAnalytics] = await Promise.all([
+      getPromptVersions(span.prompt_name),
+      getPromptAnalytics(span.prompt_name),
+    ]);
   }
 
   const statusConfig = {
@@ -78,7 +92,11 @@ export default async function SpanDetailPage({
         </div>
 
         {/* Client component with tabs and interactivity */}
-        <SpanDetailClient initialSpan={span} />
+        <SpanDetailClient
+          initialSpan={span}
+          initialVersions={initialVersions}
+          initialAnalytics={initialAnalytics}
+        />
       </div>
     </div>
   );

@@ -21,7 +21,7 @@ import GraphNode from "@/components/GraphNode";
 import PromptVersionPanel from "@/components/PromptVersionPanel";
 import PromptContentViewer from "@/components/PromptContentViewer";
 import PromptDiffViewer from "@/components/PromptDiffViewer";
-import { fetchPromptContent, fetchPromptDiff, rollbackPrompt } from "@/lib/prompt-api";
+import { fetchPromptContent, rollbackPrompt } from "@/lib/prompt-api";
 
 interface NodePosition {
   x: number;
@@ -148,7 +148,9 @@ export default function TraceGraphClient({
   const DEFAULT_USER_ID = "00000000-0000-0000-0000-000000000000";
 
   // Prompt panel state
-  const [selectedPromptName, setSelectedPromptName] = useState<string | null>(null);
+  const [selectedPromptName, setSelectedPromptName] = useState<string | null>(
+    null
+  );
   const [isPanelOpen, setIsPanelOpen] = useState(false);
 
   // Content viewer state
@@ -204,68 +206,85 @@ export default function TraceGraphClient({
   }, []);
 
   // Handler for viewing a specific version
-  const handleViewVersion = useCallback(async (version: number) => {
-    if (!selectedPromptName) return;
+  const handleViewVersion = useCallback(
+    async (version: number) => {
+      if (!selectedPromptName) return;
 
-    const content = await fetchPromptContent(DEFAULT_USER_ID, selectedPromptName, version);
-    if (content) {
-      setViewingContent({
-        content,
-        version,
-        promptName: selectedPromptName,
-      });
-    }
-  }, [selectedPromptName]);
+      const content = await fetchPromptContent(
+        DEFAULT_USER_ID,
+        selectedPromptName,
+        version
+      );
+      if (content) {
+        setViewingContent({
+          content,
+          version,
+          promptName: selectedPromptName,
+        });
+      }
+    },
+    [selectedPromptName]
+  );
 
   // Handler for comparing two versions
-  const handleCompare = useCallback(async (version1: number, version2: number) => {
-    if (!selectedPromptName) return;
+  const handleCompare = useCallback(
+    async (version1: number, version2: number) => {
+      if (!selectedPromptName) return;
 
-    // Fetch both versions' content
-    const [content1, content2] = await Promise.all([
-      fetchPromptContent(DEFAULT_USER_ID, selectedPromptName, version1),
-      fetchPromptContent(DEFAULT_USER_ID, selectedPromptName, version2),
-    ]);
+      // Fetch both versions' content
+      const [content1, content2] = await Promise.all([
+        fetchPromptContent(DEFAULT_USER_ID, selectedPromptName, version1),
+        fetchPromptContent(DEFAULT_USER_ID, selectedPromptName, version2),
+      ]);
 
-    if (content1 && content2) {
-      // Create a simple unified diff format
-      const lines1 = (content1 as string).split('\n');
-      const lines2 = (content2 as string).split('\n');
-      const diffLines: string[] = [];
+      if (content1 && content2) {
+        // Create a simple unified diff format
+        const lines1 = (content1 as string).split("\n");
+        const lines2 = (content2 as string).split("\n");
+        const diffLines: string[] = [];
 
-      // Simple line-by-line comparison
-      const maxLen = Math.max(lines1.length, lines2.length);
-      for (let i = 0; i < maxLen; i++) {
-        const line1 = lines1[i];
-        const line2 = lines2[i];
-        if (line1 === line2) {
-          diffLines.push(` ${line1 || ''}`);
-        } else {
-          if (line1 !== undefined) diffLines.push(`-${line1}`);
-          if (line2 !== undefined) diffLines.push(`+${line2}`);
+        // Simple line-by-line comparison
+        const maxLen = Math.max(lines1.length, lines2.length);
+        for (let i = 0; i < maxLen; i++) {
+          const line1 = lines1[i];
+          const line2 = lines2[i];
+          if (line1 === line2) {
+            diffLines.push(` ${line1 || ""}`);
+          } else {
+            if (line1 !== undefined) diffLines.push(`-${line1}`);
+            if (line2 !== undefined) diffLines.push(`+${line2}`);
+          }
         }
-      }
 
-      setDiffState({
-        promptName: selectedPromptName,
-        oldVersion: version1,
-        newVersion: version2,
-        diff: diffLines.join('\n'),
-      });
-    }
-  }, [selectedPromptName]);
+        setDiffState({
+          promptName: selectedPromptName,
+          oldVersion: version1,
+          newVersion: version2,
+          diff: diffLines.join("\n"),
+        });
+      }
+    },
+    [selectedPromptName]
+  );
 
   // Handler for rollback
-  const handleRollback = useCallback(async (version: number) => {
-    if (!selectedPromptName) return;
+  const handleRollback = useCallback(
+    async (version: number) => {
+      if (!selectedPromptName) return;
 
-    const result = await rollbackPrompt(DEFAULT_USER_ID, selectedPromptName, version);
-    if (result) {
-      // Close and reopen panel to refresh versions
-      setIsPanelOpen(false);
-      setTimeout(() => setIsPanelOpen(true), 100);
-    }
-  }, [selectedPromptName]);
+      const result = await rollbackPrompt(
+        DEFAULT_USER_ID,
+        selectedPromptName,
+        version
+      );
+      if (result) {
+        // Close and reopen panel to refresh versions
+        setIsPanelOpen(false);
+        setTimeout(() => setIsPanelOpen(true), 100);
+      }
+    },
+    [selectedPromptName]
+  );
 
   // Calculate layout when spans change
   const initialLayout = useMemo(
@@ -406,19 +425,19 @@ export default function TraceGraphClient({
       <PromptContentViewer
         isOpen={!!viewingContent}
         onClose={() => setViewingContent(null)}
-        promptName={viewingContent?.promptName || ''}
+        promptName={viewingContent?.promptName || ""}
         versionNumber={viewingContent?.version || 0}
-        content={viewingContent?.content || ''}
+        content={viewingContent?.content || ""}
       />
 
       {/* Diff Viewer Modal */}
       <PromptDiffViewer
         isOpen={!!diffState}
         onClose={() => setDiffState(null)}
-        promptName={diffState?.promptName || ''}
+        promptName={diffState?.promptName || ""}
         version1={diffState?.oldVersion || 0}
         version2={diffState?.newVersion || 0}
-        diff={diffState?.diff || ''}
+        diff={diffState?.diff || ""}
       />
     </div>
   );

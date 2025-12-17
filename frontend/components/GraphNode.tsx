@@ -274,11 +274,6 @@ export default function GraphNode({
                 <PromptBadge
                   promptId={currentSpan.prompt_name}
                   promptVersion={currentSpan.prompt_version || "v1.0"}
-                  onClick={() => {
-                    if (onPromptClick && currentSpan.prompt_name) {
-                      onPromptClick(currentSpan.prompt_name);
-                    }
-                  }}
                 />
               </div>
             )}
