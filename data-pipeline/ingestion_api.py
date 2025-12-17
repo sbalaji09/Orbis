@@ -13,6 +13,8 @@ from rate_limiter import check_rate_limit
 
 # Add backend to path for database access
 from fastapi.middleware.cors import CORSMiddleware
+
+from shared.validators import validate_span_id, validate_trace_id, validate_agent_id, validate_pagination
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from shared.cors_config import get_cors_config
 from backend.db_connection import db
@@ -285,6 +287,15 @@ def is_valid_uuid(val: str) -> bool:
 
 # function to validate the span
 def validate_span(span: SpanIn) -> bool:
+    try:
+        validate_trace_id(span.trace_id)
+        validate_span_id(span.span_id)
+        validate_user_id(span.user_id)
+        if span.agent_id:
+            validate_agent_id(span.agent_id)
+    except Exception:
+        return False
+    
     for attr_name in vars(span):
         attr_value = getattr(span, attr_name)
 
