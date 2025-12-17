@@ -71,6 +71,9 @@ export class WebSocketClient {
     private currentSubscription: SubscriptionType = null;
     private currentTraceId: string | null = null;
 
+    // Track if disconnect was intentional (user-initiated)
+    private intentionalDisconnect = false;
+
     // Connection metrics for monitoring
     private metrics: ConnectionMetrics = {
         connectAttempts: 0,
@@ -159,6 +162,8 @@ export class WebSocketClient {
             return;
         }
 
+        // Reset intentional disconnect flag when starting a new connection
+        this.intentionalDisconnect = false;
         this.setState("connecting");
         
         const wsUrl = this.url.includes("api_key=")
@@ -193,6 +198,12 @@ export class WebSocketClient {
                 this.connectionStartTime = null;
             }
 
+            // If this was an intentional disconnect (component unmount, navigation), don't log or reconnect
+            if (this.intentionalDisconnect) {
+                this.setState("disconnected");
+                return;
+            }
+
             // Don't reconnect on auth errors (4001 = missing/invalid key, 4003 = access denied)
             if (event.code == 4029 || event.code === 4001 || event.code === 4003 || event.code === 4401) {
                 console.error(`WebSocket auth error (${event.code}): ${event.reason}`);
@@ -216,6 +227,9 @@ export class WebSocketClient {
     }
 
     public disconnect() {
+        // Mark as intentional so onclose doesn't log warnings or reconnect
+        this.intentionalDisconnect = true;
+
         if (this.reconnectTimeout) {
             clearTimeout(this.reconnectTimeout)
             this.reconnectTimeout = null;

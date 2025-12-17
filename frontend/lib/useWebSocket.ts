@@ -7,7 +7,7 @@ interface UseWebSocketParams {
     type: WebSocketType;
     traceId?: string;     // required if type === "trace"
     apiKey: string;
-    disabled: boolean;
+    disabled?: boolean;
 }
 
 interface UseWebSocketResult {

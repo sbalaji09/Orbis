@@ -18,6 +18,7 @@ export default function DashboardClient({initialAgents, initialTraces}: Dashboar
   const { state, subscribe } = useWebSocket({
     type: "dashboard",
     apiKey,
+    disabled: false
   });
 
   const [traces, setTraces] = useState(initialTraces);
