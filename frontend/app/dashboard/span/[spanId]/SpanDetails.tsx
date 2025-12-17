@@ -301,133 +301,98 @@ export default function SpanDetails({ span: currentSpan }: SpanDetailsProps) {
           <h4 className="text-xs font-semibold text-black/40 uppercase tracking-wide">
             {`/* Token Usage */`}
           </h4>
-          <div className="flex items-center gap-3">
-            <div className="flex-1 flex items-center gap-2 p-3 bg-white border-2 border-black">
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[10px] font-medium text-black/60 uppercase tracking-wide">
-                  Prompt
-                </span>
-                <span className="text-base font-mono">
-                  {currentSpan.prompt_tokens !== null ? (
-                    currentSpan.prompt_tokens.toLocaleString()
-                  ) : (
-                    <Skeleton width="w-12" height="h-5" />
-                  )}
-                </span>
-              </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="flex flex-col gap-1 p-3 bg-white border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.1)]">
+              <span className="text-[10px] font-medium text-black/60 uppercase tracking-wide">
+                Prompt
+              </span>
+              <span className="text-base font-mono font-bold">
+                {currentSpan.prompt_tokens !== null ? (
+                  currentSpan.prompt_tokens.toLocaleString()
+                ) : (
+                  <Skeleton width="w-12" height="h-5" />
+                )}
+              </span>
             </div>
-            <div className="text-black/60 text-sm">+</div>
-            <div className="flex-1 flex items-center gap-2 p-3 bg-white border-2 border-black">
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[10px] font-medium text-black/60 uppercase tracking-wide">
-                  Completion
-                </span>
-                <span className="text-base font-mono">
-                  {currentSpan.completion_tokens !== null ? (
-                    currentSpan.completion_tokens.toLocaleString()
-                  ) : (
-                    <Skeleton width="w-12" height="h-5" />
-                  )}
-                </span>
-              </div>
+            <div className="flex flex-col gap-1 p-3 bg-white border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.1)]">
+              <span className="text-[10px] font-medium text-black/60 uppercase tracking-wide">
+                Completion
+              </span>
+              <span className="text-base font-mono font-bold">
+                {currentSpan.completion_tokens !== null ? (
+                  currentSpan.completion_tokens.toLocaleString()
+                ) : (
+                  <Skeleton width="w-12" height="h-5" />
+                )}
+              </span>
             </div>
-            <div className="text-muted text-sm">=</div>
-            <div className="flex-1 flex items-center gap-2 p-3 bg-babyblue/10 border-2 border-babyblue/50">
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[10px] font-medium text-muted uppercase tracking-wide">
-                  Total
-                </span>
-                <span className="text-base text-foreground font-mono">
-                  {currentSpan.prompt_tokens !== null &&
-                  currentSpan.completion_tokens !== null ? (
-                    (
-                      currentSpan.prompt_tokens + currentSpan.completion_tokens
-                    ).toLocaleString()
-                  ) : (
-                    <Skeleton width="w-12" height="h-5" />
-                  )}
-                </span>
-              </div>
+            <div className="flex flex-col gap-1 p-3 bg-babyblue/10 border-2 border-babyblue shadow-[2px_2px_0_rgba(0,0,0,0.1)]">
+              <span className="text-[10px] font-medium text-black/60 uppercase tracking-wide">
+                Total
+              </span>
+              <span className="text-base font-mono font-bold text-babyblue">
+                {currentSpan.prompt_tokens !== null &&
+                currentSpan.completion_tokens !== null ? (
+                  (
+                    currentSpan.prompt_tokens + currentSpan.completion_tokens
+                  ).toLocaleString()
+                ) : (
+                  <Skeleton width="w-12" height="h-5" />
+                )}
+              </span>
             </div>
           </div>
         </div>
       )}
-      {(currentSpan.input_preview !== null ||
-        currentSpan.output_preview !== null) && (
-        <div className="grid grid-cols-2 gap-3">
-          {/* Input Preview */}
-          {currentSpan.input_preview !== null && (
-            <div className="space-y-2">
-              <h4 className="text-xs font-semibold text-muted uppercase tracking-wide">
-                Input
-              </h4>
-              <div className="p-4 rounded-lg bg-background border border-border flex-1">
-                <p className="text-xs text-foreground/80 leading-snug whitespace-nowrap overflow-hidden text-ellipsis font-mono">
-                  {currentSpan.input_preview}
-                </p>
-              </div>
-              {currentSpan.input_blob_url !== null && (
-                <a
-                  href={currentSpan.input_blob_url}
-                  className="inline-flex items-center gap-1.5 text-xs text-babyblue hover:text-foreground font-medium transition group"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <span>View complete input</span>
-                  <svg
-                    className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                    />
-                  </svg>
-                </a>
-              )}
-            </div>
-          )}
+      {/* Input Preview */}
+      {currentSpan.input_preview !== null && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-semibold text-black/40 uppercase tracking-wide">
+              {`/* Input */`}
+            </h4>
+            {currentSpan.input_blob_url !== null && (
+              <a
+                href={currentSpan.input_blob_url}
+                className="text-[10px] text-babyblue hover:text-black font-medium uppercase tracking-wide transition"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                View Full →
+              </a>
+            )}
+          </div>
+          <div className="p-3 bg-white border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.1)]">
+            <p className="text-xs text-black/80 leading-relaxed line-clamp-3 font-mono">
+              {currentSpan.input_preview}
+            </p>
+          </div>
+        </div>
+      )}
 
-          {/* Output Preview */}
-          {currentSpan.output_preview !== null && (
-            <div className="space-y-2">
-              <h4 className="text-xs font-semibold text-muted uppercase tracking-wide">
-                Output
-              </h4>
-              <div className="p-4 rounded-lg bg-background border border-border flex-1">
-                <p className="text-xs text-foreground/80 leading-snug whitespace-nowrap overflow-hidden text-ellipsis font-mono">
-                  {currentSpan.output_preview}
-                </p>
-              </div>
-              {currentSpan.output_blob_url !== null && (
-                <a
-                  href={currentSpan.output_blob_url}
-                  className="inline-flex items-center gap-1.5 text-xs text-babyblue hover:text-foreground font-medium transition group"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <span>View complete output</span>
-                  <svg
-                    className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                    />
-                  </svg>
-                </a>
-              )}
-            </div>
-          )}
+      {/* Output Preview */}
+      {currentSpan.output_preview !== null && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-semibold text-black/40 uppercase tracking-wide">
+              {`/* Output */`}
+            </h4>
+            {currentSpan.output_blob_url !== null && (
+              <a
+                href={currentSpan.output_blob_url}
+                className="text-[10px] text-babyblue hover:text-black font-medium uppercase tracking-wide transition"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                View Full →
+              </a>
+            )}
+          </div>
+          <div className="p-3 bg-white border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.1)]">
+            <p className="text-xs text-black/80 leading-relaxed line-clamp-3 font-mono">
+              {currentSpan.output_preview}
+            </p>
+          </div>
         </div>
       )}
 

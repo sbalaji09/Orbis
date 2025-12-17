@@ -407,38 +407,6 @@ export default function TraceGraphClient({
           maskColor="rgba(0, 0, 0, 0.05)"
         />
       </ReactFlow>
-
-      {/* Prompt Version Panel */}
-      <PromptVersionPanel
-        promptName={selectedPromptName}
-        isOpen={isPanelOpen}
-        onClose={() => {
-          setIsPanelOpen(false);
-          setSelectedPromptName(null);
-        }}
-        onView={handleViewVersion}
-        onCompare={handleCompare}
-        onRollback={handleRollback}
-      />
-
-      {/* Content Viewer Modal */}
-      <PromptContentViewer
-        isOpen={!!viewingContent}
-        onClose={() => setViewingContent(null)}
-        promptName={viewingContent?.promptName || ""}
-        versionNumber={viewingContent?.version || 0}
-        content={viewingContent?.content || ""}
-      />
-
-      {/* Diff Viewer Modal */}
-      <PromptDiffViewer
-        isOpen={!!diffState}
-        onClose={() => setDiffState(null)}
-        promptName={diffState?.promptName || ""}
-        version1={diffState?.oldVersion || 0}
-        version2={diffState?.newVersion || 0}
-        diff={diffState?.diff || ""}
-      />
     </div>
   );
 }

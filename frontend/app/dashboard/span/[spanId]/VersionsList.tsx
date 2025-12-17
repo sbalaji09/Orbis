@@ -251,7 +251,7 @@ export default function VersionsList({
                       <button
                         onClick={() => onRollback(version.version_number)}
                         disabled={rollbackLoading !== null}
-                        className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide border-2 border-error bg-error text-white hover:bg-error/90 disabled:opacity-50 transition-colors shadow-[2px_2px_0_rgba(0,0,0,0.1)]"
+                        className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide border-2 border-error bg-[#D1437C] text-white hover:bg-[#D1437C]/90 disabled:opacity-50 transition-colors shadow-[2px_2px_0_rgba(0,0,0,0.1)]"
                       >
                         {rollbackLoading === version.version_number
                           ? "..."
