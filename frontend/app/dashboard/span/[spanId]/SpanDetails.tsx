@@ -403,7 +403,7 @@ export default function SpanDetails({ span: currentSpan }: SpanDetailsProps) {
             {`/* Error */`}
           </h4>
           <div className="p-3 bg-error/5 border-2 border-error shadow-[2px_2px_0_rgba(0,0,0,0.1)]">
-            <p className="text-xs text-error font-mono leading-relaxed break-words">
+            <p className="text-xs text-error font-mono leading-relaxed break-all">
               {currentSpan.error_message}
             </p>
           </div>

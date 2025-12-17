@@ -1,6 +1,12 @@
-import React, { Fragment } from 'react';
-import { Dialog, Transition, TransitionChild, DialogPanel, DialogTitle } from '@headlessui/react';
-import PromptBadge from './PromptBadge';
+import React, { Fragment } from "react";
+import {
+  Dialog,
+  Transition,
+  TransitionChild,
+  DialogPanel,
+  DialogTitle,
+} from "@headlessui/react";
+import PromptBadge from "./PromptBadge";
 
 interface PromptDiffViewerProps {
   isOpen: boolean;
@@ -20,27 +26,41 @@ export default function PromptDiffViewer({
   diff,
 }: PromptDiffViewerProps) {
   // Parse diff string - assuming unified diff format or simple line-by-line
-  const lines = typeof diff === 'string' ? diff.split('\n') : [];
+  const lines = typeof diff === "string" ? diff.split("\n") : [];
 
   const parsedDiff = lines.map((line, idx) => {
-    if (line.startsWith('+') && !line.startsWith('+++')) {
-      return { type: 'added' as const, content: line.substring(1), lineNum: idx + 1 };
-    } else if (line.startsWith('-') && !line.startsWith('---')) {
-      return { type: 'removed' as const, content: line.substring(1), lineNum: idx + 1 };
-    } else if (line.startsWith('@@')) {
-      return { type: 'header' as const, content: line, lineNum: idx + 1 };
+    if (line.startsWith("+") && !line.startsWith("+++")) {
+      return {
+        type: "added" as const,
+        content: line.substring(1),
+        lineNum: idx + 1,
+      };
+    } else if (line.startsWith("-") && !line.startsWith("---")) {
+      return {
+        type: "removed" as const,
+        content: line.substring(1),
+        lineNum: idx + 1,
+      };
+    } else if (line.startsWith("@@")) {
+      return { type: "header" as const, content: line, lineNum: idx + 1 };
     } else {
-      return { type: 'unchanged' as const, content: line, lineNum: idx + 1 };
+      return { type: "unchanged" as const, content: line, lineNum: idx + 1 };
     }
   });
 
-  const addedCount = parsedDiff.filter(d => d.type === 'added').length;
-  const removedCount = parsedDiff.filter(d => d.type === 'removed').length;
-  const unchangedCount = parsedDiff.filter(d => d.type === 'unchanged').length;
+  const addedCount = parsedDiff.filter((d) => d.type === "added").length;
+  const removedCount = parsedDiff.filter((d) => d.type === "removed").length;
+  const unchangedCount = parsedDiff.filter(
+    (d) => d.type === "unchanged"
+  ).length;
 
   return (
     <Transition show={isOpen} as={Fragment}>
-      <Dialog onClose={onClose} className="fixed inset-0" style={{ zIndex: 99999 }}>
+      <Dialog
+        onClose={onClose}
+        className="fixed inset-0"
+        style={{ zIndex: 99999 }}
+      >
         <TransitionChild
           as={Fragment}
           enter="ease-out duration-300"
@@ -72,19 +92,45 @@ export default function PromptDiffViewer({
                       Compare Versions
                     </DialogTitle>
                     <div className="mt-2 flex items-center gap-2">
-                      <PromptBadge promptId={promptName} promptVersion={`v${version1}`} />
-                      <svg className="w-4 h-4 text-black/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                      <PromptBadge
+                        promptId={promptName}
+                        promptVersion={`v${version1}`}
+                      />
+                      <svg
+                        className="w-4 h-4 text-black/40"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M13 7l5 5m0 0l-5 5m5-5H6"
+                        />
                       </svg>
-                      <PromptBadge promptId={promptName} promptVersion={`v${version2}`} />
+                      <PromptBadge
+                        promptId={promptName}
+                        promptVersion={`v${version2}`}
+                      />
                     </div>
                   </div>
                   <button
                     onClick={onClose}
                     className="p-1.5 hover:bg-foreground/5 transition-colors"
                   >
-                    <svg className="w-5 h-5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    <svg
+                      className="w-5 h-5 text-muted"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
                     </svg>
                   </button>
                 </div>
@@ -95,23 +141,31 @@ export default function PromptDiffViewer({
                     <div
                       key={idx}
                       className={`flex px-4 py-1 text-xs leading-5 border-b border-black/5 font-mono ${
-                        line.type === 'added'
-                          ? 'bg-success/10 text-success'
-                          : line.type === 'removed'
-                            ? 'bg-error/10 text-error'
-                            : line.type === 'header'
-                              ? 'bg-babyblue/10 text-babyblue font-semibold'
-                              : 'text-foreground/80'
+                        line.type === "added"
+                          ? "bg-success/10 text-success"
+                          : line.type === "removed"
+                          ? "bg-error/10 text-error"
+                          : line.type === "header"
+                          ? "bg-babyblue/10 text-babyblue font-semibold"
+                          : "text-foreground/80"
                       }`}
                     >
                       <span className="w-8 text-right text-black/30 pr-3 select-none shrink-0">
                         {line.lineNum}
                       </span>
                       <span className="w-4 text-center shrink-0">
-                        {line.type === 'added' ? '+' : line.type === 'removed' ? '-' : ' '}
+                        {line.type === "added"
+                          ? "+"
+                          : line.type === "removed"
+                          ? "-"
+                          : " "}
                       </span>
-                      <span className={line.type === 'removed' ? 'line-through' : ''}>
-                        {line.content || '\u00A0'}
+                      <span
+                        className={
+                          line.type === "removed" ? "line-through" : ""
+                        }
+                      >
+                        {line.content || "\u00A0"}
                       </span>
                     </div>
                   ))}

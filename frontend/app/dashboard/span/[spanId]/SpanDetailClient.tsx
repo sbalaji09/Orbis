@@ -121,6 +121,7 @@ export default function SpanDetailClient({
     if (currentSpan?.prompt_name && versions.length === 0) {
       loadVersions(currentSpan.prompt_name);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentSpan?.prompt_name]);
 
   const loadVersions = async (promptName: string) => {
@@ -180,10 +181,7 @@ export default function SpanDetailClient({
   };
 
   const handleRollback = async (versionNumber: number) => {
-    if (
-      !currentSpan?.prompt_name ||
-      !confirm(`Rollback to v${versionNumber}?`)
-    )
+    if (!currentSpan?.prompt_name || !confirm(`Rollback to v${versionNumber}?`))
       return;
 
     setRollbackLoading(versionNumber);
@@ -310,7 +308,6 @@ export default function SpanDetailClient({
             <TabPanel>
               {currentSpan.prompt_name ? (
                 <PromptAnalytics
-                  promptName={currentSpan.prompt_name}
                   analytics={initialAnalytics}
                   loading={versionsLoading}
                 />

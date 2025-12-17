@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import PromptBadge from "@/components/PromptBadge";
 import PromptContentViewer from "@/components/PromptContentViewer";
@@ -51,22 +51,55 @@ export default function PromptDetailClient({
   // Rolling back state
   const [rollingBack, setRollingBack] = useState<number | null>(null);
 
-  const loadVersions = useCallback(async () => {
-    setLoading(true);
-    const data = await fetchPromptVersions(undefined, promptName);
-    setVersions(data);
-    setLoading(false);
-  }, [promptName]);
-
   useEffect(() => {
+    let cancelled = false;
+
+    const loadVersions = async () => {
+      setLoading(true);
+      try {
+        const data = await fetchPromptVersions(undefined, promptName);
+        if (!cancelled) {
+          setVersions(data);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
     loadVersions();
-  }, [loadVersions]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [promptName]);
 
   const handleView = async (version: number) => {
     const content = await fetchPromptContent(undefined, promptName, version);
     if (content) {
       setViewingContent({ content, version });
     }
+  };
+
+  const createDiff = (oldContent: string, newContent: string): string => {
+    const lines1 = oldContent.split("\n");
+    const lines2 = newContent.split("\n");
+    const diffLines: string[] = [];
+
+    const maxLen = Math.max(lines1.length, lines2.length);
+    for (let i = 0; i < maxLen; i++) {
+      const line1 = lines1[i];
+      const line2 = lines2[i];
+      if (line1 === line2) {
+        diffLines.push(` ${line1 || ""}`);
+      } else {
+        if (line1 !== undefined) diffLines.push(`-${line1}`);
+        if (line2 !== undefined) diffLines.push(`+${line2}`);
+      }
+    }
+
+    return diffLines.join("\n");
   };
 
   const handleCompare = async (version1: number, version2: number) => {
@@ -95,7 +128,8 @@ export default function PromptDetailClient({
     setRollingBack(version);
     const result = await rollbackPrompt(undefined, promptName, version);
     if (result) {
-      await loadVersions();
+      const data = await fetchPromptVersions(undefined, promptName);
+      setVersions(data);
     }
     setRollingBack(null);
   };
@@ -231,7 +265,7 @@ export default function PromptDetailClient({
                         className={`px-6 py-4 transition-colors ${
                           selectedVersion === version.version_number
                             ? "bg-babyblue/5"
-                            : "hover:bg-black/[0.02]"
+                            : "hover:bg-black/2"
                         }`}
                       >
                         <div className="flex items-start justify-between gap-4">
@@ -331,17 +365,13 @@ export default function PromptDetailClient({
 
         {/* Analytics Tab */}
         {!loading && activeTab === "analytics" && (
-          <PromptAnalytics
-            promptName={promptName}
-            analytics={[]}
-            loading={false}
-          />
+          <PromptAnalytics analytics={[]} loading={false} />
         )}
       </div>
 
       {/* Content Viewer Modal */}
       {viewingContent && (
-        <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-100000 flex items-center justify-center p-4">
           <div
             className="absolute inset-0 bg-black/25 backdrop-blur-sm"
             onClick={() => setViewingContent(null)}
@@ -371,6 +401,10 @@ export default function PromptDetailClient({
               </h3>
             </div>
             <PromptContentViewer
+              isOpen={true}
+              onClose={() => setViewingContent(null)}
+              promptName={promptName}
+              versionNumber={viewingContent.version}
               content={viewingContent.content}
               metadata={{
                 description: `Version ${viewingContent.version} of ${promptName}`,
@@ -382,7 +416,7 @@ export default function PromptDetailClient({
 
       {/* Diff Viewer Modal */}
       {diffState && (
-        <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-100000 flex items-center justify-center p-4">
           <div
             className="absolute inset-0 bg-black/25 backdrop-blur-sm"
             onClick={() => setDiffState(null)}
@@ -412,10 +446,12 @@ export default function PromptDetailClient({
               </h3>
             </div>
             <PromptDiffViewer
-              oldContent={diffState.oldContent}
-              newContent={diffState.newContent}
-              oldVersion={diffState.oldVersion}
-              newVersion={diffState.newVersion}
+              isOpen={true}
+              onClose={() => setDiffState(null)}
+              promptName={promptName}
+              version1={diffState.oldVersion}
+              version2={diffState.newVersion}
+              diff={createDiff(diffState.oldContent, diffState.newContent)}
             />
           </div>
         </div>

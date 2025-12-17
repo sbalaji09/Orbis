@@ -59,23 +59,34 @@ export default function PromptVersionPanel({
   const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
 
   useEffect(() => {
-    if (isOpen && promptName) {
-      setLoading(true);
+    if (!isOpen || !promptName) return;
 
-      // Fetch both versions and analytics in parallel
-      Promise.all([
-        fetchPromptVersions(undefined, promptName),
-        fetchPromptAnalytics(undefined, promptName),
-      ])
-        .then(([versionsData, analyticsData]) => {
-          setVersions(versionsData);
-          // Create a map for quick lookup by version_number
-          const analyticsMap = new Map<number, PromptVersionAnalytics>();
-          analyticsData.forEach((a) => analyticsMap.set(a.version_number, a));
-          setAnalytics(analyticsMap);
-        })
-        .finally(() => setLoading(false));
-    }
+    let cancelled = false;
+
+    const loadData = async () => {
+      try {
+        const [versionsData, analyticsData] = await Promise.all([
+          fetchPromptVersions(undefined, promptName),
+          fetchPromptAnalytics(undefined, promptName),
+        ]);
+
+        if (cancelled) return;
+
+        setVersions(versionsData);
+        const analyticsMap = new Map<number, PromptVersionAnalytics>();
+        analyticsData.forEach((a) => analyticsMap.set(a.version_number, a));
+        setAnalytics(analyticsMap);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    setLoading(true);
+    loadData();
+
+    return () => {
+      cancelled = true;
+    };
   }, [isOpen, promptName]);
 
   if (!promptName) return null;
@@ -200,7 +211,7 @@ export default function PromptVersionPanel({
 
                             {/* Analytics Stats Row */}
                             {versionAnalytics && (
-                              <div className="grid grid-cols-4 gap-2 my-3 py-2 px-3 bg-black/[0.02] border border-black/10">
+                              <div className="grid grid-cols-4 gap-2 my-3 py-2 px-3 bg-black/2 border border-black/10">
                                 <div className="text-center">
                                   <p className="text-[9px] text-black/40 uppercase tracking-wide">
                                     Traces
@@ -252,7 +263,7 @@ export default function PromptVersionPanel({
 
                             {/* No analytics data placeholder */}
                             {!versionAnalytics && (
-                              <div className="my-3 py-2 px-3 bg-black/[0.02] border border-black/10 text-center">
+                              <div className="my-3 py-2 px-3 bg-black/2 border border-black/10 text-center">
                                 <p className="text-[10px] text-black/40">
                                   No usage data yet
                                 </p>

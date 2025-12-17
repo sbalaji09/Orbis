@@ -11,7 +11,6 @@ interface GraphNodeProps {
   span: Span;
   x?: number;
   y?: number;
-  onPromptClick?: (promptName: string) => void;
 }
 
 function formatDuration(duration: number | null): string {
@@ -47,7 +46,6 @@ interface DraggableGraphNodeProps extends GraphNodeProps {
     commit: boolean
   ) => void;
   isDragging?: boolean;
-  onPromptClick?: (promptName: string) => void;
 }
 
 const getHeaderColor = (spanType: string | null) => {
@@ -59,11 +57,9 @@ export default function GraphNode({
   span,
   onDrag,
   isDragging,
-  onPromptClick,
 }: DraggableGraphNodeProps) {
   const router = useRouter();
   const [showTooltip, setShowTooltip] = useState(false);
-  console.log(span);
   // SSE streaming for spans that are actively streaming
   const { data: streamData } = useSWRSubscription(
     span.is_streaming ? `/spans/${span.span_id}/stream` : null,
@@ -199,7 +195,7 @@ export default function GraphNode({
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
-              handleClick(e as any);
+              router.push(`/dashboard/span/${currentSpan.span_id}`);
             }
           }}
         >

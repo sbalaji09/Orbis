@@ -17,7 +17,7 @@ export default function PromptBadge({
   const formatVersion = (version: string | number): string => {
     const versionStr = String(version);
     // If it already starts with 'v', return as is
-    if (versionStr.startsWith('v')) return versionStr;
+    if (versionStr.startsWith("v")) return versionStr;
     // Otherwise, add 'v' prefix
     return `v${versionStr}`;
   };
@@ -26,7 +26,9 @@ export default function PromptBadge({
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2 py-1 text-[10px] font-mono font-medium bg-babyblue/10 text-babyblue border-2 border-babyblue/30 shadow-[2px_2px_0_rgba(0,0,0,0.1)] ${onClick ? 'cursor-pointer hover:bg-babyblue/20' : ''}`}
+      className={`inline-flex items-center gap-1.5 px-2 py-1 text-[10px] font-mono font-medium bg-babyblue/10 text-babyblue border-2 border-babyblue/30 shadow-[2px_2px_0_rgba(0,0,0,0.1)] ${
+        onClick ? "cursor-pointer hover:bg-babyblue/20" : ""
+      }`}
       title={`Prompt ${promptId} ${displayVersion}`}
       onClick={onClick}
     >

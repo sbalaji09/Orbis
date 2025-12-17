@@ -195,7 +195,6 @@ export default function PromptDetailPage({
       {/* Analytics Section */}
       <div className="mb-8">
         <PromptAnalytics
-          promptName={decodedName}
           analytics={Array.from(analytics.values())}
           loading={loading}
         />
@@ -287,7 +286,7 @@ export default function PromptDetailPage({
                 <div
                   key={version.version_number}
                   className={`p-4 transition-colors ${
-                    isSelected ? "bg-babyblue/10" : "hover:bg-black/[0.02]"
+                    isSelected ? "bg-babyblue/10" : "hover:bg-black/2"
                   } ${isBest ? "ring-2 ring-inset ring-success/30" : ""}`}
                 >
                   <div className="flex items-start gap-4">
@@ -327,7 +326,7 @@ export default function PromptDetailPage({
 
                       {/* Analytics Stats */}
                       {versionAnalytics && (
-                        <div className="grid grid-cols-4 gap-3 py-2 px-3 bg-black/[0.02] border border-black/10">
+                        <div className="grid grid-cols-4 gap-3 py-2 px-3 bg-black/2 border border-black/10">
                           <div>
                             <p className="text-[9px] text-black/40 uppercase tracking-wide">
                               Traces
@@ -385,7 +384,7 @@ export default function PromptDetailPage({
                       )}
 
                       {!versionAnalytics && (
-                        <div className="py-2 px-3 bg-black/[0.02] border border-black/10 text-center">
+                        <div className="py-2 px-3 bg-black/2 border border-black/10 text-center">
                           <p className="text-[10px] text-black/40">
                             No usage data yet
                           </p>

@@ -2,13 +2,11 @@ import React from "react";
 import { PromptVersionAnalytics } from "@/lib/prompt-api";
 
 interface PromptAnalyticsProps {
-  promptName: string;
   analytics?: PromptVersionAnalytics[];
   loading?: boolean;
 }
 
 export default function PromptAnalytics({
-  promptName,
   analytics = [],
   loading = false,
 }: PromptAnalyticsProps) {

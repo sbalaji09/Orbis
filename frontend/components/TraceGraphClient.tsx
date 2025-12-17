@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useMemo, useEffect, useState } from "react";
+import { useCallback, useMemo, useEffect } from "react";
 import useSWR from "swr";
 import ReactFlow, {
   Node,
@@ -18,10 +18,6 @@ import ReactFlow, {
 import "reactflow/dist/style.css";
 import { Span } from "@/lib/types";
 import GraphNode from "@/components/GraphNode";
-import PromptVersionPanel from "@/components/PromptVersionPanel";
-import PromptContentViewer from "@/components/PromptContentViewer";
-import PromptDiffViewer from "@/components/PromptDiffViewer";
-import { fetchPromptContent, rollbackPrompt } from "@/lib/prompt-api";
 
 interface NodePosition {
   x: number;
@@ -110,12 +106,7 @@ function CustomNode({
       />
       {/* GraphNode component - wrapped in div to allow dragging */}
       <div>
-        <GraphNode
-          span={data.span}
-          x={0}
-          y={0}
-          onPromptClick={data.onPromptClick}
-        />
+        <GraphNode span={data.span} x={0} y={0} />
       </div>
       {/* Handle for outgoing edges (bottom) - invisible but functional */}
       <Handle
@@ -146,27 +137,6 @@ export default function TraceGraphClient({
   // Get trace_id from first span
   const traceId = initialSpans.length > 0 ? initialSpans[0].trace_id : null;
   const DEFAULT_USER_ID = "00000000-0000-0000-0000-000000000000";
-
-  // Prompt panel state
-  const [selectedPromptName, setSelectedPromptName] = useState<string | null>(
-    null
-  );
-  const [isPanelOpen, setIsPanelOpen] = useState(false);
-
-  // Content viewer state
-  const [viewingContent, setViewingContent] = useState<{
-    content: string;
-    version: number;
-    promptName: string;
-  } | null>(null);
-
-  // Diff viewer state
-  const [diffState, setDiffState] = useState<{
-    promptName: string;
-    oldVersion: number;
-    newVersion: number;
-    diff: string;
-  } | null>(null);
 
   // Fetch spans with SWR for real-time updates (polls every 2 seconds)
   const { data: fetchedSpans } = useSWR(
@@ -199,93 +169,6 @@ export default function TraceGraphClient({
   const spans = fetchedSpans || initialSpans;
   const spanIds = spans.map((s) => s.span_id).join(",");
 
-  // Handler for prompt badge clicks
-  const handlePromptClick = useCallback((promptName: string) => {
-    setSelectedPromptName(promptName);
-    setIsPanelOpen(true);
-  }, []);
-
-  // Handler for viewing a specific version
-  const handleViewVersion = useCallback(
-    async (version: number) => {
-      if (!selectedPromptName) return;
-
-      const content = await fetchPromptContent(
-        DEFAULT_USER_ID,
-        selectedPromptName,
-        version
-      );
-      if (content) {
-        setViewingContent({
-          content,
-          version,
-          promptName: selectedPromptName,
-        });
-      }
-    },
-    [selectedPromptName]
-  );
-
-  // Handler for comparing two versions
-  const handleCompare = useCallback(
-    async (version1: number, version2: number) => {
-      if (!selectedPromptName) return;
-
-      // Fetch both versions' content
-      const [content1, content2] = await Promise.all([
-        fetchPromptContent(DEFAULT_USER_ID, selectedPromptName, version1),
-        fetchPromptContent(DEFAULT_USER_ID, selectedPromptName, version2),
-      ]);
-
-      if (content1 && content2) {
-        // Create a simple unified diff format
-        const lines1 = (content1 as string).split("\n");
-        const lines2 = (content2 as string).split("\n");
-        const diffLines: string[] = [];
-
-        // Simple line-by-line comparison
-        const maxLen = Math.max(lines1.length, lines2.length);
-        for (let i = 0; i < maxLen; i++) {
-          const line1 = lines1[i];
-          const line2 = lines2[i];
-          if (line1 === line2) {
-            diffLines.push(` ${line1 || ""}`);
-          } else {
-            if (line1 !== undefined) diffLines.push(`-${line1}`);
-            if (line2 !== undefined) diffLines.push(`+${line2}`);
-          }
-        }
-
-        setDiffState({
-          promptName: selectedPromptName,
-          oldVersion: version1,
-          newVersion: version2,
-          diff: diffLines.join("\n"),
-        });
-      }
-    },
-    [selectedPromptName]
-  );
-
-  // Handler for rollback
-  const handleRollback = useCallback(
-    async (version: number) => {
-      if (!selectedPromptName) return;
-
-      const result = await rollbackPrompt(
-        DEFAULT_USER_ID,
-        selectedPromptName,
-        version
-      );
-      if (result) {
-        // Close and reopen panel to refresh versions
-        setIsPanelOpen(false);
-        setTimeout(() => setIsPanelOpen(true), 100);
-      }
-    },
-    [selectedPromptName]
-  );
-
   // Calculate layout when spans change
   const initialLayout = useMemo(
     () => calculateDAGLayout(spans),
@@ -300,10 +183,10 @@ export default function TraceGraphClient({
         id: pos.span.span_id,
         type: "custom",
         position: { x: pos.x, y: pos.y },
-        data: { span: pos.span, onPromptClick: handlePromptClick },
+        data: { span: pos.span },
         draggable: true,
       })),
-    [initialLayout, handlePromptClick]
+    [initialLayout]
   );
 
   // Convert to React Flow edges
