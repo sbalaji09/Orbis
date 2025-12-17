@@ -1,6 +1,12 @@
-import React, { useState, Fragment } from 'react';
-import { Dialog, Transition, TransitionChild, DialogPanel, DialogTitle } from '@headlessui/react';
-import PromptBadge from './PromptBadge';
+import React, { useState, Fragment } from "react";
+import {
+  Dialog,
+  Transition,
+  TransitionChild,
+  DialogPanel,
+  DialogTitle,
+} from "@headlessui/react";
+import PromptBadge from "./PromptBadge";
 
 interface PromptContentViewerProps {
   isOpen: boolean;
@@ -33,7 +39,11 @@ export default function PromptContentViewer({
 
   return (
     <Transition show={isOpen} as={Fragment}>
-      <Dialog onClose={onClose} className="fixed inset-0" style={{ zIndex: 99999 }}>
+      <Dialog
+        onClose={onClose}
+        className="fixed inset-0"
+        style={{ zIndex: 99999 }}
+      >
         <TransitionChild
           as={Fragment}
           enter="ease-out duration-300"
@@ -65,15 +75,28 @@ export default function PromptContentViewer({
                       Prompt Content
                     </DialogTitle>
                     <div className="mt-2">
-                      <PromptBadge promptId={promptName} promptVersion={versionNumber} />
+                      <PromptBadge
+                        promptId={promptName}
+                        promptVersion={`v${versionNumber}`}
+                      />
                     </div>
                   </div>
                   <button
                     onClick={onClose}
                     className="p-1.5 hover:bg-foreground/5 transition-colors"
                   >
-                    <svg className="w-5 h-5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    <svg
+                      className="w-5 h-5 text-muted"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
                     </svg>
                   </button>
                 </div>
@@ -93,13 +116,17 @@ export default function PromptContentViewer({
                     {metadata.description && (
                       <div className="flex items-start text-[11px] text-black/60 mb-1">
                         <span className="font-medium w-20 shrink-0">{`// Desc`}</span>
-                        <span className="line-clamp-2">{metadata.description}</span>
+                        <span className="line-clamp-2">
+                          {metadata.description}
+                        </span>
                       </div>
                     )}
                     {metadata.created_at && (
                       <div className="flex items-center text-[11px] text-black/60">
                         <span className="font-medium w-20">{`// Created`}</span>
-                        <span className="font-mono">{new Date(metadata.created_at).toLocaleDateString()}</span>
+                        <span className="font-mono">
+                          {new Date(metadata.created_at).toLocaleDateString()}
+                        </span>
                       </div>
                     )}
                   </div>
@@ -114,17 +141,39 @@ export default function PromptContentViewer({
                     <button
                       onClick={copyToClipboard}
                       className={`absolute top-3 right-3 p-2 border-2 border-black transition-all shadow-[2px_2px_0_rgba(0,0,0,0.1)] hover:shadow-[3px_3px_0_rgba(0,0,0,0.15)] ${
-                        copied ? 'bg-success text-white border-success' : 'bg-white hover:bg-mustard/10'
+                        copied
+                          ? "bg-success text-white border-success"
+                          : "bg-white hover:bg-mustard/10"
                       }`}
                       title="Copy to clipboard"
                     >
                       {copied ? (
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M5 13l4 4L19 7"
+                          />
                         </svg>
                       ) : (
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                          />
                         </svg>
                       )}
                     </button>

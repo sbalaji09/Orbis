@@ -79,6 +79,7 @@ export async function fetchPromptVersions(
     }
 
     const data = await response.json();
+    console.log(data);
     return data.versions || [];
   } catch (error) {
     console.error("Error fetching agents:", error);
