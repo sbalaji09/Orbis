@@ -16,6 +16,15 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from shared.cors_config import get_cors_config
 
+from shared.validators import (
+    validate_trace_id,
+    validate_span_id,
+    validate_user_id,
+    validate_agent_id,
+    validate_pagination,
+    ValidationError,
+)
+
 
 app = FastAPI(
     title="Orbis Query API",
