@@ -35,3 +35,18 @@ def validate_uuid(val: str, field_name: str = "id") -> str:
         raise ValidationError(field_name, f"{field_name} must be a valid UUID format")
 
     return val
+
+def validate_trace_id(trace_id: str) -> str:
+    return validate_uuid(trace_id, "trace_id")
+
+def validate_span_id(span_id: str) -> str:
+    return validate_uuid(span_id, "span_id")
+
+def validate_user_id(user_id: str) -> str:
+    return validate_uuid(user_id, "user_id")
+
+def validate_agent_id(agent_id: Optional[str]) -> Optional[str]:
+    if agent_id is None or agent_id == "":
+        return None
+    
+    return validate_uuid(agent_id, "agent_id")
