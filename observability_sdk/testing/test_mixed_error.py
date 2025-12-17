@@ -67,7 +67,13 @@ def run_invalid_command():
         raise RuntimeError(f"Command failed: {result.stderr}")
     return result.stdout.strip()
 
-@observe(name="mixed_workflow", prompt_id="mixed_tester", prompt_version="v1.0")
+@observe(
+    name="mixed_workflow",
+    prompt_id="mixed_tester",
+    prompt_version="v7.0",
+    prompt_template="Discover a comprehensive test workflow with mixed success and failure operations including LLM calls, HTTP requests, and CLI commands to validate error handling and telemetry capture.",
+    metadata={"author": "test", "purpose": "mixed_error_testing", "expected_success_rate": "62.5%"}
+)
 def mixed_success_failure_workflow():
     """
     Workflow with mixed successes and failures

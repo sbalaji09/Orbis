@@ -13,13 +13,14 @@ import json
 @dataclass
 class PromptVersion:
     """Represents a versioned prompt"""
-    prompt_id: str
+    prompt_id: str  # Human-readable name (e.g., "mixed_tester")
     version: str
     prompt_text: str
     prompt_hash: str = field(init=False)
     metadata: Dict[str, Any] = field(default_factory=dict)
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    
+    backend_uuid: Optional[str] = None  # UUID returned from backend for linking spans
+
     def __post_init__(self):
         """Compute hash after initialization"""
         self.prompt_hash = self._compute_hash(self.prompt_text)
@@ -39,14 +40,17 @@ class PromptVersion:
             "created_at": self.created_at.isoformat()
         }
 
-    def persist_to_backend(self, agent_id: str, api_key: str, api_url: str = "http://localhost:8000") -> bool:
+    def persist_to_backend(self, agent_id: str, api_key: str, api_url: str = "http://localhost:8000") -> Optional[str]:
         """
         Persist this prompt version to the backend database.
         Called automatically when registering a prompt.
+
+        Returns:
+            Optional[str]: The UUID prompt_id from backend if successful, None otherwise
         """
         try:
             import requests
-            
+
             response = requests.post(
                 f"{api_url}/prompts/prompts",
                 params={
@@ -60,18 +64,24 @@ class PromptVersion:
                 },
                 timeout=5.0
             )
-            
+
             if response.status_code in [200, 201]:
+                # Extract the UUID prompt_id from the backend response
+                backend_data = response.json()
+                if backend_data and isinstance(backend_data, dict):
+                    backend_prompt_id = backend_data.get("prompt_id")
+                    print(f"✓ Prompt persisted to backend: {self.prompt_id} v{self.version} (UUID: {backend_prompt_id})")
+                    return str(backend_prompt_id) if backend_prompt_id else None
                 print(f"✓ Prompt persisted to backend: {self.prompt_id} v{self.version}")
-                return True
+                return None
             else:
                 print(f"⚠ Failed to persist prompt: {response.status_code}")
-                print(f"⚠ Error details: {response.text}")  # ← ADD THIS LINE
-                return False
-        
+                print(f"⚠ Error details: {response.text}")
+                return None
+
         except Exception as e:
             print(f"⚠ Error persisting prompt: {e}")
-            return False
+            return None
     
     def __str__(self) -> str:
         return f"PromptVersion(id='{self.prompt_id}', version='{self.version}', hash='{self.prompt_hash[:8]}...')"
@@ -138,8 +148,10 @@ class PromptRegistry:
 
             # Persist to backend if credentials provided
             if agent_id and api_key:
-                prompt_version.persist_to_backend(agent_id, api_key, api_url="http://localhost:8000")
-        
+                backend_uuid = prompt_version.persist_to_backend(agent_id, api_key, api_url="http://localhost:8000")
+                if backend_uuid:
+                    prompt_version.backend_uuid = backend_uuid
+
         return self._prompts[key]
     
     def get_prompt(self, prompt_id: str, version: str) -> Optional[PromptVersion]:

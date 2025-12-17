@@ -45,7 +45,6 @@ def observe(
 
             # add prompt versioning metadata
             if prompt_id:
-                span.prompt_id = prompt_id
                 span.prompt_name = prompt_id
                 span.prompt_version = prompt_version or "v1.0"
 
@@ -61,6 +60,11 @@ def observe(
                         api_key=get_config().api_key
                     )
                     span.prompt_hash = registered_prompt.prompt_hash
+                    # Use the backend UUID for linking spans to prompts
+                    span.prompt_id = registered_prompt.backend_uuid or prompt_id
+                else:
+                    # If no template, just use the name (won't link to backend properly)
+                    span.prompt_id = prompt_id
 
             # if there's a parent, set parent relationship
             if parent_span:

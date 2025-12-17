@@ -1034,7 +1034,7 @@ class SupabaseDB:
                         pv.version_number,
                         COUNT(DISTINCT s.trace_id) AS trace_count,
                         COALESCE(AVG(s.cost), 0) AS avg_cost,
-                        COALESCE(AVG(s.duration), 0) AS avg_latency,
+                        COALESCE(AVG(s.duration) / 1000.0, 0) AS avg_latency,
                         COUNT(DISTINCT CASE WHEN s.error_message IS NOT NULL THEN s.trace_id END) AS error_traces,
                         ROUND(
                             COUNT(DISTINCT CASE WHEN s.error_message IS NOT NULL THEN s.trace_id END)::NUMERIC
@@ -1087,7 +1087,7 @@ class SupabaseDB:
                         pv.version_number,
                         COUNT(DISTINCT s.trace_id) AS trace_count,
                         COALESCE(AVG(s.cost), 0) AS avg_cost,
-                        COALESCE(AVG(s.duration), 0) AS avg_latency,
+                        COALESCE(AVG(s.duration) / 1000.0, 0) AS avg_latency,
                         COUNT(DISTINCT CASE WHEN s.error_message IS NOT NULL THEN s.trace_id END) AS error_traces,
                         ROUND(
                             COUNT(DISTINCT CASE WHEN s.error_message IS NOT NULL THEN s.trace_id END)::NUMERIC
