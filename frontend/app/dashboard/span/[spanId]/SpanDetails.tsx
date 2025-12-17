@@ -35,12 +35,12 @@ interface SpanDetailsProps {
 
 export default function SpanDetails({ span: currentSpan }: SpanDetailsProps) {
   return (
-    <div className="space-y-5 bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6">
+    <div className="space-y-4 bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6">
       {/* Prompt Versioning Information */}
       {(currentSpan.prompt_id ||
         currentSpan.prompt_version ||
         currentSpan.prompt_hash) && (
-        <div className="space-y-3">
+        <div className="space-y-2">
           <h4 className="text-xs font-semibold text-black/40 uppercase tracking-wide">
             {`/* Prompt Version */`}
           </h4>
@@ -434,11 +434,11 @@ export default function SpanDetails({ span: currentSpan }: SpanDetailsProps) {
       {/* Error Message */}
       {currentSpan.error_message !== null && (
         <div className="space-y-2">
-          <h4 className="text-xs font-semibold text-error uppercase tracking-wide">
-            Error
+          <h4 className="text-xs font-semibold text-black/40 uppercase tracking-wide">
+            {`/* Error */`}
           </h4>
-          <div className="p-4 rounded-lg bg-red-50 border border-error/30">
-            <p className="text-xs text-error/90 leading-relaxed wrap-break-word font-mono">
+          <div className="p-3 bg-error/5 border-2 border-error shadow-[2px_2px_0_rgba(0,0,0,0.1)]">
+            <p className="text-xs text-error font-mono leading-relaxed break-words">
               {currentSpan.error_message}
             </p>
           </div>
