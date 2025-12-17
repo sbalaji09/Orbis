@@ -340,6 +340,86 @@ export default function GraphNode({
                 </div>
               </div>
             )}
+
+            {/* Span Type Info */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-semibold text-black/40 uppercase tracking-wide">
+                {`/* Span Type */`}
+              </h4>
+              {(() => {
+                const typeConfig = getSpanTypeConfig(currentSpan.span_type);
+                return (
+                  <div className={`inline-flex items-center gap-2 px-3 py-2 ${typeConfig.color} ${typeConfig.textColor} border-2 border-black`}>
+                    <span className="text-lg">{typeConfig.icon}</span>
+                    <span className="font-bold">{typeConfig.label}</span>
+                  </div>
+                );
+              })()}
+              
+              {/* HTTP-specific details */}
+              {currentSpan.span_type === "http" && (
+                <div className="grid grid-cols-2 gap-3 mt-3">
+                  {currentSpan.http_method && (
+                    <div className="flex flex-col gap-1 p-3 bg-white border-2 border-black">
+                      <span className="text-[10px] font-medium text-black/60 uppercase">Method</span>
+                      <span className="font-mono font-bold">{currentSpan.http_method}</span>
+                    </div>
+                  )}
+                  {currentSpan.http_status_code && (
+                    <div className="flex flex-col gap-1 p-3 bg-white border-2 border-black">
+                      <span className="text-[10px] font-medium text-black/60 uppercase">Status</span>
+                      <span className={`font-mono font-bold ${currentSpan.http_status_code >= 400 ? 'text-error' : 'text-success'}`}>
+                        {currentSpan.http_status_code}
+                      </span>
+                    </div>
+                  )}
+                  {currentSpan.http_url && (
+                    <div className="col-span-2 flex flex-col gap-1 p-3 bg-white border-2 border-black">
+                      <span className="text-[10px] font-medium text-black/60 uppercase">URL</span>
+                      <span className="font-mono text-xs truncate">{currentSpan.http_url}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* CLI-specific details */}
+              {currentSpan.span_type === "cli" && (
+                <div className="space-y-3 mt-3">
+                  {currentSpan.cli_command && (
+                    <div className="flex flex-col gap-1 p-3 bg-black border-2 border-black">
+                      <span className="text-[10px] font-medium text-white/60 uppercase">Command</span>
+                      <code className="font-mono text-xs text-green-400">{currentSpan.cli_command}</code>
+                    </div>
+                  )}
+                  {currentSpan.cli_exit_code !== null && (
+                    <div className="flex flex-col gap-1 p-3 bg-white border-2 border-black w-fit">
+                      <span className="text-[10px] font-medium text-black/60 uppercase">Exit Code</span>
+                      <span className={`font-mono font-bold ${currentSpan.cli_exit_code === 0 ? 'text-success' : 'text-error'}`}>
+                        {currentSpan.cli_exit_code}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Tool-specific details */}
+              {currentSpan.span_type === "tool" && (
+                <div className="grid grid-cols-2 gap-3 mt-3">
+                  {currentSpan.tool_name && (
+                    <div className="flex flex-col gap-1 p-3 bg-white border-2 border-black">
+                      <span className="text-[10px] font-medium text-black/60 uppercase">Tool Name</span>
+                      <span className="font-mono font-semibold">{currentSpan.tool_name}</span>
+                    </div>
+                  )}
+                  {currentSpan.tool_category && (
+                    <div className="flex flex-col gap-1 p-3 bg-white border-2 border-black">
+                      <span className="text-[10px] font-medium text-black/60 uppercase">Category</span>
+                      <span className="font-mono">{currentSpan.tool_category}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
