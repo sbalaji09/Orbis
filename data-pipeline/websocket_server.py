@@ -23,6 +23,8 @@ from rate_limiter_ws import (
 from dataclasses import asdict
 from websocket.health import health_monitor, WebSocketHealthStatus
 
+from shared.validators import validate_trace_id, validate_user_id
+
 logger = logging.getLogger(__name__)
 trace_connection_manager = ConnectionManager()
 
@@ -88,6 +90,12 @@ async def websocket_trace(websocket: WebSocket, trace_id: str, api_key: str = Qu
     user_id = await validate_api_key(api_key)
     if not user_id:
         await websocket.close(code=4401, reason="Invalid API key")
+        return
+    
+    try:
+        validate_trace_id(trace_id)
+    except Exception:
+        await websocket.close(code=4000, reason="Invalid trace_id format")
         return
     
     if not await validate_trace_ownership(trace_id, user_id):
