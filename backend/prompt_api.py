@@ -24,8 +24,16 @@ async def create_prompt(agent_id: str, name: str, content: str):
         aws_region = os.getenv('AWS_REGION')
 
         version_number = db.max_version_prompt_number(name)["Version number"]
-        s3URL = upload_prompt_to_s3(
-            content, bucket_name, name, version_number, aws_region)
+
+        if bucket_name:
+            try:
+                s3URL = upload_prompt_to_s3(
+                    content, bucket_name, name, version_number, aws_region)
+            except Exception as e:
+                print(f"S3 upload failed: {e}, using None")
+                s3URL = None
+        else:
+            s3URL = None
 
         prompt_version = db.insert_prompt_row(name, version_number, s3URL, agent_id,
                                               content_hash, content[:min(500, len(content))])
@@ -53,11 +61,44 @@ async def get_all_prompt_families(user_id: str = Header(..., alias="X-User-ID"))
 @router.get("/diff")
 async def get_prompt_differences(prompt_id1: str, prompt_id2: str):
     try:
-        s3_url1 = db.get_s3url_by_prompt_id(prompt_id1)
-        s3_url2 = db.get_s3url_by_prompt_id(prompt_id2)
+        # Get prompt records with both s3_url and content_preview
+        conn = db.get_connection()
+        try:
+            with conn.cursor() as cur:
+                query = """
+                    SELECT prompt_id, s3_url, content_preview
+                    FROM prompt_versions
+                    WHERE prompt_id IN (%s, %s)
+                """
+                cur.execute(query, (prompt_id1, prompt_id2))
+                rows = cur.fetchall()
 
-        content1 = download_prompt_from_s3(s3_url1)
-        content2 = download_prompt_from_s3(s3_url2)
+                prompt_data = {}
+                for row in rows:
+                    prompt_data[str(row[0])] = {
+                        "s3_url": row[1],
+                        "content_preview": row[2]
+                    }
+        finally:
+            db.return_connection(conn)
+
+        if prompt_id1 not in prompt_data or prompt_id2 not in prompt_data:
+            raise HTTPException(
+                status_code=404, detail="One or both prompts not found")
+
+        # Get content - use preview if no S3 URL or placeholder, otherwise download from S3
+        s3_url1 = prompt_data[prompt_id1]["s3_url"]
+        s3_url2 = prompt_data[prompt_id2]["s3_url"]
+
+        if not s3_url1 or (s3_url1 and s3_url1.startswith("placeholder://")):
+            content1 = prompt_data[prompt_id1]["content_preview"]
+        else:
+            content1 = download_prompt_from_s3(s3_url1)
+
+        if not s3_url2 or (s3_url2 and s3_url2.startswith("placeholder://")):
+            content2 = prompt_data[prompt_id2]["content_preview"]
+        else:
+            content2 = download_prompt_from_s3(s3_url2)
 
         return prompt_diff(content1, prompt_id1, content2, prompt_id2)
     except Exception as e:
@@ -85,9 +126,31 @@ async def get_version_numbers(name: str):
 @router.get("/{name}/content")
 async def get_prompt_content(name: str, version_number: int | None = None):
     try:
-        s3_url = db.get_s3url_prompt(name, version_number)
+        # If no version_number provided, get the latest version
+        if version_number is None:
+            versions = db.get_prompts_versions(name)
+            if not versions or len(versions) == 0:
+                raise HTTPException(
+                    status_code=404, detail="No versions found for this prompt")
+            version_number = int(versions[0]["version_number"])
+
+        prompt_record = db.get_prompt_version(name, int(version_number))
+        if not prompt_record:
+            raise HTTPException(
+                status_code=404, detail=f"Version {version_number} not found for prompt '{name}'")
+
+        s3_url = prompt_record.get("s3_url")
+
+        # If no S3 URL or placeholder URL (optional S3), return content_preview from database
+        if not s3_url or (s3_url and s3_url.startswith("placeholder://")):
+            content = prompt_record.get("content_preview", "")
+            return {"content": content}
+
+        # Otherwise download from S3
         content = download_prompt_from_s3(s3_url)
         return {"content": content}
+    except HTTPException:
+        raise  # Re-raise HTTPException as-is (don't convert to 500)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -131,13 +194,44 @@ async def get_prompt_analytics(prompt_name: str):
 @router.get("/compare")
 async def compare_prompt_analytics(prompt_id1: str, prompt_id2: str):
     try:
-        # get the s3 urls and their content
-        s3_url1 = db.get_content_by_promptid(prompt_id1)
-        s3_url2 = db.get_content_by_promptid(prompt_id2)
+        # Get prompt records with both s3_url and content_preview
+        conn = db.get_connection()
+        try:
+            with conn.cursor() as cur:
+                query = """
+                    SELECT prompt_id, s3_url, content_preview
+                    FROM prompt_versions
+                    WHERE prompt_id IN (%s, %s)
+                """
+                cur.execute(query, (prompt_id1, prompt_id2))
+                rows = cur.fetchall()
 
-        prompt1_content = download_prompt_from_s3(
-            s3_url1[0])  # s3_url1 is a tuple
-        prompt2_content = download_prompt_from_s3(s3_url2[0])
+                prompt_data = {}
+                for row in rows:
+                    prompt_data[str(row[0])] = {
+                        "s3_url": row[1],
+                        "content_preview": row[2]
+                    }
+        finally:
+            db.return_connection(conn)
+
+        if prompt_id1 not in prompt_data or prompt_id2 not in prompt_data:
+            raise HTTPException(
+                status_code=404, detail="One or both prompts not found")
+
+        # Get content - use preview if no S3 URL or placeholder, otherwise download from S3
+        s3_url1 = prompt_data[prompt_id1]["s3_url"]
+        s3_url2 = prompt_data[prompt_id2]["s3_url"]
+
+        if not s3_url1 or (s3_url1 and s3_url1.startswith("placeholder://")):
+            prompt1_content = prompt_data[prompt_id1]["content_preview"]
+        else:
+            prompt1_content = download_prompt_from_s3(s3_url1)
+
+        if not s3_url2 or (s3_url2 and s3_url2.startswith("placeholder://")):
+            prompt2_content = prompt_data[prompt_id2]["content_preview"]
+        else:
+            prompt2_content = download_prompt_from_s3(s3_url2)
 
         # get analytics for both prompts
         analytics_list = db.get_prompt_analytics_for_prompt_ids(
@@ -160,15 +254,23 @@ async def compare_prompt_analytics(prompt_id1: str, prompt_id2: str):
         diff_result = prompt_diff(
             prompt1_content, prompt_id1, prompt2_content, prompt_id2)
 
-        # call LLM for analysis
-        llm_analysis = get_llm_comparison_analysis(
-            prompt1_content=prompt1_content,
-            prompt2_content=prompt2_content,
-            outputs1=output_texts1,
-            outputs2=output_texts2,
-            analytics1=analytics1,
-            analytics2=analytics2
-        )
+        # call LLM for analysis (optional - gracefully handle missing API key)
+        llm_analysis = None
+        try:
+            if os.getenv("OPENAI_API_KEY"):
+                llm_analysis = get_llm_comparison_analysis(
+                    prompt1_content=prompt1_content,
+                    prompt2_content=prompt2_content,
+                    outputs1=output_texts1,
+                    outputs2=output_texts2,
+                    analytics1=analytics1,
+                    analytics2=analytics2
+                )
+            else:
+                llm_analysis = "LLM analysis not available (OPENAI_API_KEY not set)"
+        except Exception as llm_error:
+            print(f"LLM analysis failed (continuing without it): {llm_error}")
+            llm_analysis = f"LLM analysis failed: {str(llm_error)}"
 
         # return complete comparison
         return {
