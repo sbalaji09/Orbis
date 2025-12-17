@@ -56,7 +56,7 @@ export default function VersionsList({
                   <PromptBadge
                     key={v}
                     promptId={promptName}
-                    promptVersion={String(v)}
+                    promptVersion={`v${v}`}
                   />
                 ))}
             </div>
@@ -149,7 +149,7 @@ export default function VersionsList({
                       <div className="flex items-center gap-2 mb-2">
                         <PromptBadge
                           promptId={promptName}
-                          promptVersion={String(version.version_number)}
+                          promptVersion={`v${version.version_number}`}
                         />
                         {version.is_active && (
                           <span className="px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide bg-success text-white">
@@ -251,7 +251,7 @@ export default function VersionsList({
                       <button
                         onClick={() => onRollback(version.version_number)}
                         disabled={rollbackLoading !== null}
-                        className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide border-2 border-error bg-error text-white hover:bg-error/90 disabled:opacity-50 transition-colors shadow-[2px_2px_0_rgba(0,0,0,0.1)]"
+                        className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide border-2 border-error bg-[#D1437C] text-white hover:bg-[#D1437C]/90 disabled:opacity-50 transition-colors shadow-[2px_2px_0_rgba(0,0,0,0.1)]"
                       >
                         {rollbackLoading === version.version_number
                           ? "..."

@@ -33,7 +33,7 @@ interface Version {
 
 interface SpanDetailClientProps {
   initialSpan: Span;
-  initialVersions?: any[];
+  initialVersions?: Version[];
   initialAnalytics?: PromptVersionAnalytics[];
 }
 
@@ -121,6 +121,7 @@ export default function SpanDetailClient({
     if (currentSpan?.prompt_name && versions.length === 0) {
       loadVersions(currentSpan.prompt_name);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentSpan?.prompt_name]);
 
   const loadVersions = async (promptName: string) => {
@@ -180,10 +181,7 @@ export default function SpanDetailClient({
   };
 
   const handleRollback = async (versionNumber: number) => {
-    if (
-      !currentSpan?.prompt_name ||
-      !confirm(`Rollback to version ${versionNumber}?`)
-    )
+    if (!currentSpan?.prompt_name || !confirm(`Rollback to v${versionNumber}?`))
       return;
 
     setRollbackLoading(versionNumber);
@@ -236,70 +234,68 @@ export default function SpanDetailClient({
     <>
       {/* Tabs */}
       <TabGroup selectedIndex={selectedTab} onChange={setSelectedTab}>
-        <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] mb-6 overflow-hidden">
-          <TabList className="flex border-b-2 border-black">
-            <Tab
-              className={({ selected }) =>
-                `flex-1 px-6 py-3 text-xs font-bold uppercase tracking-wide transition-all focus:outline-none relative ${
-                  selected
-                    ? "bg-black text-mustard"
-                    : "bg-background text-black/60 hover:bg-black/5 hover:text-black"
-                }`
-              }
-            >
-              {({ selected }) => (
-                <>
-                  <span className="relative z-10">Details</span>
-                  {selected && (
-                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-mustard" />
-                  )}
-                </>
-              )}
-            </Tab>
-            {hasPromptData && (
-              <>
-                <Tab
-                  className={({ selected }) =>
-                    `flex-1 px-6 py-3 text-xs font-bold uppercase tracking-wide transition-all focus:outline-none border-l-2 border-black relative ${
-                      selected
-                        ? "bg-black text-mustard"
-                        : "bg-background text-black/60 hover:bg-black/5 hover:text-black"
-                    }`
-                  }
-                >
-                  {({ selected }) => (
-                    <>
-                      <span className="relative z-10">Analysis</span>
-                      {selected && (
-                        <div className="absolute bottom-0 left-0 right-0 h-1 bg-mustard" />
-                      )}
-                    </>
-                  )}
-                </Tab>
-                <Tab
-                  className={({ selected }) =>
-                    `flex-1 px-6 py-3 text-xs font-bold uppercase tracking-wide transition-all focus:outline-none border-l-2 border-black relative ${
-                      selected
-                        ? "bg-black text-mustard"
-                        : "bg-background text-black/60 hover:bg-black/5 hover:text-black"
-                    }`
-                  }
-                >
-                  {({ selected }) => (
-                    <>
-                      <span className="relative z-10">
-                        Versions {versions.length > 0 && `(${versions.length})`}
-                      </span>
-                      {selected && (
-                        <div className="absolute bottom-0 left-0 right-0 h-1 bg-mustard" />
-                      )}
-                    </>
-                  )}
-                </Tab>
-              </>
-            )}
-          </TabList>
-        </div>
+        {hasPromptData && (
+          <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] mb-3 overflow-hidden">
+            <TabList className="flex border-b-2 border-black">
+              <Tab
+                className={({ selected }) =>
+                  `flex-1 px-6 py-3 text-xs font-bold uppercase tracking-wide transition-all focus:outline-none relative cursor-pointer ${
+                    selected
+                      ? "bg-black text-mustard"
+                      : "bg-background text-black/60 hover:bg-black/5 hover:text-black"
+                  }`
+                }
+              >
+                {({ selected }) => (
+                  <>
+                    <span className="relative z-10">Details</span>
+                    {selected && (
+                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-mustard" />
+                    )}
+                  </>
+                )}
+              </Tab>
+              <Tab
+                className={({ selected }) =>
+                  `flex-1 px-6 py-3 text-xs font-bold uppercase tracking-wide transition-all focus:outline-none border-l-2 border-black relative cursor-pointer ${
+                    selected
+                      ? "bg-black text-mustard"
+                      : "bg-background text-black/60 hover:bg-black/5 hover:text-black"
+                  }`
+                }
+              >
+                {({ selected }) => (
+                  <>
+                    <span className="relative z-10">Analysis</span>
+                    {selected && (
+                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-mustard" />
+                    )}
+                  </>
+                )}
+              </Tab>
+              <Tab
+                className={({ selected }) =>
+                  `flex-1 px-6 py-3 text-xs font-bold uppercase tracking-wide transition-all cursor-pointer focus:outline-none border-l-2 border-black relative ${
+                    selected
+                      ? "bg-black text-mustard"
+                      : "bg-background text-black/60 hover:bg-black/5 hover:text-black"
+                  }`
+                }
+              >
+                {({ selected }) => (
+                  <>
+                    <span className="relative z-10">
+                      Versions {versions.length > 0 && `(${versions.length})`}
+                    </span>
+                    {selected && (
+                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-mustard" />
+                    )}
+                  </>
+                )}
+              </Tab>
+            </TabList>
+          </div>
+        )}
 
         <TabPanels>
           {/* Details Tab */}
@@ -312,7 +308,6 @@ export default function SpanDetailClient({
             <TabPanel>
               {currentSpan.prompt_name ? (
                 <PromptAnalytics
-                  promptName={currentSpan.prompt_name}
                   analytics={initialAnalytics}
                   loading={versionsLoading}
                 />
