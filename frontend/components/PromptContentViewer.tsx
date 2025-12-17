@@ -65,7 +65,7 @@ export default function PromptContentViewer({
                       Prompt Content
                     </DialogTitle>
                     <div className="mt-2">
-                      <PromptBadge promptId={promptName} promptVersion={versionNumber} />
+                      <PromptBadge promptId={promptName} promptVersion={`v${versionNumber}`} />
                     </div>
                   </div>
                   <button

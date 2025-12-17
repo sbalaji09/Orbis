@@ -131,7 +131,7 @@ export default function PromptDetailPage({
   const handleRollback = async (versionNumber: number) => {
     if (
       !confirm(
-        `Rollback to version ${versionNumber}? This will create a new version with the content from v${versionNumber}.`
+        `Rollback to v${versionNumber}? This will create a new version with the content from v${versionNumber}.`
       )
     ) {
       return;

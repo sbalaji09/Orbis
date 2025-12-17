@@ -131,11 +131,11 @@ export default function PromptComparisonView({
                       Prompt Comparison
                     </DialogTitle>
                     <div className="mt-2 flex items-center gap-2">
-                      <PromptBadge promptId={promptName} promptVersion={version1} />
+                      <PromptBadge promptId={promptName} promptVersion={`v${version1}`} />
                       <svg className="w-4 h-4 text-black/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                       </svg>
-                      <PromptBadge promptId={promptName} promptVersion={version2} />
+                      <PromptBadge promptId={promptName} promptVersion={`v${version2}`} />
                     </div>
                   </div>
                   <button
@@ -247,7 +247,7 @@ export default function PromptComparisonView({
                         <div className="h-full grid grid-cols-2 divide-x divide-black/10">
                           <div className="flex flex-col h-full">
                             <div className="px-4 py-2 bg-black/[0.02] border-b border-black/10 shrink-0">
-                              <PromptBadge promptId={promptName} promptVersion={version1} />
+                              <PromptBadge promptId={promptName} promptVersion={`v${version1}`} />
                             </div>
                             <div ref={leftPanelRef} className="flex-1 overflow-auto p-4">
                               <pre className="text-xs font-mono whitespace-pre-wrap text-foreground/80 leading-relaxed">
@@ -257,7 +257,7 @@ export default function PromptComparisonView({
                           </div>
                           <div className="flex flex-col h-full">
                             <div className="px-4 py-2 bg-black/[0.02] border-b border-black/10 shrink-0">
-                              <PromptBadge promptId={promptName} promptVersion={version2} />
+                              <PromptBadge promptId={promptName} promptVersion={`v${version2}`} />
                             </div>
                             <div ref={rightPanelRef} className="flex-1 overflow-auto p-4">
                               <pre className="text-xs font-mono whitespace-pre-wrap text-foreground/80 leading-relaxed">
@@ -304,7 +304,7 @@ export default function PromptComparisonView({
                           <div className="flex flex-col h-full">
                             <div className="px-4 py-2 bg-black/[0.02] border-b border-black/10 shrink-0">
                               <span className="text-xs font-semibold text-black/60">
-                                Version {version1} Outputs ({comparisonData.prompts.version1.sample_outputs.length})
+                                v{version1} Outputs ({comparisonData.prompts.version1.sample_outputs.length})
                               </span>
                             </div>
                             <div className="flex-1 overflow-auto p-4 space-y-3">
@@ -325,7 +325,7 @@ export default function PromptComparisonView({
                           <div className="flex flex-col h-full">
                             <div className="px-4 py-2 bg-black/[0.02] border-b border-black/10 shrink-0">
                               <span className="text-xs font-semibold text-black/60">
-                                Version {version2} Outputs ({comparisonData.prompts.version2.sample_outputs.length})
+                                v{version2} Outputs ({comparisonData.prompts.version2.sample_outputs.length})
                               </span>
                             </div>
                             <div className="flex-1 overflow-auto p-4 space-y-3">

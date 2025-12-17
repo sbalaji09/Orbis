@@ -182,7 +182,7 @@ export default function SpanDetailClient({
   const handleRollback = async (versionNumber: number) => {
     if (
       !currentSpan?.prompt_name ||
-      !confirm(`Rollback to version ${versionNumber}?`)
+      !confirm(`Rollback to v${versionNumber}?`)
     )
       return;
 

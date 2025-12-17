@@ -175,7 +175,7 @@ export default function PromptVersionPanel({
                             <div className="flex items-center justify-between mb-2">
                               <PromptBadge
                                 promptId={promptName}
-                                promptVersion={version.version_number}
+                                promptVersion={`v${version.version_number}`}
                                 onClick={() =>
                                   setSelectedVersion(
                                     selectedVersion === version.version_number

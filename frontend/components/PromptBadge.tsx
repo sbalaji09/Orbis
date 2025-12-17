@@ -2,19 +2,33 @@ import React from "react";
 
 interface PromptBadgeProps {
   promptId: string | null;
-  promptVersion: string;
+  promptVersion: string | number;
+  onClick?: () => void;
 }
 
 export default function PromptBadge({
   promptId,
   promptVersion,
+  onClick,
 }: PromptBadgeProps) {
   if (!promptId) return null;
 
+  // Ensure version is always displayed as vX.Y format
+  const formatVersion = (version: string | number): string => {
+    const versionStr = String(version);
+    // If it already starts with 'v', return as is
+    if (versionStr.startsWith('v')) return versionStr;
+    // Otherwise, add 'v' prefix
+    return `v${versionStr}`;
+  };
+
+  const displayVersion = formatVersion(promptVersion);
+
   return (
     <span
-      className="inline-flex items-center gap-1.5 px-2 py-1 text-[10px] font-mono font-medium bg-babyblue/10 text-babyblue border-2 border-babyblue/30 shadow-[2px_2px_0_rgba(0,0,0,0.1)]"
-      title={`Prompt ${promptId} ${promptVersion}`}
+      className={`inline-flex items-center gap-1.5 px-2 py-1 text-[10px] font-mono font-medium bg-babyblue/10 text-babyblue border-2 border-babyblue/30 shadow-[2px_2px_0_rgba(0,0,0,0.1)] ${onClick ? 'cursor-pointer hover:bg-babyblue/20' : ''}`}
+      title={`Prompt ${promptId} ${displayVersion}`}
+      onClick={onClick}
     >
       <svg
         className="w-3 h-3"
@@ -30,7 +44,7 @@ export default function PromptBadge({
         />
       </svg>
       <span className="truncate max-w-20">{promptId}</span>
-      <span className="text-babyblue/60">{promptVersion}</span>
+      <span className="text-babyblue/60">{displayVersion}</span>
     </span>
   );
 }

@@ -56,7 +56,7 @@ export default function VersionsList({
                   <PromptBadge
                     key={v}
                     promptId={promptName}
-                    promptVersion={String(v)}
+                    promptVersion={`v${v}`}
                   />
                 ))}
             </div>
@@ -149,7 +149,7 @@ export default function VersionsList({
                       <div className="flex items-center gap-2 mb-2">
                         <PromptBadge
                           promptId={promptName}
-                          promptVersion={String(version.version_number)}
+                          promptVersion={`v${version.version_number}`}
                         />
                         {version.is_active && (
                           <span className="px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide bg-success text-white">
