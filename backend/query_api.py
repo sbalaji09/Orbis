@@ -60,6 +60,9 @@ async def list_traces(
     status: Optional[str] = Query(None, description="Filter by status")
 ):
     try:
+        validate_user_id(user_id)
+        limit, offset = validate_pagination(limit, offset)
+        
         # Get traces with enhanced information from spans
         traces = db.get_traces_with_stats(
             user_id, limit=limit, offset=offset, status_filter=status)
@@ -105,6 +108,9 @@ async def get_trace(
     user_id: str = Header(..., alias="X-User-ID")
 ):
     try:
+        validate_trace_id(trace_id)
+        validate_user_id(user_id)
+
         trace = db.get_trace_by_id(trace_id)
 
         if not trace:
@@ -129,6 +135,9 @@ async def get_trace_spans(
     user_id: str = Header(..., alias="X-User-ID")
 ):
     try:
+        validate_trace_id(trace_id)
+        validate_user_id(user_id)
+        
         # check if the trace exists and the user has access
         trace = db.get_trace_by_id(trace_id)
         if not trace:
@@ -162,12 +171,16 @@ async def get_trace_span_count(
     Returns just the span count and streaming status.
     """
     try:
+        validate_trace_id(trace_id)
+
         effective_user_id = user_id or user_id_query
         if not effective_user_id:
             return JSONResponse(
                 status_code=400,
                 content={"error": "user_id required"}
             )
+        
+        validate_trace_id(user_id)
 
         trace = db.get_trace_by_id(trace_id)
         if not trace:
@@ -198,6 +211,9 @@ async def get_trace_summary(
     user_id: str = Header(..., alias="X-User-ID")
 ):
     try:
+        validate_trace_id(trace_id)
+        validate_user_id(user_id)
+        
         summary = db.get_trace_summary(trace_id)
 
         if not summary:
@@ -222,6 +238,9 @@ async def get_span(
     user_id: str = Header(..., alias="X-User-ID")
 ):
     try:
+        validate_span_id(span_id)
+        validate_user_id(user_id)
+        
         span = db.get_span_by_id(span_id)
 
         if not span:
@@ -238,26 +257,15 @@ async def get_span(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# stream a specific span by ID (Server-Sent Events)
-
-
+# stream a specific span using SSE
 @app.get("/spans/{span_id}/stream")
 async def stream_span(
     span_id: str,
     user_id: str = Header(None, alias="X-User-ID"),
     user_id_query: str = Query(None, alias="user_id")
 ):
-    """
-    Stream real-time updates for a specific span using Server-Sent Events (SSE).
-
-    This endpoint:
-    - Polls the database every 500ms for span updates
-    - Automatically stops streaming when is_streaming becomes false
-    - Validates user access on initial connection
-    - Returns updates as JSON in SSE format
-    - Accepts user_id via header (preferred) or query param (for EventSource compatibility)
-    """
     # Use header if available, otherwise query param
+    validate_span_id(span_id)
     effective_user_id = user_id or user_id_query
     if not effective_user_id:
         return JSONResponse(
@@ -265,6 +273,8 @@ async def stream_span(
             content={
                 "error": "user_id required via X-User-ID header or user_id query parameter"}
         )
+
+    validate_user_id(user_id)
 
     async def event_generator():
         try:
