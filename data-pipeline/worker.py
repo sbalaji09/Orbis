@@ -287,6 +287,10 @@ class SpanWorker:
             }})
         
         # DEBUG: Print what we're about to return
+        # Truncate error_message to 200 characters if present
+        error_msg = span.get('error_message')
+        truncated_error = error_msg[:200] if error_msg else None
+
         prepared_data = {
             "span_id": str(span.get('span_id', 'unknown')),
             "trace_id": trace_id,
@@ -304,7 +308,7 @@ class SpanWorker:
             "completion_tokens": span.get('output_tokens'),
             "cost": span.get('total_cost'),
             "status": span.get('status'),
-            "error_message": span.get('error_message'),
+            "error_message": truncated_error,
             "is_streaming": span.get('is_streaming', False),
             "time_to_first_token": span.get('time_to_first_token'),
             "tokens_per_second": span.get('tokens_per_second'),
