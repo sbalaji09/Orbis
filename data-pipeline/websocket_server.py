@@ -24,7 +24,7 @@ from dataclasses import asdict
 from websocket.health import health_monitor, WebSocketHealthStatus
 
 logger = logging.getLogger(__name__)
-connection_manager = ConnectionManager()
+trace_connection_manager = ConnectionManager()
 
 # Redis connection for pub/sub
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
@@ -106,7 +106,7 @@ async def websocket_trace(websocket: WebSocket, trace_id: str, api_key: str = Qu
     connection_id = str(uuid.uuid4())
     await register_ws_connection(user_id, connection_id)
 
-    await connection_manager.connect(websocket, trace_id = trace_id)
+    await trace_connection_manager.connect(websocket=websocket, user_id=user_id, trace_id=trace_id)
 
     try:
         await websocket.send_json({"event": "subscribed", "trace_id": trace_id, "user_id": user_id})
@@ -118,7 +118,7 @@ async def websocket_trace(websocket: WebSocket, trace_id: str, api_key: str = Qu
         pass
     finally:
         await unregister_ws_connection(user_id, connection_id)
-        await connection_manager.disconnect(websocket)
+        await trace_connection_manager.disconnect(websocket)
 
 # stream real-time span updates for all traces belonging to a user
 @app.websocket("/ws/dashboard")
@@ -194,11 +194,11 @@ async def websocket_dashboard(websocket: WebSocket, api_key: str = Query(None, a
             await pubsub.unsubscribe(f"user:{user_id}:spans")
             await pubsub.close()
 
-connection_manager = DashboardConnectionManager()
+dashboard_connection_manager = DashboardConnectionManager()
 
 @app.on_event("startup")
 async def startup_event():
-    subscriber = init_redis_subscriber(connection_manager)
+    subscriber = init_redis_subscriber(dashboard_connection_manager)
     await subscriber.start()
 
 @app.on_event("shutdown")
@@ -215,7 +215,7 @@ async def websocket_health():
     subscriber = get_redis_subscriber()
 
     health_status = await health_monitor.get_health_status(
-        connection_manager=connection_manager,
+        connection_manager=dashboard_connection_manager,
         redis_subscriber=subscriber,
         redis_url=redis_url,
     )
@@ -238,7 +238,7 @@ async def websocket_metrics():
     subscriber = get_redis_subscriber()
 
     health_status = await health_monitor.get_health_status(
-        connection_manager=connection_manager,
+        connection_manager=dashboard_connection_manager,
         redis_subscriber=subscriber,
         redis_url=redis_url,
     )
