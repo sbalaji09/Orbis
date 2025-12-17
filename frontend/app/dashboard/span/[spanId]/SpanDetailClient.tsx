@@ -236,70 +236,68 @@ export default function SpanDetailClient({
     <>
       {/* Tabs */}
       <TabGroup selectedIndex={selectedTab} onChange={setSelectedTab}>
-        <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] mb-6 overflow-hidden">
-          <TabList className="flex border-b-2 border-black">
-            <Tab
-              className={({ selected }) =>
-                `flex-1 px-6 py-3 text-xs font-bold uppercase tracking-wide transition-all focus:outline-none relative ${
-                  selected
-                    ? "bg-black text-mustard"
-                    : "bg-background text-black/60 hover:bg-black/5 hover:text-black"
-                }`
-              }
-            >
-              {({ selected }) => (
-                <>
-                  <span className="relative z-10">Details</span>
-                  {selected && (
-                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-mustard" />
-                  )}
-                </>
-              )}
-            </Tab>
-            {hasPromptData && (
-              <>
-                <Tab
-                  className={({ selected }) =>
-                    `flex-1 px-6 py-3 text-xs font-bold uppercase tracking-wide transition-all focus:outline-none border-l-2 border-black relative ${
-                      selected
-                        ? "bg-black text-mustard"
-                        : "bg-background text-black/60 hover:bg-black/5 hover:text-black"
-                    }`
-                  }
-                >
-                  {({ selected }) => (
-                    <>
-                      <span className="relative z-10">Analysis</span>
-                      {selected && (
-                        <div className="absolute bottom-0 left-0 right-0 h-1 bg-mustard" />
-                      )}
-                    </>
-                  )}
-                </Tab>
-                <Tab
-                  className={({ selected }) =>
-                    `flex-1 px-6 py-3 text-xs font-bold uppercase tracking-wide transition-all focus:outline-none border-l-2 border-black relative ${
-                      selected
-                        ? "bg-black text-mustard"
-                        : "bg-background text-black/60 hover:bg-black/5 hover:text-black"
-                    }`
-                  }
-                >
-                  {({ selected }) => (
-                    <>
-                      <span className="relative z-10">
-                        Versions {versions.length > 0 && `(${versions.length})`}
-                      </span>
-                      {selected && (
-                        <div className="absolute bottom-0 left-0 right-0 h-1 bg-mustard" />
-                      )}
-                    </>
-                  )}
-                </Tab>
-              </>
-            )}
-          </TabList>
-        </div>
+        {hasPromptData && (
+          <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] mb-6 overflow-hidden">
+            <TabList className="flex border-b-2 border-black">
+              <Tab
+                className={({ selected }) =>
+                  `flex-1 px-6 py-3 text-xs font-bold uppercase tracking-wide transition-all focus:outline-none relative ${
+                    selected
+                      ? "bg-black text-mustard"
+                      : "bg-background text-black/60 hover:bg-black/5 hover:text-black"
+                  }`
+                }
+              >
+                {({ selected }) => (
+                  <>
+                    <span className="relative z-10">Details</span>
+                    {selected && (
+                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-mustard" />
+                    )}
+                  </>
+                )}
+              </Tab>
+              <Tab
+                className={({ selected }) =>
+                  `flex-1 px-6 py-3 text-xs font-bold uppercase tracking-wide transition-all focus:outline-none border-l-2 border-black relative ${
+                    selected
+                      ? "bg-black text-mustard"
+                      : "bg-background text-black/60 hover:bg-black/5 hover:text-black"
+                  }`
+                }
+              >
+                {({ selected }) => (
+                  <>
+                    <span className="relative z-10">Analysis</span>
+                    {selected && (
+                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-mustard" />
+                    )}
+                  </>
+                )}
+              </Tab>
+              <Tab
+                className={({ selected }) =>
+                  `flex-1 px-6 py-3 text-xs font-bold uppercase tracking-wide transition-all focus:outline-none border-l-2 border-black relative ${
+                    selected
+                      ? "bg-black text-mustard"
+                      : "bg-background text-black/60 hover:bg-black/5 hover:text-black"
+                  }`
+                }
+              >
+                {({ selected }) => (
+                  <>
+                    <span className="relative z-10">
+                      Versions {versions.length > 0 && `(${versions.length})`}
+                    </span>
+                    {selected && (
+                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-mustard" />
+                    )}
+                  </>
+                )}
+              </Tab>
+            </TabList>
+          </div>
+        )}
 
         <TabPanels>
           {/* Details Tab */}

@@ -1,5 +1,4 @@
 import { Span } from "@/lib/types";
-import { getSpanTypeConfig } from "@/lib/span-type-config";
 
 function Skeleton({
   width = "w-20",
@@ -95,25 +94,12 @@ export default function SpanDetails({ span: currentSpan }: SpanDetailsProps) {
         </div>
       )}
 
-      {/* Span Type Info */}
-      <div className="space-y-3">
-        <h4 className="text-xs font-semibold text-black/40 uppercase tracking-wide">
-          {`/* Span Type */`}
-        </h4>
-        {(() => {
-          const typeConfig = getSpanTypeConfig(currentSpan.span_type);
-          return (
-            <div
-              className={`inline-flex items-center gap-2 px-3 py-2 ${typeConfig.color} ${typeConfig.textColor} border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.1)]`}
-            >
-              <span className="text-lg">{typeConfig.icon}</span>
-              <span className="font-bold">{typeConfig.label}</span>
-            </div>
-          );
-        })()}
-
-        {/* HTTP-specific details */}
-        {currentSpan.span_type === "http" && (
+      {/* HTTP-specific details */}
+      {currentSpan.span_type === "http" && (
+        <div className="space-y-3">
+          <h4 className="text-xs font-semibold text-black/40 uppercase tracking-wide">
+            {`/* HTTP Details */`}
+          </h4>
           <div className="grid grid-cols-2 gap-3 mt-3">
             {currentSpan.http_method && (
               <div className="flex flex-col gap-1 p-3 bg-white border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.1)]">
@@ -152,10 +138,15 @@ export default function SpanDetails({ span: currentSpan }: SpanDetailsProps) {
               </div>
             )}
           </div>
-        )}
+        </div>
+      )}
 
-        {/* CLI-specific details */}
-        {currentSpan.span_type === "cli" && (
+      {/* CLI-specific details */}
+      {currentSpan.span_type === "cli" && (
+        <div className="space-y-3">
+          <h4 className="text-xs font-semibold text-black/40 uppercase tracking-wide">
+            {`/* CLI Details */`}
+          </h4>
           <div className="space-y-3 mt-3">
             {currentSpan.cli_command && (
               <div className="flex flex-col gap-1 p-3 bg-black border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.1)]">
@@ -185,10 +176,15 @@ export default function SpanDetails({ span: currentSpan }: SpanDetailsProps) {
                 </div>
               )}
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Tool-specific details */}
-        {currentSpan.span_type === "tool" && (
+      {/* Tool-specific details */}
+      {currentSpan.span_type === "tool" && (
+        <div className="space-y-3">
+          <h4 className="text-xs font-semibold text-black/40 uppercase tracking-wide">
+            {`/* Tool Details */`}
+          </h4>
           <div className="grid grid-cols-2 gap-3 mt-3">
             {currentSpan.tool_name && (
               <div className="flex flex-col gap-1 p-3 bg-white border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.1)]">
@@ -209,8 +205,8 @@ export default function SpanDetails({ span: currentSpan }: SpanDetailsProps) {
               </div>
             )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Timing Information */}
       <div className="space-y-3">
