@@ -67,7 +67,11 @@ CREATE TABLE spans (
     prompt_id UUID REFERENCES prompt_versions(prompt_id),
     prompt_name VARCHAR(50),
     prompt_version TEXT,
-    prompt_hash TEXT
+    prompt_hash TEXT,
+    span_type VARCHAR,
+    tool_metadata JSONB,
+    http_method VARCHAR,
+    
 );
 
 CREATE TABLE evaluations (
