@@ -25,7 +25,6 @@ from shared.validators import (
     ValidationError,
 )
 
-
 app = FastAPI(
     title="Orbis Query API",
     description="API for reading traces, spans, and metrics",
@@ -407,8 +406,6 @@ async def get_traces_by_agent(agent_id: str, user_id: str, limit: int = 5, offse
         raise HTTPException(status_code=500, detail=str(e))
 
 # get all the agents belonging to a specific user
-
-
 @app.get("/agents")
 async def get_agents(user_id: str = Header(..., alias="X-User-ID")):
     try:
@@ -421,8 +418,12 @@ async def get_agents(user_id: str = Header(..., alias="X-User-ID")):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# Import profile_api to register agent creation endpoints
-import profile_api  # noqa: F401
+@app.exception_handler(ValidationError)
+async def validation_error_handler(request, exc: ValidationError):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=exc.detail
+    )
 
 if __name__ == "__main__":
     import uvicorn
