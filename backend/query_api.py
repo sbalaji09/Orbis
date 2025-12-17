@@ -1,3 +1,4 @@
+from prompt_api import router as prompt_router
 from db_connection import db
 from fastapi import FastAPI, HTTPException, Query, Header
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,7 +16,6 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from shared.cors_config import get_cors_config
 
-from prompt_api import router as prompt_router
 
 app = FastAPI(
     title="Orbis Query API",

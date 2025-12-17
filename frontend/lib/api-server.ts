@@ -117,6 +117,29 @@ export async function getTrace(
   }
 }
 
+export async function getSpan(
+  spanId: string,
+  userId: string = DEFAULT_USER_ID
+): Promise<Span | null> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/spans/${spanId}`, {
+      headers: {
+        "X-User-ID": userId.toString(),
+      },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    return response.json();
+  } catch (error) {
+    console.error("Error fetching span:", error);
+    return null;
+  }
+}
+
 export async function getPromptsByAgent(
   agentId: string,
   userId: string = DEFAULT_USER_ID
@@ -138,6 +161,62 @@ export async function getPromptsByAgent(
     return data || [];
   } catch (error) {
     console.error("Error fetching prompts:", error);
+    return [];
+  }
+}
+
+export async function getPromptVersions(
+  promptName: string,
+  userId: string = DEFAULT_USER_ID
+) {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/prompts/${encodeURIComponent(promptName)}/versions`,
+      {
+        headers: {
+          "X-User-ID": userId,
+        },
+        cache: "no-store",
+      }
+    );
+
+    if (!response.ok) {
+      console.error(`Failed to fetch prompt versions: ${response.statusText}`);
+      return [];
+    }
+
+    const data = await response.json();
+    return data.versions || [];
+  } catch (error) {
+    console.error("Error fetching prompt versions:", error);
+    return [];
+  }
+}
+
+export async function getPromptAnalytics(
+  promptName: string,
+  userId: string = DEFAULT_USER_ID
+) {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/prompts/analytics/${encodeURIComponent(promptName)}`,
+      {
+        headers: {
+          "X-User-ID": userId,
+        },
+        cache: "no-store",
+      }
+    );
+
+    if (!response.ok) {
+      console.error(`Failed to fetch prompt analytics: ${response.statusText}`);
+      return [];
+    }
+
+    const data = await response.json();
+    return data.versions || [];
+  } catch (error) {
+    console.error("Error fetching prompt analytics:", error);
     return [];
   }
 }

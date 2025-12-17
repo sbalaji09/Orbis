@@ -10,6 +10,7 @@ router = APIRouter(
     tags=["prompts"]
 )
 
+
 @router.post("/prompts")
 async def create_prompt(agent_id: str, name: str, content: str):
     # generate hash for content
@@ -26,7 +27,8 @@ async def create_prompt(agent_id: str, name: str, content: str):
 
         if bucket_name:
             try:
-                s3URL = upload_prompt_to_s3(content, bucket_name, name, version_number, aws_region)
+                s3URL = upload_prompt_to_s3(
+                    content, bucket_name, name, version_number, aws_region)
             except Exception as e:
                 print(f"S3 upload failed: {e}, using None")
                 s3URL = None
@@ -40,6 +42,8 @@ async def create_prompt(agent_id: str, name: str, content: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 # Static routes must come before dynamic routes
+
+
 @router.get("/families")
 async def get_all_prompt_families(user_id: str = Header(..., alias="X-User-ID")):
     try:
@@ -52,6 +56,7 @@ async def get_all_prompt_families(user_id: str = Header(..., alias="X-User-ID"))
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.get("/diff")
 async def get_prompt_differences(prompt_id1: str, prompt_id2: str):
@@ -78,7 +83,8 @@ async def get_prompt_differences(prompt_id1: str, prompt_id2: str):
             db.return_connection(conn)
 
         if prompt_id1 not in prompt_data or prompt_id2 not in prompt_data:
-            raise HTTPException(status_code=404, detail="One or both prompts not found")
+            raise HTTPException(
+                status_code=404, detail="One or both prompts not found")
 
         # Get content - use preview if no S3 URL or placeholder, otherwise download from S3
         s3_url1 = prompt_data[prompt_id1]["s3_url"]
@@ -98,6 +104,7 @@ async def get_prompt_differences(prompt_id1: str, prompt_id2: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.get("/agent/{agent_id}")
 async def get_prompt_by_agent_id(agent_id: str):
     try:
@@ -105,6 +112,7 @@ async def get_prompt_by_agent_id(agent_id: str):
         return prompt_families
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.get("/{name}/versions")
 async def get_version_numbers(name: str):
@@ -114,6 +122,7 @@ async def get_version_numbers(name: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.get("/{name}/content")
 async def get_prompt_content(name: str, version_number: int | None = None):
     try:
@@ -121,12 +130,14 @@ async def get_prompt_content(name: str, version_number: int | None = None):
         if version_number is None:
             versions = db.get_prompts_versions(name)
             if not versions or len(versions) == 0:
-                raise HTTPException(status_code=404, detail="No versions found for this prompt")
+                raise HTTPException(
+                    status_code=404, detail="No versions found for this prompt")
             version_number = int(versions[0]["version_number"])
 
         prompt_record = db.get_prompt_version(name, int(version_number))
         if not prompt_record:
-            raise HTTPException(status_code=404, detail=f"Version {version_number} not found for prompt '{name}'")
+            raise HTTPException(
+                status_code=404, detail=f"Version {version_number} not found for prompt '{name}'")
 
         s3_url = prompt_record.get("s3_url")
 
@@ -143,12 +154,14 @@ async def get_prompt_content(name: str, version_number: int | None = None):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.post("/{name}/rollback")
 async def rollback_prompt(name: str, version_number: int):
     try:
         prompt_rollback = db.get_prompt_version(name, version_number)
         db.deactivate_version(name, version_number)
-        new_version_number = db.max_version_prompt_number(name)["Version number"]
+        new_version_number = db.max_version_prompt_number(name)[
+            "Version number"]
         new_version = db.insert_prompt_row(
             name,
             new_version_number,
@@ -168,6 +181,7 @@ async def rollback_prompt(name: str, version_number: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.get("/analytics/{prompt_name}")
 async def get_prompt_analytics(prompt_name: str):
     try:
@@ -175,6 +189,7 @@ async def get_prompt_analytics(prompt_name: str):
         return {"prompt_name": prompt_name, "versions": analytics}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.get("/compare")
 async def compare_prompt_analytics(prompt_id1: str, prompt_id2: str):
@@ -201,7 +216,8 @@ async def compare_prompt_analytics(prompt_id1: str, prompt_id2: str):
             db.return_connection(conn)
 
         if prompt_id1 not in prompt_data or prompt_id2 not in prompt_data:
-            raise HTTPException(status_code=404, detail="One or both prompts not found")
+            raise HTTPException(
+                status_code=404, detail="One or both prompts not found")
 
         # Get content - use preview if no S3 URL or placeholder, otherwise download from S3
         s3_url1 = prompt_data[prompt_id1]["s3_url"]
@@ -218,19 +234,25 @@ async def compare_prompt_analytics(prompt_id1: str, prompt_id2: str):
             prompt2_content = download_prompt_from_s3(s3_url2)
 
         # get analytics for both prompts
-        analytics_list = db.get_prompt_analytics_for_prompt_ids(prompt_id1, prompt_id2)
-        analytics1 = next((a for a in analytics_list if str(a['prompt_id']) == prompt_id1), {})
-        analytics2 = next((a for a in analytics_list if str(a['prompt_id']) == prompt_id2), {})
+        analytics_list = db.get_prompt_analytics_for_prompt_ids(
+            prompt_id1, prompt_id2)
+        analytics1 = next((a for a in analytics_list if str(
+            a['prompt_id']) == prompt_id1), {})
+        analytics2 = next((a for a in analytics_list if str(
+            a['prompt_id']) == prompt_id2), {})
 
         # get sample outputs for each version
         outputs1 = db.get_output_preview(prompt_id1, limit=5)
         outputs2 = db.get_output_preview(prompt_id2, limit=5)
 
-        output_texts1 = [o['output_preview'] for o in outputs1 if o['output_preview']]
-        output_texts2 = [o['output_preview'] for o in outputs2 if o['output_preview']]
+        output_texts1 = [o['output_preview']
+                         for o in outputs1 if o['output_preview']]
+        output_texts2 = [o['output_preview']
+                         for o in outputs2 if o['output_preview']]
 
         # generate text differences
-        diff_result = prompt_diff(prompt1_content, prompt_id1, prompt2_content, prompt_id2)
+        diff_result = prompt_diff(
+            prompt1_content, prompt_id1, prompt2_content, prompt_id2)
 
         # call LLM for analysis (optional - gracefully handle missing API key)
         llm_analysis = None
@@ -271,6 +293,8 @@ async def compare_prompt_analytics(prompt_id1: str, prompt_id2: str):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
 def compute_hash_sha256(content: str) -> str:
     hash_object = hashlib.sha256(content.encode("utf-8"))
     return hash_object.hexdigest()

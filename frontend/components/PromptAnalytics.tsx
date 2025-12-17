@@ -1,20 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import { fetchPromptAnalytics, PromptVersionAnalytics } from '@/lib/prompt-api';
+import React from "react";
+import { PromptVersionAnalytics } from "@/lib/prompt-api";
 
 interface PromptAnalyticsProps {
   promptName: string;
+  analytics?: PromptVersionAnalytics[];
+  loading?: boolean;
 }
 
-export default function PromptAnalytics({ promptName }: PromptAnalyticsProps) {
-  const [analytics, setAnalytics] = useState<PromptVersionAnalytics[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchPromptAnalytics(undefined, promptName)
-      .then(setAnalytics)
-      .finally(() => setLoading(false));
-  }, [promptName]);
-
+export default function PromptAnalytics({
+  promptName,
+  analytics = [],
+  loading = false,
+}: PromptAnalyticsProps) {
   if (loading) {
     return (
       <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-8">
@@ -27,17 +24,19 @@ export default function PromptAnalytics({ promptName }: PromptAnalyticsProps) {
   }
 
   // Find best performing version (lowest error rate with most traces)
-  const bestVersion = analytics.length > 0
-    ? analytics.reduce((best, curr) => {
-        if (curr.trace_count === 0) return best;
-        if (best.trace_count === 0) return curr;
-        const bestError = best.error_rate_pct ?? 100;
-        const currError = curr.error_rate_pct ?? 100;
-        if (currError < bestError) return curr;
-        if (currError === bestError && curr.trace_count > best.trace_count) return curr;
-        return best;
-      })
-    : null;
+  const bestVersion =
+    analytics.length > 0
+      ? analytics.reduce((best, curr) => {
+          if (curr.trace_count === 0) return best;
+          if (best.trace_count === 0) return curr;
+          const bestError = best.error_rate_pct ?? 100;
+          const currError = curr.error_rate_pct ?? 100;
+          if (currError < bestError) return curr;
+          if (currError === bestError && curr.trace_count > best.trace_count)
+            return curr;
+          return best;
+        })
+      : null;
 
   return (
     <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] overflow-hidden">
@@ -54,11 +53,23 @@ export default function PromptAnalytics({ promptName }: PromptAnalyticsProps) {
       {/* Best performing banner */}
       {bestVersion && bestVersion.trace_count > 0 && (
         <div className="px-6 py-3 bg-success/10 border-b-2 border-success/20 flex items-center gap-2">
-          <svg className="w-4 h-4 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <svg
+            className="w-4 h-4 text-success"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
           </svg>
           <span className="text-[10px] font-medium text-success">
-            Best performing: v{bestVersion.version_number} ({bestVersion.trace_count} traces, {bestVersion.error_rate_pct ?? 0}% error rate)
+            Best performing: v{bestVersion.version_number} (
+            {bestVersion.trace_count} traces, {bestVersion.error_rate_pct ?? 0}%
+            error rate)
           </span>
         </div>
       )}
@@ -92,13 +103,16 @@ export default function PromptAnalytics({ promptName }: PromptAnalyticsProps) {
             {analytics
               .sort((a, b) => b.version_number - a.version_number)
               .map((row, idx) => {
-                const isBest = bestVersion && row.version_number === bestVersion.version_number && row.trace_count > 0;
+                const isBest =
+                  bestVersion &&
+                  row.version_number === bestVersion.version_number &&
+                  row.trace_count > 0;
                 return (
                   <tr
                     key={row.version_number}
                     className={`border-b border-black/5 hover:bg-babyblue/5 transition-colors ${
-                      idx % 2 === 0 ? 'bg-white' : 'bg-background/50'
-                    } ${isBest ? 'ring-2 ring-success/30 ring-inset' : ''}`}
+                      idx % 2 === 0 ? "bg-white" : "bg-background/50"
+                    } ${isBest ? "ring-2 ring-success/30 ring-inset" : ""}`}
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">
@@ -116,30 +130,40 @@ export default function PromptAnalytics({ promptName }: PromptAnalyticsProps) {
                       {row.trace_count.toLocaleString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-mustard font-semibold">
-                      {row.avg_cost > 0 ? `$${row.avg_cost.toFixed(4)}` : '—'}
+                      {row.avg_cost > 0 ? `$${row.avg_cost.toFixed(4)}` : "—"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-foreground">
-                      {row.avg_latency > 0 ? `${row.avg_latency.toFixed(2)}s` : '—'}
+                      {row.avg_latency > 0
+                        ? `${row.avg_latency.toFixed(2)}s`
+                        : "—"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-foreground">
                       {row.error_traces}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-mono font-semibold ${
-                        row.error_rate_pct === null || row.error_rate_pct === 0
-                          ? 'bg-success/10 text-success border border-success/30'
-                          : row.error_rate_pct < 5
-                            ? 'bg-warning/10 text-warning border border-warning/30'
-                            : 'bg-error/10 text-error border border-error/30'
-                      }`}>
-                        <div className={`w-1.5 h-1.5 ${
-                          row.error_rate_pct === null || row.error_rate_pct === 0
-                            ? 'bg-success'
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-mono font-semibold ${
+                          row.error_rate_pct === null ||
+                          row.error_rate_pct === 0
+                            ? "bg-success/10 text-success border border-success/30"
                             : row.error_rate_pct < 5
-                              ? 'bg-warning'
-                              : 'bg-error'
-                        }`}></div>
-                        {row.error_rate_pct === null ? '0%' : `${row.error_rate_pct.toFixed(1)}%`}
+                            ? "bg-warning/10 text-warning border border-warning/30"
+                            : "bg-error/10 text-error border border-error/30"
+                        }`}
+                      >
+                        <div
+                          className={`w-1.5 h-1.5 ${
+                            row.error_rate_pct === null ||
+                            row.error_rate_pct === 0
+                              ? "bg-success"
+                              : row.error_rate_pct < 5
+                              ? "bg-warning"
+                              : "bg-error"
+                          }`}
+                        ></div>
+                        {row.error_rate_pct === null
+                          ? "0%"
+                          : `${row.error_rate_pct.toFixed(1)}%`}
                       </span>
                     </td>
                   </tr>
@@ -152,7 +176,8 @@ export default function PromptAnalytics({ promptName }: PromptAnalyticsProps) {
       {/* Empty state */}
       {analytics.length === 0 && (
         <div className="px-6 py-12 text-center text-muted text-sm">
-          No analytics data available yet. Analytics will appear once this prompt is used in traces.
+          No analytics data available yet. Analytics will appear once this
+          prompt is used in traces.
         </div>
       )}
     </div>

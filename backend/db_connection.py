@@ -206,7 +206,8 @@ class SupabaseDB:
                     span_data.get('prompt_hash'),
                     # Tool tracking fields
                     span_data.get('span_type', 'llm'),
-                    json.dumps(span_data.get('tool_metadata')) if span_data.get('tool_metadata') else None,
+                    json.dumps(span_data.get('tool_metadata')) if span_data.get(
+                        'tool_metadata') else None,
                     span_data.get('http_method'),
                     span_data.get('http_url'),
                     span_data.get('http_status_code'),
@@ -310,7 +311,7 @@ class SupabaseDB:
                 return [dict(row) for row in results]
         finally:
             self.return_connection(conn)
-    
+
     def get_traces_with_stats(self, user_id: str, limit: int = 50, offset: int = 0, status_filter: str = None) -> List[Dict]:
         """
         Get traces for a user with enhanced stats calculated from spans.
@@ -362,31 +363,33 @@ class SupabaseDB:
                 FROM trace_stats
                 WHERE 1=1
                 """
-                
+
                 params = [user_id]
-                
+
                 if status_filter:
                     sql += " AND status = %s"
                     params.append(status_filter)
-                
+
                 sql += " ORDER BY start_time DESC LIMIT %s OFFSET %s"
                 params.extend([limit, offset])
-                
+
                 cur.execute(sql, params)
                 results = cur.fetchall()
-                
+
                 traces = []
                 for row in results:
                     trace = dict(row)
-                    
+
                     # Convert ALL datetime objects to ISO strings
-                    for key, value in list(trace.items()):  # Use list() to avoid dict size change during iteration
+                    # Use list() to avoid dict size change during iteration
+                    for key, value in list(trace.items()):
                         if isinstance(value, datetime.datetime):
                             trace[key] = value.isoformat()
-                    
+
                     traces.append(trace)
 
-                print(f"DEBUG: Final trace[0] created_at type: {type(traces[0]['created_at'])}")
+                print(
+                    f"DEBUG: Final trace[0] created_at type: {type(traces[0]['created_at'])}")
                 return traces
         except Exception as e:
             print(f"Error in get_traces_with_stats: {e}")
@@ -552,7 +555,7 @@ class SupabaseDB:
                 return [dict(row) for row in results]
         finally:
             self.return_connection(conn)
-    
+
     def insert_agent(self, user_id: str, agent_name: str, api_key: str) -> str:
         conn = self.get_connection()
         try:
@@ -582,7 +585,7 @@ class SupabaseDB:
             raise Exception(f"Failed to insert agent: {e}")
         finally:
             self.return_connection(conn)
-    
+
     def get_agents_by_userid(self, user_id: str, limit: int = 50, offset: int = 0) -> List[Dict]:
         conn = self.get_connection()
         try:
@@ -669,7 +672,8 @@ class SupabaseDB:
                 # convert the list of dicts into a list of tuples
                 values = [
                     (
-                        span['span_id'], span['trace_id'], span.get('parent_span_ids', []),
+                        span['span_id'], span['trace_id'], span.get(
+                            'parent_span_ids', []),
                         span['name'], span['start_time'], span['end_time'],
                         span['duration'], span['input_preview'], span['input_blob_url'],
                         span['output_preview'], span['output_blob_url'], span['llm_model'],
@@ -684,7 +688,8 @@ class SupabaseDB:
                         span.get('prompt_hash'),
                         # Tool tracking fields
                         span.get('span_type', 'llm'),
-                        json.dumps(span.get('tool_metadata')) if span.get('tool_metadata') else None,
+                        json.dumps(span.get('tool_metadata')) if span.get(
+                            'tool_metadata') else None,
                         span.get('http_method'),
                         span.get('http_url'),
                         span.get('http_status_code'),
@@ -706,16 +711,18 @@ class SupabaseDB:
 
                 # Use explicit UUID casting in template (41 values total)
                 template = "(%s, %s, %s::uuid[], %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
-                execute_values(cur, query, values, template=template, fetch=True)
+                execute_values(cur, query, values,
+                               template=template, fetch=True)
 
                 conn.commit()
-                return [span['span_id'] for span in spans]  # Return the span IDs from input, not from DB
+                # Return the span IDs from input, not from DB
+                return [span['span_id'] for span in spans]
         except Exception as e:
             conn.rollback()
             raise Exception(f"Failed to batch insert spans: {e}")
         finally:
             self.return_connection(conn)
-    
+
     def check_identical_hash(self, hash_val: str, agent_id: str) -> Optional[bool]:
         conn = self.get_connection()
         try:
@@ -740,7 +747,7 @@ class SupabaseDB:
             raise Exception(f"Failed to check for identical hash: {e}")
         finally:
             self.return_connection(conn)
-    
+
     def max_version_prompt_number(self, name: str) -> int:
         conn = self.get_connection()
         try:
@@ -762,7 +769,7 @@ class SupabaseDB:
             raise Exception(f"Failed to query largest prompt number")
         finally:
             self.return_connection(conn)
-    
+
     def insert_prompt_row(self, name: str, version_number: int, s3_url: str,
                           agent_id: str, prompt_hash: str, content_preview: str,
                           parent_version_id: str = None):
@@ -811,7 +818,8 @@ class SupabaseDB:
 
                 cur.execute(
                     query,
-                    (name, version_number, s3_url, agent_id, prompt_hash, content_preview, parent_version_id)
+                    (name, version_number, s3_url, agent_id,
+                     prompt_hash, content_preview, parent_version_id)
                 )
                 created_prompt = cur.fetchone()
                 conn.commit()
@@ -827,7 +835,7 @@ class SupabaseDB:
             raise Exception(f"Failed to insert row into prompt versions")
         finally:
             self.return_connection(conn)
-    
+
     # gets all the propmt families with their latest versions and version counts
     def get_all_prompt_families(self, user_id: str) -> List[Dict]:
         conn = self.get_connection()
@@ -889,8 +897,8 @@ class SupabaseDB:
             raise Exception(f"Failed to get prompts by agent id")
         finally:
             self.return_connection(conn)
-        
-    def get_s3url_prompt(self, name: str, version_number:int=None) -> List[Dict]:
+
+    def get_s3url_prompt(self, name: str, version_number: int = None) -> List[Dict]:
         conn = self.get_connection()
         try:
             with conn.cursor() as cur:
@@ -929,7 +937,7 @@ class SupabaseDB:
         try:
             with conn.cursor() as cur:
                 query = """
-                    SELECT version_number, metadata, created_at, is_active
+                    SELECT version_number, metadata, created_at, is_active, prompt_hash, prompt_id
                     FROM prompt_versions
                     WHERE name = %s
                     ORDER BY version_number DESC
@@ -939,13 +947,15 @@ class SupabaseDB:
                     (name,)
                 )
                 rows = cur.fetchall()
-            
+
             versions = [
                 {
                     "version_number": row[0],
                     "metadata": row[1],
                     "created_at": row[2],
                     "is_active": row[3],
+                    "prompt_hash": row[4],
+                    "prompt_id": row[5]
                 }
                 for row in rows
             ]
@@ -954,7 +964,7 @@ class SupabaseDB:
             raise Exception(f"Failed to get all prompt versions")
         finally:
             self.return_connection(conn)
-    
+
     def get_prompt_version(self, name: str, version_number: int) -> List[Dict]:
         conn = self.get_connection()
         try:
@@ -983,7 +993,7 @@ class SupabaseDB:
                 "metadata": row[5],
                 "parent_version_id": row[6],
             }
-                
+
         except Exception as e:
             raise Exception(f"Failed to get prompt version")
         finally:
@@ -1008,7 +1018,7 @@ class SupabaseDB:
             raise Exception(f"Failed to get all prompt versions")
         finally:
             self.return_connection(conn)
-    
+
     def get_prompt_analytics(self, prompt_name: str) -> List[Dict[str, Any]]:
         """
         Get consolidated analytics for all versions of a prompt family.
@@ -1046,7 +1056,7 @@ class SupabaseDB:
             raise Exception(f"Failed to get prompt analytics: {e}")
         finally:
             self.return_connection(conn)
-    
+
     def get_content_by_promptid(self, prompt_id: str) -> tuple | None:
         conn = self.get_connection()
         try:
@@ -1058,13 +1068,13 @@ class SupabaseDB:
                 """
                 cur.execute(query, (prompt_id,))
                 row = cur.fetchone()
-            
+
             return row
         except Exception as e:
             raise Exception(f"Failed to get prompt analytics: {e}")
         finally:
             self.return_connection(conn)
-    
+
     # gets analytics for two versions of a prompt
     def get_prompt_analytics_for_prompt_ids(self, prompt_id1: str, prompt_id2: str) -> List[Dict[str, Any]]:
         conn = self.get_connection()
@@ -1099,7 +1109,7 @@ class SupabaseDB:
             raise Exception(f"Failed to get prompt analytics: {e}")
         finally:
             self.return_connection(conn)
-    
+
     def get_output_preview(self, prompt_id: str, limit: int = 5) -> List[Dict[str, Any]]:
         conn = self.get_connection()
         try:
@@ -1114,14 +1124,14 @@ class SupabaseDB:
                 """
                 cur.execute(query, (prompt_id, limit))
                 rows = cur.fetchall()
-            
+
             col_names = [desc[0] for desc in cur.description]
             return [dict(zip(col_names, row)) for row in rows]
         except Exception as e:
             raise Exception(f"Failed to get prompt analytics: {e}")
         finally:
             self.return_connection(conn)
-        
+
     # closes all the connections in the pool
     def close(self):
         self.pool.closeall()
