@@ -23,6 +23,8 @@ from rate_limiter_ws import (
 from dataclasses import asdict
 from websocket.health import health_monitor, WebSocketHealthStatus
 
+from shared.validators import validate_trace_id, validate_user_id
+
 logger = logging.getLogger(__name__)
 trace_connection_manager = ConnectionManager()
 
@@ -90,17 +92,27 @@ async def websocket_trace(websocket: WebSocket, trace_id: str, api_key: str = Qu
         await websocket.close(code=4401, reason="Invalid API key")
         return
     
-    if not await validate_trace_ownership(trace_id, user_id):
-        await websocket.close(code=4003, reason="Access denied - trace not found")
+    try:
+        validate_trace_id(trace_id)
+    except Exception:
+        await websocket.close(code=4000, reason="Invalid trace_id format")
         return
-    
+
+    # Check if trace exists and verify ownership
+    # If trace doesn't exist yet, allow connection (it will be created when first span arrives)
+    trace_exists = await validate_trace_ownership(trace_id, user_id)
+    if trace_exists is False:
+        # False means trace exists but doesn't belong to user
+        # None would mean trace doesn't exist yet (which is OK)
+        trace = db.get_trace_by_id(trace_id)
+        if trace is not None:
+            # Trace exists but doesn't belong to this user
+            await websocket.close(code=4003, reason="Access denied - trace belongs to another user")
+            return
+
     allowed, reason = await check_ws_connection_limit(user_id)
     if not allowed:
         await websocket.close(code=4029, reason=reason)
-        return
-    
-    if not await validate_trace_ownership(trace_id, user_id):
-        await websocket.close(code=4003, reason="Access denied - trace not found")
         return
     
     connection_id = str(uuid.uuid4())

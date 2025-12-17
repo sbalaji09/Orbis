@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import useSWRSubscription from "swr/subscription";
 import { Span } from "@/lib/types";
 import PromptBadge from "./PromptBadge";
+import { getSpanTypeConfig } from "@/lib/span-type-config";
 
 interface GraphNodeProps {
   span: Span;
@@ -49,32 +50,9 @@ interface DraggableGraphNodeProps extends GraphNodeProps {
   onPromptClick?: (promptName: string) => void;
 }
 
-const getHeaderColor = (traceId: string, spanId: string) => {
-  const combined = `${traceId}-${spanId}`;
-  let hash = 50001;
-
-  for (let i = 0; i < combined.length; i++) {
-    const char = combined.charCodeAt(i);
-    hash = ((hash << 5) + hash) ^ char; // hash * 33 XOR char
-  }
-
-  // Additional mixing to improve distribution
-  hash = hash ^ (hash >>> 16);
-  hash = Math.imul(hash, 0x85ebca6b);
-  hash = hash ^ (hash >>> 13);
-  hash = Math.imul(hash, 0xc2b2ae35);
-  hash = hash ^ (hash >>> 16);
-
-  const colorIndex = Math.abs(hash) % 4;
-
-  const colors = [
-    "bg-[#e8c302]",
-    "bg-[#10B981]",
-    "bg-[#D1437C]",
-    "bg-[#5B5FFF]",
-  ];
-
-  return colors[colorIndex];
+const getHeaderColor = (spanType: string | null) => {
+  const config = getSpanTypeConfig(spanType);
+  return config.color;
 };
 
 export default function GraphNode({
@@ -228,8 +206,7 @@ export default function GraphNode({
           {/* Terminal-style colored top bar - draggable handle (remove nodrag from this) */}
           <div
             className={`h-6 ${getHeaderColor(
-              span.trace_id,
-              span.span_id
+              currentSpan.span_type
             )} border-b-2 border-black flex items-center px-2 gap-1 cursor-grab active:cursor-grabbing`}
           >
             <div className="w-2 h-2 rounded-full bg-white/30"></div>

@@ -326,78 +326,52 @@ export default function SpanModal({ span, isOpen, onClose }: SpanModalProps) {
                       </div>
                     </div>
                   )}
-
-                  {/* Input Preview */}
-                  {span.input_preview !== null && (
-                    <div className="space-y-2">
-                      <h4 className="text-xs font-semibold text-muted uppercase tracking-wide">
-                        Input
-                      </h4>
-                      <div className="p-4 rounded-lg bg-background border border-border">
-                        <p className="text-xs text-foreground/80 leading-relaxed line-clamp-6 whitespace-pre-wrap wrap-break-word font-mono">
-                          {span.input_preview}
-                        </p>
-                      </div>
-                      {span.input_blob_url !== null && (
-                        <a
-                          href={span.input_blob_url}
-                          className="inline-flex items-center gap-1.5 text-xs text-babyblue hover:text-foreground font-medium transition group"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <span>View complete input</span>
-                          <svg
-                            className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
+                  {/* Input/Output Side by Side */}
+                  {(span.input_preview !== null || span.output_preview !== null) && (
+                    <div className="grid grid-cols-2 gap-3">
+                      {/* Input Preview */}
+                      <div className="space-y-1.5 flex flex-col min-w-0">
+                        <h4 className="text-xs font-semibold text-muted uppercase tracking-wide">
+                          Input
+                        </h4>
+                        <div className="p-2 rounded bg-background border border-border flex-1 max-h-24 overflow-hidden">
+                          <p className="text-[10px] text-foreground/80 leading-relaxed line-clamp-4 whitespace-pre-wrap break-words font-mono">
+                            {span.input_preview ?? "—"}
+                          </p>
+                        </div>
+                        {span.input_blob_url !== null && (
+                          <a
+                            href={span.input_blob_url}
+                            className="inline-flex items-center gap-1 text-[10px] text-babyblue hover:text-foreground font-medium transition"
+                            target="_blank"
+                            rel="noopener noreferrer"
                           >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                            />
-                          </svg>
-                        </a>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Output Preview */}
-                  {span.output_preview !== null && (
-                    <div className="space-y-2">
-                      <h4 className="text-xs font-semibold text-muted uppercase tracking-wide">
-                        Output
-                      </h4>
-                      <div className="p-4 rounded-lg bg-background border border-border">
-                        <p className="text-xs text-foreground/80 leading-relaxed line-clamp-6 whitespace-pre-wrap wrap-break-word font-mono">
-                          {span.output_preview}
-                        </p>
+                            View full
+                          </a>
+                        )}
                       </div>
-                      {span.output_blob_url !== null && (
-                        <a
-                          href={span.output_blob_url}
-                          className="inline-flex items-center gap-1.5 text-xs text-babyblue hover:text-foreground font-medium transition group"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <span>View complete output</span>
-                          <svg
-                            className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
+
+                      {/* Output Preview */}
+                      <div className="space-y-1.5 flex flex-col min-w-0">
+                        <h4 className="text-xs font-semibold text-muted uppercase tracking-wide">
+                          Output
+                        </h4>
+                        <div className="p-2 rounded bg-background border border-border flex-1 max-h-24 overflow-hidden">
+                          <p className="text-[10px] text-foreground/80 leading-relaxed line-clamp-4 whitespace-pre-wrap break-words font-mono">
+                            {span.output_preview ?? "—"}
+                          </p>
+                        </div>
+                        {span.output_blob_url !== null && (
+                          <a
+                            href={span.output_blob_url}
+                            className="inline-flex items-center gap-1 text-[10px] text-babyblue hover:text-foreground font-medium transition"
+                            target="_blank"
+                            rel="noopener noreferrer"
                           >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                            />
-                          </svg>
-                        </a>
-                      )}
+                            View full
+                          </a>
+                        )}
+                      </div>
                     </div>
                   )}
 

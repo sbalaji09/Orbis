@@ -1,4 +1,5 @@
 import { Span } from "@/lib/types";
+import { getSpanTypeConfig } from "@/lib/span-type-config";
 
 function Skeleton({
   width = "w-20",
@@ -116,6 +117,86 @@ export default function SpanDetails({ span: currentSpan }: SpanDetailsProps) {
           </div>
         </div>
       )}
+
+      {/* Span Type Info */}
+      <div className="space-y-3">
+        <h4 className="text-xs font-semibold text-black/40 uppercase tracking-wide">
+          {`/* Span Type */`}
+        </h4>
+        {(() => {
+          const typeConfig = getSpanTypeConfig(currentSpan.span_type);
+          return (
+            <div className={`inline-flex items-center gap-2 px-3 py-2 ${typeConfig.color} ${typeConfig.textColor} border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.1)]`}>
+              <span className="text-lg">{typeConfig.icon}</span>
+              <span className="font-bold">{typeConfig.label}</span>
+            </div>
+          );
+        })()}
+
+        {/* HTTP-specific details */}
+        {currentSpan.span_type === "http" && (
+          <div className="grid grid-cols-2 gap-3 mt-3">
+            {currentSpan.http_method && (
+              <div className="flex flex-col gap-1 p-3 bg-white border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.1)]">
+                <span className="text-[10px] font-medium text-black/60 uppercase">Method</span>
+                <span className="font-mono font-bold">{currentSpan.http_method}</span>
+              </div>
+            )}
+            {currentSpan.http_status_code && (
+              <div className="flex flex-col gap-1 p-3 bg-white border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.1)]">
+                <span className="text-[10px] font-medium text-black/60 uppercase">Status</span>
+                <span className={`font-mono font-bold ${currentSpan.http_status_code >= 400 ? 'text-error' : 'text-success'}`}>
+                  {currentSpan.http_status_code}
+                </span>
+              </div>
+            )}
+            {currentSpan.http_url && (
+              <div className="col-span-2 flex flex-col gap-1 p-3 bg-white border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.1)]">
+                <span className="text-[10px] font-medium text-black/60 uppercase">URL</span>
+                <span className="font-mono text-xs break-all">{currentSpan.http_url}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* CLI-specific details */}
+        {currentSpan.span_type === "cli" && (
+          <div className="space-y-3 mt-3">
+            {currentSpan.cli_command && (
+              <div className="flex flex-col gap-1 p-3 bg-black border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.1)]">
+                <span className="text-[10px] font-medium text-white/60 uppercase">Command</span>
+                <code className="font-mono text-xs text-green-400 break-all">{currentSpan.cli_command}</code>
+              </div>
+            )}
+            {currentSpan.cli_exit_code !== null && currentSpan.cli_exit_code !== undefined && (
+              <div className="flex flex-col gap-1 p-3 bg-white border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.1)] w-fit">
+                <span className="text-[10px] font-medium text-black/60 uppercase">Exit Code</span>
+                <span className={`font-mono font-bold ${currentSpan.cli_exit_code === 0 ? 'text-success' : 'text-error'}`}>
+                  {currentSpan.cli_exit_code}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tool-specific details */}
+        {currentSpan.span_type === "tool" && (
+          <div className="grid grid-cols-2 gap-3 mt-3">
+            {currentSpan.tool_name && (
+              <div className="flex flex-col gap-1 p-3 bg-white border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.1)]">
+                <span className="text-[10px] font-medium text-black/60 uppercase">Tool Name</span>
+                <span className="font-mono font-semibold">{currentSpan.tool_name}</span>
+              </div>
+            )}
+            {currentSpan.tool_category && (
+              <div className="flex flex-col gap-1 p-3 bg-white border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.1)]">
+                <span className="text-[10px] font-medium text-black/60 uppercase">Category</span>
+                <span className="font-mono">{currentSpan.tool_category}</span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Timing Information */}
       <div className="space-y-3">
@@ -261,77 +342,80 @@ export default function SpanDetails({ span: currentSpan }: SpanDetailsProps) {
           </div>
         </div>
       )}
-
-      {/* Input Preview */}
-      {currentSpan.input_preview !== null && (
-        <div className="space-y-2">
-          <h4 className="text-xs font-semibold text-muted uppercase tracking-wide">
-            Input
-          </h4>
-          <div className="p-4 rounded-lg bg-background border border-border">
-            <p className="text-xs text-foreground/80 leading-relaxed line-clamp-6 whitespace-pre-wrap wrap-break-word font-mono">
-              {currentSpan.input_preview}
-            </p>
-          </div>
-          {currentSpan.input_blob_url !== null && (
-            <a
-              href={currentSpan.input_blob_url}
-              className="inline-flex items-center gap-1.5 text-xs text-babyblue hover:text-foreground font-medium transition group"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <span>View complete input</span>
-              <svg
-                className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                />
-              </svg>
-            </a>
+      {(currentSpan.input_preview !== null || currentSpan.output_preview !== null) && (
+        <div className="grid grid-cols-2 gap-3">
+          {/* Input Preview */}
+          {currentSpan.input_preview !== null && (
+            <div className="space-y-2">
+              <h4 className="text-xs font-semibold text-muted uppercase tracking-wide">
+                Input
+              </h4>
+              <div className="p-4 rounded-lg bg-background border border-border flex-1">
+                <p className="text-xs text-foreground/80 leading-snug whitespace-nowrap overflow-hidden text-ellipsis font-mono">
+                  {currentSpan.input_preview}
+                </p>
+              </div>
+              {currentSpan.input_blob_url !== null && (
+                <a
+                  href={currentSpan.input_blob_url}
+                  className="inline-flex items-center gap-1.5 text-xs text-babyblue hover:text-foreground font-medium transition group"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <span>View complete input</span>
+                  <svg
+                    className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                    />
+                  </svg>
+                </a>
+              )}
+            </div>
           )}
-        </div>
-      )}
 
-      {/* Output Preview */}
-      {currentSpan.output_preview !== null && (
-        <div className="space-y-2">
-          <h4 className="text-xs font-semibold text-muted uppercase tracking-wide">
-            Output
-          </h4>
-          <div className="p-4 rounded-lg bg-background border border-border">
-            <p className="text-xs text-foreground/80 leading-relaxed line-clamp-6 whitespace-pre-wrap wrap-break-word font-mono">
-              {currentSpan.output_preview}
-            </p>
-          </div>
-          {currentSpan.output_blob_url !== null && (
-            <a
-              href={currentSpan.output_blob_url}
-              className="inline-flex items-center gap-1.5 text-xs text-babyblue hover:text-foreground font-medium transition group"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <span>View complete output</span>
-              <svg
-                className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                />
-              </svg>
-            </a>
+          {/* Output Preview */}
+          {currentSpan.output_preview !== null && (
+            <div className="space-y-2">
+              <h4 className="text-xs font-semibold text-muted uppercase tracking-wide">
+                Output
+              </h4>
+              <div className="p-4 rounded-lg bg-background border border-border flex-1">
+                <p className="text-xs text-foreground/80 leading-snug whitespace-nowrap overflow-hidden text-ellipsis font-mono">
+                  {currentSpan.output_preview}
+                </p>
+              </div>
+              {currentSpan.output_blob_url !== null && (
+                <a
+                  href={currentSpan.output_blob_url}
+                  className="inline-flex items-center gap-1.5 text-xs text-babyblue hover:text-foreground font-medium transition group"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <span>View complete output</span>
+                  <svg
+                    className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                    />
+                  </svg>
+                </a>
+              )}
+            </div>
           )}
         </div>
       )}

@@ -13,6 +13,8 @@ from rate_limiter import check_rate_limit
 
 # Add backend to path for database access
 from fastapi.middleware.cors import CORSMiddleware
+
+from shared.validators import validate_span_id, validate_trace_id, validate_agent_id, validate_user_id, validate_pagination
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from shared.cors_config import get_cors_config
 from backend.db_connection import db
@@ -160,6 +162,11 @@ async def post_span(request: Request, span: SpanIn):
 
     # first checks if the span is not valid and if it is not, we return an Exception
     if not validate_span(span):
+        # Log which validation failed for debugging
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Span validation failed for span_id={span.span_id}, trace_id={span.trace_id}")
+        logger.error(f"Span data: {span.model_dump()}")
         raise HTTPException(
             status_code=400,
             detail="Span not valid and could not be processed"
@@ -285,21 +292,34 @@ def is_valid_uuid(val: str) -> bool:
 
 # function to validate the span
 def validate_span(span: SpanIn) -> bool:
+    import logging
+    logger = logging.getLogger(__name__)
+
+    try:
+        validate_trace_id(span.trace_id)
+        validate_span_id(span.span_id)
+        validate_user_id(span.user_id)
+        if span.agent_id:
+            validate_agent_id(span.agent_id)
+    except Exception as e:
+        logger.error(f"UUID validation failed: {e}")
+        return False
+
     for attr_name in vars(span):
         attr_value = getattr(span, attr_name)
 
         # These fields can be None or empty
         if attr_name in ('error_message', 'agent_id', 'model', 'input_data', 'output_data'):
             continue
-        
+
         # Numeric fields can be 0
         if attr_name in ('input_tokens', 'output_tokens', 'total_cost', 'duration'):
             continue
-        
+
         # Streaming fields are optional
         if attr_name in ('is_streaming', 'time_to_first_token', 'tokens_per_second'):
             continue
-        
+
         # Prompt versioning fields are optional
         if attr_name in ('prompt_id', 'prompt_name', 'prompt_version', 'prompt_hash'):
             continue
@@ -312,6 +332,7 @@ def validate_span(span: SpanIn) -> bool:
             continue
 
         if attr_value is None:
+            logger.error(f"Required field '{attr_name}' is None")
             return False
 
         # Validate UUIDs

@@ -47,6 +47,14 @@ export interface Span {
   prompt_name: string | null;
   prompt_version: string | null;
   prompt_hash: string | null;
+  span_type: string | null;
+  http_method: string | null;
+  http_url: string | null;
+  http_status_code: number | null;
+  cli_command: string | null;
+  cli_exit_code: number | null;
+  tool_name: string | null;
+  tool_category: string | null;
 }
 
 export interface PromptVersion {
