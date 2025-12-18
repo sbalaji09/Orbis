@@ -14,11 +14,12 @@ from rate_limiter import check_rate_limit
 # Add backend to path for database access
 from fastapi.middleware.cors import CORSMiddleware
 
-from shared.validators import validate_span_id, validate_trace_id, validate_agent_id, validate_user_id, validate_pagination
+from shared.validators import validate_span_id, validate_trace_id, validate_agent_id, validate_pagination, validate_user_id
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from shared.cors_config import get_cors_config
 from backend.db_connection import db
 
+from queues.dlq_processor import dlq_processor
 
 class SpanIn(BaseModel):
     trace_id: str
@@ -280,7 +281,40 @@ async def dashboard_ws(websocket: WebSocket):
     except Exception:
         ws_manager.disconnect(websocket)
         raise
-    
+
+# metrics endpoint for the DLQ
+@app.get("/dlq/metrics")
+async def get_dlq_metrics():
+    try:
+        metrics = dlq_processor.get_metrics()
+        return {
+            "status": "healthy" if metrics["dlq_length"] < 10 else "warning",
+            **metrics
+        }
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+# endpoint to retry all the tasks in the DLQ
+@app.post("/dlq/retry-all")
+async def retry_all_dlq(request: Request):
+    check_api_key(request)
+
+    try:
+        count = dlq_processor.retry_all()
+        return {"status": "success", "retried": count}
+    except Exception as e:
+        raise HTTPException(500, f"Failed to retry DLQ: {e}")
+
+# endpoint to clear expired tasks from the DLQ
+@app.post("/dlq/clear-expired")
+async def clear_expired_dlq(request: Request):
+    check_api_key(request)
+
+    try:
+        count = dlq_processor.clear_expired()
+        return {"status": "success", "cleared": count}
+    except Exception as e:
+        raise HTTPException(500, f"Failed to clear DLQ: {e}")
 
 # validates the uuid (user id) that belongs to a specific span
 def is_valid_uuid(val: str) -> bool:

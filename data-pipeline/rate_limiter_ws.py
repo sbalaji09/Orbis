@@ -10,6 +10,7 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 
 WS_MAX_CONNECTIONS_PER_USER = int(os.getenv("WS_MAX_CONNECTIONS_PER_USER", 10))
 WS_CONNECTION_ATTEMPTS_PER_MINUTE = int(os.getenv("WS_CONNECTION_ATTEMPTS_PER_MINUTE", 30))
+WS_MAX_CONNECTIONS_PER_TRACE = int(os.getenv("WS_MAX_CONNECTIONS_PER_TRACE", 5))
 
 _redis_client: Optional[aioredis.Redis] = None
 
@@ -81,3 +82,17 @@ async def get_user_connection_count(user_id: str) -> int:
         return await redis.scard(conn_key)
     except Exception:
         return 0
+    
+# limits how many users can watch the same trace simultaneously
+async def check_trace_connection_limit(trace_id: str) -> Tuple[bool, str]:
+    redis = await get_redis()
+    trace_key = f"ws_trace_connections:{trace_id}"
+
+    try:
+        count = await redis.scard(trace_key)
+        if count >= WS_MAX_CONNECTIONS_PER_TRACE:
+            return False, f"Too many connections to this trace ({count})"
+    except Exception as e:
+        logger.error(f"Redis error in trace connection check: {e}")
+    
+    return True, ""

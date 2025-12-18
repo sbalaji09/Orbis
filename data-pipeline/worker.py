@@ -16,6 +16,7 @@ from backend.db_connection import db
 from collections import defaultdict
 import socket
 import signal
+from queues.dlq_processor import dlq_processor
 
 # add the application logging layer to the path
 sys.path.append(os.path.join(os.path.dirname(__file__), 'application_logging'))
@@ -389,6 +390,19 @@ class SpanWorker:
                 else:
                     if self.pending_spans and time.time() - self.batch_start_time >= self.FLUSH_INTERVAL:
                         self.flush_batch()
+            
+            # process the DLQ every 5 minutes
+            if not hasattr(self, '_last_dlq_process'):
+                    self._last_dlq_process = 0
+                
+            if time.time() - self._last_dlq_process > 300:
+                try:
+                    summary = dlq_processor.process_dlq()
+                    if summary["retried"] > 0 or summary["expired"] > 0:
+                        self.logger.info(f"DLQ processed: {summary}")
+                except Exception as e:
+                    self.logger.error(f"DLQ processing failed: {e}")
+                self._last_dlq_process = time.time()
             
             if self.pending_spans:
                 self.logger.info(f"Flushing {len(self.pending_spans)} remaining spans before shutdown")
