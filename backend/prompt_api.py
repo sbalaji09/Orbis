@@ -100,20 +100,12 @@ async def get_prompt_differences(prompt_id1: str, prompt_id2: str):
         if not s3_url1 or (s3_url1 and s3_url1.startswith("placeholder://")):
             content1 = prompt_data[prompt_id1]["content_preview"]
         else:
-            try:
-                content1 = download_prompt_from_s3(s3_url1)
-            except Exception as e:
-                print(f"S3 download failed for {s3_url1}: {e}, using content_preview")
-                content1 = prompt_data[prompt_id1]["content_preview"]
+            content1 = download_prompt_from_s3(s3_url1)
 
         if not s3_url2 or (s3_url2 and s3_url2.startswith("placeholder://")):
             content2 = prompt_data[prompt_id2]["content_preview"]
         else:
-            try:
-                content2 = download_prompt_from_s3(s3_url2)
-            except Exception as e:
-                print(f"S3 download failed for {s3_url2}: {e}, using content_preview")
-                content2 = prompt_data[prompt_id2]["content_preview"]
+            content2 = download_prompt_from_s3(s3_url2)
 
         return prompt_diff(content1, prompt_id1, content2, prompt_id2)
     except Exception as e:
@@ -161,15 +153,9 @@ async def get_prompt_content(name: str, version_number: int | None = None):
             content = prompt_record.get("content_preview", "")
             return {"content": content}
 
-        # Try to download from S3, but fall back to content_preview if credentials are missing
-        try:
-            content = download_prompt_from_s3(s3_url)
-            return {"content": content}
-        except Exception as s3_error:
-            # If S3 download fails (e.g., missing credentials), fall back to content_preview
-            print(f"S3 download failed for {s3_url}: {s3_error}, using content_preview")
-            content = prompt_record.get("content_preview", "")
-            return {"content": content}
+        # Otherwise download from S3
+        content = download_prompt_from_s3(s3_url)
+        return {"content": content}
     except HTTPException:
         raise  # Re-raise HTTPException as-is (don't convert to 500)
     except Exception as e:
@@ -247,20 +233,12 @@ async def compare_prompt_analytics(prompt_id1: str, prompt_id2: str):
         if not s3_url1 or (s3_url1 and s3_url1.startswith("placeholder://")):
             prompt1_content = prompt_data[prompt_id1]["content_preview"]
         else:
-            try:
-                prompt1_content = download_prompt_from_s3(s3_url1)
-            except Exception as e:
-                print(f"S3 download failed for {s3_url1}: {e}, using content_preview")
-                prompt1_content = prompt_data[prompt_id1]["content_preview"]
+            prompt1_content = download_prompt_from_s3(s3_url1)
 
         if not s3_url2 or (s3_url2 and s3_url2.startswith("placeholder://")):
             prompt2_content = prompt_data[prompt_id2]["content_preview"]
         else:
-            try:
-                prompt2_content = download_prompt_from_s3(s3_url2)
-            except Exception as e:
-                print(f"S3 download failed for {s3_url2}: {e}, using content_preview")
-                prompt2_content = prompt_data[prompt_id2]["content_preview"]
+            prompt2_content = download_prompt_from_s3(s3_url2)
 
         # get analytics for both prompts
         analytics_list = db.get_prompt_analytics_for_prompt_ids(
