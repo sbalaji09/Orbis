@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { getTrace } from "@/lib/api-server";
 import { useWebSocket } from "@/lib/useWebSocket";
 import type { WebSocketMessage } from "@/lib/websocket";
+import {useAuth} from "@/hooks/useAuth";
 type ConnectionState = "connecting" | "connected" | "disconnected" | "error";
 
 interface TraceOverviewClientProps {
@@ -14,13 +15,15 @@ interface TraceOverviewClientProps {
 
 export default function TraceOverviewClient({traceId, apiKey, children}: TraceOverviewClientProps) {
   // Disable WebSocket if no API key is provided
+  const { session } = useAuth();
+  apiKey = session?.access_token ?? "";
   const hasApiKey = Boolean(apiKey);
 
   const { state, subscribe } = useWebSocket({
     type: "trace",
     traceId,
     apiKey,
-    disabled: !hasApiKey,
+    disabled: !apiKey,
   });
 
   const [hasNewSpans, setHasNewSpans] = useState(false);
