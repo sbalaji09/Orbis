@@ -59,6 +59,7 @@ app.include_router(prompt_router)
 app.add_middleware(CORSMiddleware, **get_cors_config())
 
 # Import profile_api to register its routes (must be after app creation)
+import profile_api  # noqa: F401 - imported for side effects (route registration)
 
 # health check endpoint
 
@@ -422,22 +423,6 @@ async def get_traces_by_agent(agent_id: str, user_id: str, limit: int = 5, offse
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-# get all the agents belonging to a specific user
-
-
-@app.get("/agents")
-async def get_agents(user_id: str = Depends(get_user_id_from_token)):
-    # try:
-    agents = db.get_agents_by_userid(user_id)
-
-    return {
-        "agents": agents if agents else [],
-        "count": len(agents) if agents else 0
-    }
-    # except Exception as e:
-    #     raise HTTPException(status_code=500, detail=str(e))
-
 
 @app.exception_handler(ValidationError)
 async def validation_error_handler(request, exc: ValidationError):

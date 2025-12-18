@@ -83,7 +83,7 @@ def generate_key_with_string(input_string: str) -> str:
 async def fetch_agents(user_id: str = Depends(get_user_id_from_token)):
     try:
         print(f"[AGENTS] Fetching agents for user_id: {user_id}")
-        api_keys: List[Dict] = db.get_agents(user_id)
+        api_keys: List[Dict] = db.get_agents_by_userid(user_id)
         print(f"[AGENTS] Found {len(api_keys)} agents")
         return {
             "user_id": user_id,
