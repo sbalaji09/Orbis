@@ -16,8 +16,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from shared.validators import validate_span_id, validate_trace_id, validate_agent_id, validate_pagination, validate_user_id
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'backend'))
 from shared.cors_config import get_cors_config
 from backend.db_connection import db
+from backend.prompt_api import router as prompt_router
 
 from queues.dlq_processor import dlq_processor
 
@@ -151,6 +153,9 @@ class EndTraceIn(BaseModel):
 
 app = FastAPI()
 app.add_middleware(CORSMiddleware, **get_cors_config())
+
+# Include prompt versioning API
+app.include_router(prompt_router)
 
 # post endpoint from the SDK to the backend infra that now uses the message queu
 # instead of sending to the database automatically

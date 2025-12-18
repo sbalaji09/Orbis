@@ -68,11 +68,17 @@ class PromptVersion:
             if response.status_code in [200, 201]:
                 # Extract the UUID prompt_id from the backend response
                 backend_data = response.json()
+                print(f"DEBUG: Backend response = {backend_data}")  # DEBUG
                 if backend_data and isinstance(backend_data, dict):
                     backend_prompt_id = backend_data.get("prompt_id")
-                    print(f"✓ Prompt persisted to backend: {self.prompt_id} v{self.version} (UUID: {backend_prompt_id})")
-                    return str(backend_prompt_id) if backend_prompt_id else None
-                print(f"✓ Prompt persisted to backend: {self.prompt_id} v{self.version}")
+                    print(f"DEBUG: Extracted prompt_id = {backend_prompt_id}")  # DEBUG
+                    if backend_prompt_id:
+                        print(f"✓ Prompt persisted to backend: {self.prompt_id} v{self.version} (UUID: {backend_prompt_id})")
+                        return str(backend_prompt_id)
+                    else:
+                        print(f"⚠ Backend response missing 'prompt_id' field")
+                        return None
+                print(f"✓ Prompt persisted to backend: {self.prompt_id} v{self.version} (NO UUID)")
                 return None
             else:
                 print(f"⚠ Failed to persist prompt: {response.status_code}")
@@ -114,6 +120,7 @@ class PromptRegistry:
         metadata: Optional[Dict[str, Any]] = None,
         agent_id: Optional[str] = None,
         api_key: Optional[str] = None,
+        api_url: Optional[str] = None,
     ) -> PromptVersion:
         """
         Register a new prompt version.
@@ -148,7 +155,11 @@ class PromptRegistry:
 
             # Persist to backend if credentials provided
             if agent_id and api_key:
-                backend_uuid = prompt_version.persist_to_backend(agent_id, api_key, api_url="http://localhost:8000")
+                backend_uuid = prompt_version.persist_to_backend(
+                    agent_id,
+                    api_key,
+                    api_url=api_url or "http://localhost:8080"
+                )
                 if backend_uuid:
                     prompt_version.backend_uuid = backend_uuid
 

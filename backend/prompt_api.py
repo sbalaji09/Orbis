@@ -17,8 +17,14 @@ async def create_prompt(agent_id: str, name: str, content: str):
     content_hash = compute_hash_sha256(content)
 
     try:
+        # Check if prompt with identical hash already exists
         if db.check_identical_hash(content_hash, agent_id):
-            return
+            # Return the existing prompt instead of empty response
+            existing_prompt = db.get_prompt_by_hash(content_hash, agent_id)
+            if existing_prompt:
+                return existing_prompt
+            # If not found, continue to create new one
+            pass
 
         bucket_name = os.getenv('S3_BUCKET_NAME')
         aws_region = os.getenv('AWS_REGION')

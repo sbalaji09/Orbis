@@ -4,7 +4,7 @@ import time
 import logging
 from datetime import datetime, timezone
 from typing import Optional
-from redis_queue import RedisQueue
+from queues.redis_queue import RedisQueue
 from dotenv import load_dotenv
 
 load_dotenv()

@@ -51,13 +51,15 @@ def observe(
                 # register prompt if template provided
                 if prompt_template:
                     registry = get_prompt_registry()
+                    config = get_config()
                     registered_prompt = registry.register_prompt(
                         prompt_id=prompt_id,
                         version=prompt_version or "v1.0",
                         prompt_text=prompt_template,
                         metadata=metadata or {},
                         agent_id=span.agent_id,
-                        api_key=get_config().api_key
+                        api_key=config.api_key,
+                        api_url=config.api_url
                     )
                     span.prompt_hash = registered_prompt.prompt_hash
                     # Use the backend UUID for linking spans to prompts

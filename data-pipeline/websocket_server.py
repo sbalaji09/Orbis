@@ -210,7 +210,7 @@ dashboard_connection_manager = DashboardConnectionManager()
 
 @app.on_event("startup")
 async def startup_event():
-    subscriber = init_redis_subscriber(dashboard_connection_manager)
+    subscriber = init_redis_subscriber(trace_connection_manager)
     await subscriber.start()
 
 @app.on_event("shutdown")

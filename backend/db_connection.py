@@ -748,6 +748,24 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
 
+    def get_prompt_by_hash(self, hash_val: str, agent_id: str) -> Optional[dict]:
+        """Get prompt version by hash - returns the prompt data"""
+        conn = self.get_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                query = """
+                    SELECT * FROM prompt_versions
+                    WHERE prompt_hash = %s
+                    AND agent_id = %s
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                """
+                cur.execute(query, (hash_val, agent_id))
+                result = cur.fetchone()
+                return dict(result) if result else None
+        finally:
+            self.return_connection(conn)
+
     def max_version_prompt_number(self, name: str) -> int:
         conn = self.get_connection()
         try:
