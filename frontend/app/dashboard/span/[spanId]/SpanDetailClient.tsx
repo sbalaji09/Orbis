@@ -18,8 +18,7 @@ import PromptContentViewer from "@/components/PromptContentViewer";
 import PromptComparisonView from "@/components/PromptComparisonView";
 import SpanDetails from "./SpanDetails";
 import VersionsList from "./VersionsList";
-
-const DEFAULT_USER_ID = "user-1";
+import { useAuth } from "@/hooks/useAuth";
 
 interface Version {
   prompt_id: string;
@@ -42,6 +41,7 @@ export default function SpanDetailClient({
   initialVersions = [],
   initialAnalytics = [],
 }: SpanDetailClientProps) {
+  const { session } = useAuth();
   const [selectedTab, setSelectedTab] = useState(0);
   const [versions, setVersions] = useState<Version[]>(initialVersions);
 
@@ -79,9 +79,14 @@ export default function SpanDetailClient({
       key: string,
       { next }: { next: (error: Error | null, data?: Span) => void }
     ) => {
+      const token = session?.access_token;
+      if (!token) {
+        next(new Error("Not authenticated"));
+        return () => {};
+      }
+
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      const userId = DEFAULT_USER_ID;
-      const url = `${apiUrl}${key}?user_id=${encodeURIComponent(userId)}`;
+      const url = `${apiUrl}${key}?token=${encodeURIComponent(token)}`;
       const eventSource = new EventSource(url);
 
       eventSource.onmessage = (event) => {
@@ -128,8 +133,8 @@ export default function SpanDetailClient({
     setVersionsLoading(true);
     try {
       const [versionsData, analyticsData] = await Promise.all([
-        fetchPromptVersions(undefined, promptName),
-        fetchPromptAnalytics(undefined, promptName),
+        fetchPromptVersions(promptName),
+        fetchPromptAnalytics(promptName),
       ]);
       setVersions(versionsData);
       const analyticsMap = new Map<number, PromptVersionAnalytics>();
@@ -144,11 +149,7 @@ export default function SpanDetailClient({
 
   const handleView = async (version: number) => {
     if (!currentSpan?.prompt_name) return;
-    const content = await fetchPromptContent(
-      undefined,
-      currentSpan.prompt_name,
-      version
-    );
+    const content = await fetchPromptContent(currentSpan.prompt_name, version);
     if (content) {
       setViewingContent({ content, version });
     }
@@ -186,7 +187,7 @@ export default function SpanDetailClient({
 
     setRollbackLoading(versionNumber);
     try {
-      await rollbackPrompt(undefined, currentSpan.prompt_name, versionNumber);
+      await rollbackPrompt(currentSpan.prompt_name, versionNumber);
       await loadVersions(currentSpan.prompt_name);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Rollback failed");

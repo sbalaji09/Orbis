@@ -6,6 +6,7 @@ import useSWRSubscription from "swr/subscription";
 import { Span } from "@/lib/types";
 import PromptBadge from "./PromptBadge";
 import { getSpanTypeConfig } from "@/lib/span-type-config";
+import { useAuth } from "@/hooks/useAuth";
 
 interface GraphNodeProps {
   span: Span;
@@ -59,15 +60,21 @@ export default function GraphNode({
   isDragging,
 }: DraggableGraphNodeProps) {
   const router = useRouter();
+  const { session } = useAuth();
   const [showTooltip, setShowTooltip] = useState(false);
   // SSE streaming for spans that are actively streaming
   const { data: streamData } = useSWRSubscription(
     span.is_streaming ? `/spans/${span.span_id}/stream` : null,
     (key, { next }) => {
-      const DEFAULT_USER_ID = "00000000-0000-0000-0000-000000000000";
+      const token = session?.access_token;
+      if (!token) {
+        next(new Error("Not authenticated"));
+        return () => {};
+      }
+
       const apiUrl = `${
         process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-      }${key}?user_id=${DEFAULT_USER_ID}`;
+      }${key}?token=${encodeURIComponent(token)}`;
       const eventSource = new EventSource(apiUrl);
 
       eventSource.onmessage = (event) => {

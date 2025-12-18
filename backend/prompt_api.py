@@ -1,9 +1,10 @@
 import os
 from db_connection import db
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, HTTPException, Header, Depends
 from s3connect import *
 import hashlib
 from llm_service import get_llm_comparison_analysis
+from auth_utils import get_user_id_from_token
 
 router = APIRouter(
     prefix="/prompts",
@@ -51,7 +52,7 @@ async def create_prompt(agent_id: str, name: str, content: str):
 
 
 @router.get("/families")
-async def get_all_prompt_families(user_id: str = Header(..., alias="X-User-ID")):
+async def get_all_prompt_families(user_id: str = Depends(get_user_id_from_token)):
     try:
         print(f"Fetching prompt families for user_id: {user_id}")
         families = db.get_all_prompt_families(user_id)

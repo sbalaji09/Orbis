@@ -66,8 +66,8 @@ export default function PromptVersionPanel({
     const loadData = async () => {
       try {
         const [versionsData, analyticsData] = await Promise.all([
-          fetchPromptVersions(undefined, promptName),
-          fetchPromptAnalytics(undefined, promptName),
+          fetchPromptVersions(promptName),
+          fetchPromptAnalytics(promptName),
         ]);
 
         if (cancelled) return;

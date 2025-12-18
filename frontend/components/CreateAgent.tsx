@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/hooks/useAuth";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-const DEFAULT_USER_ID = "00000000-0000-0000-0000-000000000000";
 
 export function CreateAgent() {
   const router = useRouter();
+  const { session } = useAuth();
   const [agentName, setAgentName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -27,12 +28,19 @@ export function CreateAgent() {
     setResult(null);
 
     try {
+      const token = session?.access_token;
+      if (!token) {
+        setResult({ error: "Not authenticated" });
+        setIsLoading(false);
+        return;
+      }
+
       const response = await fetch(
         `${API_BASE_URL}/agent?agent_name=${encodeURIComponent(agentName)}`,
         {
           method: "POST",
           headers: {
-            "X-User-ID": DEFAULT_USER_ID,
+            Authorization: `Bearer ${token}`,
           },
         }
       );

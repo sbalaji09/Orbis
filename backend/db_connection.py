@@ -388,8 +388,9 @@ class SupabaseDB:
 
                     traces.append(trace)
 
-                print(
-                    f"DEBUG: Final trace[0] created_at type: {type(traces[0]['created_at'])}")
+                if traces:
+                    print(
+                        f"DEBUG: Final trace[0] created_at type: {type(traces[0]['created_at'])}")
                 return traces
         except Exception as e:
             print(f"Error in get_traces_with_stats: {e}")
