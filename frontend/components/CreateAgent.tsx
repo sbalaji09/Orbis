@@ -6,7 +6,11 @@ import { useAuth } from "@/hooks/useAuth";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-export function CreateAgent() {
+interface CreateAgentProps {
+  onAgentCreated?: (agent: { agent_id: string; agent_name: string }) => void;
+}
+
+export function CreateAgent({ onAgentCreated }: CreateAgentProps) {
   const router = useRouter();
   const { session } = useAuth();
   const [agentName, setAgentName] = useState("");
@@ -71,8 +75,16 @@ export function CreateAgent() {
   };
 
   const closeModal = () => {
+    // Notify parent component about the new agent
+    if (onAgentCreated && result?.agent_id) {
+      onAgentCreated({
+        agent_id: result.agent_id,
+        agent_name: agentName,
+      });
+    }
     setShowModal(false);
     setAgentName("");
+    setResult(null);
     // Refresh the page to show the new agent in the list
     router.refresh();
   };

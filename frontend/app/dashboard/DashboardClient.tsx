@@ -22,8 +22,19 @@ export default function DashboardClient({initialAgents, initialTraces}: Dashboar
   });
 
   const [traces, setTraces] = useState(initialTraces);
-  const [agents] = useState(initialAgents);
+  const [agents, setAgents] = useState(initialAgents);
   const [hasNewTraces, setHasNewTraces] = useState(false);
+
+  // Callback when a new agent is created
+  const handleAgentCreated = (newAgent: { agent_id: string; agent_name: string }) => {
+    setAgents(prev => [
+      {
+        ...newAgent,
+        created_at: new Date().toISOString(),
+      },
+      ...prev,
+    ]);
+  };
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const autoScroll = useRef(true);
@@ -131,7 +142,7 @@ export default function DashboardClient({initialAgents, initialTraces}: Dashboar
 
         {/* Create Agent */}
         <div className="mb-6">
-          <CreateAgent />
+          <CreateAgent onAgentCreated={handleAgentCreated} />
         </div>
 
         {/* NEW TRACES BANNER */}

@@ -557,6 +557,21 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
 
+    def agent_name_exists(self, user_id: str, agent_name: str) -> bool:
+        """Check if an agent with the given name already exists for this user"""
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                sql = """
+                    SELECT 1 FROM agents
+                    WHERE user_id = %s AND agent_name = %s
+                    LIMIT 1
+                """
+                cur.execute(sql, (user_id, agent_name))
+                return cur.fetchone() is not None
+        finally:
+            self.return_connection(conn)
+
     def insert_agent(self, user_id: str, agent_name: str, api_key: str) -> str:
         conn = self.get_connection()
         try:

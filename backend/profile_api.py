@@ -45,6 +45,13 @@ def remove_api_key_from_redis(api_key: str):
 
 @app.post("/agent")
 async def create_ai_agent(agent_name: str, user_id: str = Depends(get_user_id_from_token)):
+    # Check if agent name already exists for this user
+    if db.agent_name_exists(user_id, agent_name):
+        raise HTTPException(
+            status_code=409,
+            detail=f"An agent with the name '{agent_name}' already exists"
+        )
+
     # Generate plaintext API key
     api_key = generate_key_with_string(agent_name)
 
