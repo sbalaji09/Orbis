@@ -44,3 +44,50 @@ def check_health_rate_limit(request: Request) -> None:
                 "retry_after": 60 - (int(time.time() % 60))
             }
         )
+
+# checks if a request is authorized to access detailed metrics
+# supports dedicated metrics API key, basic auth, and a regular API key
+def check_metrics_auth(request: Request) -> bool:
+    if not METRICS_AUTH_ENABLED:
+        return True
+    
+    # check metrics API key
+    metrics_key = request.headers.get("X-Metrics-Key")
+    if metrics_key and METRICS_API_KEY:
+        if secrets.compare_digest(metrics_key, METRICS_API_KEY):
+            return True
+    
+    # check basic auth
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Basic ") and METRICS_BASIC_USER and METRICS_BASIC_PASS:
+        import base64
+        try:
+            credentials = base64.b64decode(auth_header[6:]).decode("utf-8")
+            username, password = credentials.split(":", 1)
+            if (secrets.compare_digest(username, METRICS_BASIC_USER) and
+                secrets.compare_digest(password, METRICS_BASIC_PASS)):
+                return True
+        except Exception:
+            pass
+
+    # check regular API key (existing auth)       
+    api_key = request.headers.get("X-API-KEY")
+    if api_key:
+        return True
+
+    raise HTTPException(
+        status_code=401,
+        detail={
+            "error": "unauthorized",
+            "message": "Metrics endpoint requires authentication",
+            "methods": ["X-Metrics-Key header", "Basic auth", "X-API-Key header"]
+        }
+    )
+
+# returns minimal health info safe for public exposure
+# used for unauthenticated / health endpoint
+def get_minimal_health() -> dict:
+    return {
+        "status": "healthy",
+        "timestamp": int(time.time())
+    }
