@@ -273,8 +273,11 @@ async def health_check_detailed(request: Request):
 
 # metrics endpoint for monitoring and observability
 @app.get("/metrics")
-async def metrics():
+async def metrics(request: Request):
+    check_health_rate_limit(request)
+    check_metrics_auth(request)
     return get_metrics()
+
 
 @app.websocket("/ws/dashboard")
 async def dashboard_ws(websocket: WebSocket):
@@ -291,7 +294,10 @@ async def dashboard_ws(websocket: WebSocket):
 
 # metrics endpoint for the DLQ
 @app.get("/dlq/metrics")
-async def get_dlq_metrics():
+async def get_dlq_metrics(request: Request):
+    check_health_rate_limit(request)
+    check_metrics_auth(request)
+    
     try:
         metrics = dlq_processor.get_metrics()
         return {
