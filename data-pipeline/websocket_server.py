@@ -14,6 +14,11 @@ from websocket.redis_subscriber import init_redis_subscriber, get_redis_subscrib
 from auth.websocket_auth import validate_api_key, validate_trace_ownership
 from shared.health_auth import check_health_rate_limit, check_metrics_auth
 
+# Import db for database operations
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'backend'))
+from backend.db_connection import db
+
 import uuid
 from rate_limiter_ws import (
     check_ws_connection_limit,

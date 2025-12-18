@@ -12,7 +12,7 @@ import {
   fetchPromptAnalytics,
   PromptComparisonResult,
   PromptVersionAnalytics,
-} from "@/lib/prompt-api";
+} from "@/lib/prompt-api-client";
 import PromptAnalytics from "@/components/PromptAnalytics";
 import PromptContentViewer from "@/components/PromptContentViewer";
 import PromptComparisonView from "@/components/PromptComparisonView";
@@ -132,9 +132,10 @@ export default function SpanDetailClient({
   const loadVersions = async (promptName: string) => {
     setVersionsLoading(true);
     try {
+      const token = session?.access_token ?? null;
       const [versionsData, analyticsData] = await Promise.all([
-        fetchPromptVersions(promptName),
-        fetchPromptAnalytics(promptName),
+        fetchPromptVersions(promptName, token),
+        fetchPromptAnalytics(promptName, token),
       ]);
       setVersions(versionsData);
       const analyticsMap = new Map<number, PromptVersionAnalytics>();
@@ -149,7 +150,8 @@ export default function SpanDetailClient({
 
   const handleView = async (version: number) => {
     if (!currentSpan?.prompt_name) return;
-    const content = await fetchPromptContent(currentSpan.prompt_name, version);
+    const token = session?.access_token ?? null;
+    const content = await fetchPromptContent(currentSpan.prompt_name, version, token);
     if (content) {
       setViewingContent({ content, version });
     }
@@ -170,7 +172,8 @@ export default function SpanDetailClient({
     setComparisonData(null);
     console.log(versions);
     try {
-      const data = await comparePrompts(version1.prompt_id, version2.prompt_id);
+      const token = session?.access_token ?? null;
+      const data = await comparePrompts(version1.prompt_id, version2.prompt_id, token);
       setComparisonData(data);
     } catch (err) {
       setComparisonError(
@@ -187,7 +190,8 @@ export default function SpanDetailClient({
 
     setRollbackLoading(versionNumber);
     try {
-      await rollbackPrompt(currentSpan.prompt_name, versionNumber);
+      const token = session?.access_token ?? null;
+      await rollbackPrompt(currentSpan.prompt_name, versionNumber, token);
       await loadVersions(currentSpan.prompt_name);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Rollback failed");
