@@ -13,10 +13,14 @@ interface TraceOverviewClientProps {
 }
 
 export default function TraceOverviewClient({traceId, apiKey, children}: TraceOverviewClientProps) {
+  // Disable WebSocket if no API key is provided
+  const hasApiKey = Boolean(apiKey);
+
   const { state, subscribe } = useWebSocket({
     type: "trace",
     traceId,
     apiKey,
+    disabled: !hasApiKey,
   });
 
   const [hasNewSpans, setHasNewSpans] = useState(false);
@@ -26,7 +30,7 @@ export default function TraceOverviewClient({traceId, apiKey, children}: TraceOv
 
   const isConnected = state === "connected";
   const isReconnecting = state === "connecting";
-  const isDegraded = state === "error" || state === "disconnected";
+  const isDegraded = !hasApiKey || state === "error" || state === "disconnected";
 
   // scroll handler for follow mode
   const scrollToBottom = () => {
@@ -134,8 +138,10 @@ export default function TraceOverviewClient({traceId, apiKey, children}: TraceOv
 
       {isDegraded && (
         <p className="mt-2 text-xs text-muted-foreground">
-          WebSocket connection lost. The page will continue to update via
-          periodic polling (server revalidate / client fetch).
+          {!hasApiKey
+            ? "Real-time updates disabled (no API key). Page will update via polling."
+            : "WebSocket connection lost. Page will continue to update via polling."
+          }
         </p>
       )}
     </div>
