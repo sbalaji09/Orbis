@@ -1,5 +1,6 @@
+import { getAuthHeaders } from "./supabase/auth";
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-const DEFAULT_USER_ID = "00000000-0000-0000-0000-000000000000"; // In production, get from auth/session
 
 export interface PromptFamily {
   name: string;
@@ -33,13 +34,12 @@ export interface PromptComparisonResult {
   llm_analysis: string;
 }
 
-export async function fetchPromptFamilies(
-  userId: string = DEFAULT_USER_ID
-): Promise<PromptFamily[]> {
+export async function fetchPromptFamilies(): Promise<PromptFamily[]> {
   try {
+    const authHeaders = await getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/prompts/families`, {
       headers: {
-        "X-User-ID": userId,
+        ...authHeaders,
       },
       cache: "no-store",
     });
@@ -58,16 +58,14 @@ export async function fetchPromptFamilies(
   }
 }
 
-export async function fetchPromptVersions(
-  userId: string = DEFAULT_USER_ID,
-  prompt_name: string
-) {
+export async function fetchPromptVersions(prompt_name: string) {
   try {
+    const authHeaders = await getAuthHeaders();
     const response = await fetch(
       `${API_BASE_URL}/prompts/${prompt_name}/versions`,
       {
         headers: {
-          "X-User-ID": userId,
+          ...authHeaders,
         },
         cache: "no-store",
       }
@@ -88,16 +86,16 @@ export async function fetchPromptVersions(
 }
 
 export async function fetchPromptContent(
-  userId: string = DEFAULT_USER_ID,
   prompt_name: string,
   versionId: number
 ) {
   try {
+    const authHeaders = await getAuthHeaders();
     const response = await fetch(
       `${API_BASE_URL}/prompts/${prompt_name}/content?version_number=${versionId}`,
       {
         headers: {
-          "X-User-ID": userId,
+          ...authHeaders,
         },
         cache: "no-store",
       }
@@ -117,7 +115,6 @@ export async function fetchPromptContent(
 }
 
 export async function fetchPromptDiff(
-  userId: string = DEFAULT_USER_ID,
   version_number1: number,
   version_number2: number
 ) {
@@ -126,9 +123,10 @@ export async function fetchPromptDiff(
   url.searchParams.set("prompt_id2", String(version_number2));
 
   try {
+    const authHeaders = await getAuthHeaders();
     const response = await fetch(url.toString(), {
       headers: {
-        "X-User-ID": userId,
+        ...authHeaders,
       },
       cache: "no-store",
     });
@@ -146,11 +144,7 @@ export async function fetchPromptDiff(
   }
 }
 
-export async function rollbackPrompt(
-  userId: string = DEFAULT_USER_ID,
-  name: string,
-  versionNumber: number
-) {
+export async function rollbackPrompt(name: string, versionNumber: number) {
   // URL: /prompts/{name}/rollback?version_number=3
   const url = new URL(
     `${API_BASE_URL}/prompts/${encodeURIComponent(name)}/rollback`
@@ -158,10 +152,11 @@ export async function rollbackPrompt(
   url.searchParams.set("version_number", String(versionNumber));
 
   try {
+    const authHeaders = await getAuthHeaders();
     const response = await fetch(url.toString(), {
       method: "POST",
       headers: {
-        "X-User-ID": userId,
+        ...authHeaders,
       },
       cache: "no-store",
     });
@@ -181,15 +176,15 @@ export async function rollbackPrompt(
 
 export async function comparePrompts(
   promptId1: string,
-  promptId2: string,
-  userId: string = DEFAULT_USER_ID
+  promptId2: string
 ): Promise<PromptComparisonResult> {
   try {
+    const authHeaders = await getAuthHeaders();
     const response = await fetch(
       `${API_BASE_URL}/prompts/compare?prompt_id1=${promptId1}&prompt_id2=${promptId2}`,
       {
         headers: {
-          "X-User-ID": userId,
+          ...authHeaders,
         },
         cache: "no-store",
       }
@@ -217,15 +212,15 @@ export interface PromptVersionAnalytics {
 }
 
 export async function fetchPromptAnalytics(
-  userId: string = DEFAULT_USER_ID,
   promptName: string
 ): Promise<PromptVersionAnalytics[]> {
   try {
+    const authHeaders = await getAuthHeaders();
     const response = await fetch(
       `${API_BASE_URL}/prompts/analytics/${encodeURIComponent(promptName)}`,
       {
         headers: {
-          "X-User-ID": userId,
+          ...authHeaders,
         },
         cache: "no-store",
       }

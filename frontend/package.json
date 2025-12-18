@@ -10,6 +10,11 @@
   },
   "dependencies": {
     "@headlessui/react": "^2.2.9",
+    "@supabase/auth-helpers-nextjs": "^0.15.0",
+    "@supabase/auth-ui-react": "^0.4.7",
+    "@supabase/auth-ui-shared": "^0.1.8",
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.88.0",
     "lucide-react": "^0.554.0",
     "motion": "^12.23.24",
     "next": "16.0.1",

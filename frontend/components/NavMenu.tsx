@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ReactElement } from "react";
 import { Logo } from "./Logo";
+import { useAuth } from "@/hooks/useAuth";
 
 interface NavItem {
   icon: ReactElement;
@@ -72,6 +73,7 @@ const navItems: NavItem[] = [
 
 export default function NavMenu() {
   const pathname = usePathname();
+  const { user, signOut } = useAuth();
 
   const isActive = (link: string) => {
     if (link === "/dashboard") {
@@ -99,31 +101,44 @@ export default function NavMenu() {
       </Link>
 
       {/* Navigation Links */}
-      <ul className="flex items-center gap-1">
-        {navItems.map((item) => {
-          const active = isActive(item.link);
-          return (
-            <li key={item.name}>
-              <Link
-                href={item.link}
-                className={`relative px-4 py-2 transition-all duration-200 flex items-center gap-2 text-sm font-medium border-2 ${
-                  active
-                    ? "bg-black text-mustard border-black"
-                    : "bg-transparent text-black/60 border-transparent hover:text-foreground hover:bg-black/5"
-                }`}
-              >
-                <span className="w-4 h-4">{item.icon}</span>
-                <span>{item.name}</span>
-                {item.badge && (
-                  <span className="px-1.5 py-0.5 text-[9px] font-semibold bg-babyblue/10 text-babyblue border border-babyblue uppercase tracking-wide">
-                    {item.badge}
-                  </span>
-                )}
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
+      <div className="flex items-center gap-4">
+        <ul className="flex items-center gap-1">
+          {navItems.map((item) => {
+            const active = isActive(item.link);
+            return (
+              <li key={item.name}>
+                <Link
+                  href={item.link}
+                  className={`relative px-4 py-2 transition-all duration-200 flex items-center gap-2 text-sm font-medium border-2 ${
+                    active
+                      ? "bg-black text-mustard border-black"
+                      : "bg-transparent text-black/60 border-transparent hover:text-foreground hover:bg-black/5"
+                  }`}
+                >
+                  <span className="w-4 h-4">{item.icon}</span>
+                  <span>{item.name}</span>
+                  {item.badge && (
+                    <span className="px-1.5 py-0.5 text-[9px] font-semibold bg-babyblue/10 text-babyblue border border-babyblue uppercase tracking-wide">
+                      {item.badge}
+                    </span>
+                  )}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+
+        {/* User Info & Logout */}
+        <div className="flex items-center gap-3 pl-3 border-l-2 border-black/10">
+          <span className="text-xs text-black/50">{user?.email}</span>
+          <button
+            onClick={signOut}
+            className="px-3 py-1.5 text-xs font-medium border-2 border-black/20 hover:border-black hover:bg-black hover:text-white transition-all"
+          >
+            Logout
+          </button>
+        </div>
+      </div>
     </nav>
   );
 }

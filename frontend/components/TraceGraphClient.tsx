@@ -18,6 +18,7 @@ import ReactFlow, {
 import "reactflow/dist/style.css";
 import { Span } from "@/lib/types";
 import GraphNode from "@/components/GraphNode";
+import { useAuth } from "@/hooks/useAuth";
 
 interface NodePosition {
   x: number;
@@ -136,17 +137,20 @@ export default function TraceGraphClient({
 }) {
   // Get trace_id from first span
   const traceId = initialSpans.length > 0 ? initialSpans[0].trace_id : null;
-  const DEFAULT_USER_ID = "00000000-0000-0000-0000-000000000000";
+  const { session } = useAuth();
 
   // Fetch spans with SWR for real-time updates (polls every 2 seconds)
   const { data: fetchedSpans } = useSWR(
-    traceId ? `/traces/${traceId}/spans` : null,
+    traceId && session?.access_token ? `/traces/${traceId}/spans` : null,
     async (url) => {
+      const token = session?.access_token;
+      if (!token) throw new Error("Not authenticated");
+
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}${url}`,
         {
           headers: {
-            "X-User-ID": DEFAULT_USER_ID,
+            Authorization: `Bearer ${token}`,
           },
         }
       );
