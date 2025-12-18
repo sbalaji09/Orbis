@@ -55,11 +55,13 @@ app = FastAPI(
 # Include the prompt router
 app.include_router(prompt_router)
 
+# Include the profile router (agents and API keys)
+from profile_api import router as profile_router
+app.include_router(profile_router)
+print("[QUERY_API] Profile router included successfully")
+
 # CORS - allows your frontend to call this API
 app.add_middleware(CORSMiddleware, **get_cors_config())
-
-# Import profile_api to register its routes (must be after app creation)
-import profile_api  # noqa: F401 - imported for side effects (route registration)
 
 # health check endpoint
 
@@ -405,20 +407,28 @@ async def search_traces(
 # get traces based on the specific agent
 
 
-@app.get("/traces/{agent_id}")
-async def get_traces_by_agent(agent_id: str, user_id: str, limit: int = 5, offset: int = 0):
+@app.get("/agents/{agent_id}/traces")
+async def get_traces_by_agent(
+    agent_id: str,
+    user_id: str = Depends(get_user_id_from_token)
+):
     try:
-        span = db.get_traces_by_agentid(agent_id, user_id)
+        validate_agent_id(agent_id)
+        validate_user_id(user_id)
 
-        if not span:
-            raise HTTPException(status_code=404, detail="Span not found")
+        traces = db.get_traces_by_agentid(agent_id, user_id)
 
-        # check if the user has access via a trace
-        trace = db.get_trace_by_id(span['trace_id'])
-        if not trace or trace.get('user_id') != user_id:
-            raise HTTPException(status_code=403, detail="Access denied")
+        # Convert datetime objects to ISO strings for JSON serialization
+        for trace in traces:
+            for key, value in list(trace.items()):
+                if isinstance(value, datetime):
+                    trace[key] = value.isoformat()
 
-        return span
+        return {
+            "agent_id": agent_id,
+            "traces": traces,
+            "count": len(traces)
+        }
     except HTTPException:
         raise
     except Exception as e:

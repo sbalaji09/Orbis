@@ -24,7 +24,7 @@ except ImportError as e:
 
 # Configure Orbis
 configure(
-    api_key="test-tool-tracking-key-123",
+    api_key="VGVzdCBBZ2VudAyqF8dhGI1mMuqLtMFmouY=",
     project_id="616d8f4e-8b03-4112-a40c-a61164977cb5",
     user_id="00000000-0000-0000-0000-000000000000",
     api_url="http://localhost:8080",

@@ -2,8 +2,7 @@ import base64
 import os
 from typing import List, Dict
 
-from fastapi import HTTPException, Header, Depends
-from query_api import app
+from fastapi import APIRouter, HTTPException, Header, Depends
 from auth_utils import get_user_id_from_token
 import secrets
 import redis
@@ -12,6 +11,11 @@ from db_connection import db
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Create a router instead of using app directly to avoid circular imports
+router = APIRouter()
+
+print("[PROFILE_API] Creating profile API router...")
 
 
 def hash_api_key(api_key: str) -> str:
@@ -43,7 +47,7 @@ def remove_api_key_from_redis(api_key: str):
 # api key endpoint for users
 
 
-@app.post("/agent")
+@router.post("/agent")
 async def create_ai_agent(agent_name: str, user_id: str = Depends(get_user_id_from_token)):
     # Check if agent name already exists for this user
     if db.agent_name_exists(user_id, agent_name):
@@ -86,7 +90,7 @@ def generate_key_with_string(input_string: str) -> str:
     return api_key
 
 
-@app.get("/agents")
+@router.get("/agents")
 async def fetch_agents(user_id: str = Depends(get_user_id_from_token)):
     try:
         print(f"[AGENTS] Fetching agents for user_id: {user_id}")
@@ -100,7 +104,7 @@ async def fetch_agents(user_id: str = Depends(get_user_id_from_token)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.delete("/agent")
+@router.delete("/agent")
 async def delete_agent(agent_id: str, user_id: str = Depends(get_user_id_from_token)):
     try:
         res = db.delete_agent(agent_id, user_id)
@@ -114,3 +118,6 @@ async def delete_agent(agent_id: str, user_id: str = Depends(get_user_id_from_to
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+print("[PROFILE_API] Router created successfully!")
