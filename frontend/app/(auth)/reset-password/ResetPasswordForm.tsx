@@ -7,6 +7,7 @@ import Link from "next/link";
 
 export default function ResetPasswordForm() {
   const supabase = useSupabase();
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
 
   return (
     <div className="bg-white border-2 border-black shadow-[8px_8px_0_rgba(0,0,0,0.2)] p-8">
@@ -27,7 +28,7 @@ export default function ResetPasswordForm() {
         providers={[]}
         view="forgotten_password"
         showLinks={false}
-        redirectTo={`${window.location.origin}/auth/callback`}
+        redirectTo={`${origin}/auth/callback`}
       />
       <div className="mt-6 text-center">
         <Link href="/login" className="text-sm text-foreground hover:underline">

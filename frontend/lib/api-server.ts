@@ -11,6 +11,13 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 export async function getAgents(): Promise<Agent[]> {
   try {
     const authHeaders = await getAuthHeaders();
+
+    // If no auth headers, user is not authenticated
+    if (!authHeaders.Authorization) {
+      console.warn("No authentication token available for getAgents");
+      return [];
+    }
+
     const response = await fetch(`${API_BASE_URL}/agents`, {
       headers: {
         ...authHeaders,
@@ -39,12 +46,19 @@ export async function getTraces(
   } = {}
 ): Promise<Trace[]> {
   try {
+    const authHeaders = await getAuthHeaders();
+
+    // If no auth headers, user is not authenticated
+    if (!authHeaders.Authorization) {
+      console.warn("No authentication token available for getTraces");
+      return [];
+    }
+
     const params = new URLSearchParams();
     if (options.limit) params.append("limit", options.limit.toString());
     if (options.offset) params.append("offset", options.offset.toString());
     if (options.status) params.append("status", options.status);
 
-    const authHeaders = await getAuthHeaders();
     const response = await fetch(
       `${API_BASE_URL}/traces?${params.toString()}`,
       {

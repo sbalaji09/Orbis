@@ -1,21 +1,4 @@
-from prompt_api import router as prompt_router
-from db_connection import db
-from fastapi import FastAPI, HTTPException, Query, Header
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, JSONResponse
-from typing import Optional
-from datetime import datetime
-import sys
-import os
-import json
-import asyncio
-
-# add parent directory to path
-sys.path.append(os.path.dirname(__file__))
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-
-from shared.cors_config import get_cors_config
-
+from auth_utils import get_user_id_from_token, verify_token_from_query
 from shared.validators import (
     validate_trace_id,
     validate_span_id,
@@ -24,6 +7,27 @@ from shared.validators import (
     validate_pagination,
     ValidationError,
 )
+from shared.cors_config import get_cors_config
+from prompt_api import router as prompt_router
+from db_connection import db
+from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, HTTPException, Query, Header, Depends
+from datetime import datetime
+from typing import Optional
+import asyncio
+import json
+import sys
+import os
+
+# CRITICAL: Must add parent directory to path before any local imports
+# fmt: off
+sys.path.append(os.path.dirname(__file__))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+# fmt: on
+
+
+# JWT authentication
 
 app = FastAPI(
     title="Orbis Query API",
@@ -36,6 +40,8 @@ app.include_router(prompt_router)
 
 # CORS - allows your frontend to call this API
 app.add_middleware(CORSMiddleware, **get_cors_config())
+
+# Import profile_api to register its routes (must be after app creation)
 
 # health check endpoint
 
@@ -53,7 +59,7 @@ async def health_check():
 
 @app.get("/traces")
 async def list_traces(
-    user_id: str = Header(..., alias="X-User-ID"),
+    user_id: str = Depends(get_user_id_from_token),
     limit: int = Query(50, ge=1, le=100, description="Max traces to return"),
     offset: int = Query(0, ge=0, description="Number to skip for pagination"),
     status: Optional[str] = Query(None, description="Filter by status")
@@ -61,7 +67,7 @@ async def list_traces(
     try:
         validate_user_id(user_id)
         limit, offset = validate_pagination(limit, offset)
-        
+
         # Get traces with enhanced information from spans
         traces = db.get_traces_with_stats(
             user_id, limit=limit, offset=offset, status_filter=status)
@@ -86,7 +92,7 @@ async def list_traces(
 
 @app.get("/traces/recent")
 async def get_recent_traces(
-    user_id: str = Header(..., alias="X-User-ID"),
+    user_id: str = Depends(get_user_id_from_token),
     limit: int = Query(10, ge=1, le=50, description="Number of recent traces")
 ):
     try:
@@ -104,7 +110,7 @@ async def get_recent_traces(
 @app.get("/traces/{trace_id}")
 async def get_trace(
     trace_id: str,
-    user_id: str = Header(..., alias="X-User-ID")
+    user_id: str = Depends(get_user_id_from_token)
 ):
     try:
         validate_trace_id(trace_id)
@@ -131,12 +137,12 @@ async def get_trace(
 @app.get("/traces/{trace_id}/spans")
 async def get_trace_spans(
     trace_id: str,
-    user_id: str = Header(..., alias="X-User-ID")
+    user_id: str = Depends(get_user_id_from_token)
 ):
     try:
         validate_trace_id(trace_id)
         validate_user_id(user_id)
-        
+
         # check if the trace exists and the user has access
         trace = db.get_trace_by_id(trace_id)
         if not trace:
@@ -162,8 +168,7 @@ async def get_trace_spans(
 @app.get("/traces/{trace_id}/span-count")
 async def get_trace_span_count(
     trace_id: str,
-    user_id: str = Header(None, alias="X-User-ID"),
-    user_id_query: str = Query(None, alias="user_id")
+    user_id: str = Depends(get_user_id_from_token)
 ):
     """
     Lightweight endpoint for polling to detect new spans.
@@ -171,21 +176,13 @@ async def get_trace_span_count(
     """
     try:
         validate_trace_id(trace_id)
-
-        effective_user_id = user_id or user_id_query
-        if not effective_user_id:
-            return JSONResponse(
-                status_code=400,
-                content={"error": "user_id required"}
-            )
-        
-        validate_trace_id(user_id)
+        validate_user_id(user_id)
 
         trace = db.get_trace_by_id(trace_id)
         if not trace:
             raise HTTPException(status_code=404, detail="Trace not found")
 
-        if trace.get('user_id') != effective_user_id:
+        if trace.get('user_id') != user_id:
             raise HTTPException(status_code=403, detail="Access denied")
 
         spans = db.get_spans_by_trace(trace_id)
@@ -207,12 +204,12 @@ async def get_trace_span_count(
 @app.get("/traces/{trace_id}/summary")
 async def get_trace_summary(
     trace_id: str,
-    user_id: str = Header(..., alias="X-User-ID")
+    user_id: str = Depends(get_user_id_from_token)
 ):
     try:
         validate_trace_id(trace_id)
         validate_user_id(user_id)
-        
+
         summary = db.get_trace_summary(trace_id)
 
         if not summary:
@@ -234,12 +231,12 @@ async def get_trace_summary(
 @app.get("/spans/{span_id}")
 async def get_span(
     span_id: str,
-    user_id: str = Header(..., alias="X-User-ID")
+    user_id: str = Depends(get_user_id_from_token)
 ):
     try:
         validate_span_id(span_id)
         validate_user_id(user_id)
-        
+
         span = db.get_span_by_id(span_id)
 
         if not span:
@@ -257,23 +254,17 @@ async def get_span(
         raise HTTPException(status_code=500, detail=str(e))
 
 # stream a specific span using SSE
+
+
 @app.get("/spans/{span_id}/stream")
 async def stream_span(
     span_id: str,
-    user_id: str = Header(None, alias="X-User-ID"),
-    user_id_query: str = Query(None, alias="user_id")
+    token: Optional[str] = Query(
+        None, description="JWT token for authentication")
 ):
-    # Use header if available, otherwise query param
+    # Verify JWT token from query parameter for SSE
+    user_id = verify_token_from_query(token)
     validate_span_id(span_id)
-    effective_user_id = user_id or user_id_query
-    if not effective_user_id:
-        return JSONResponse(
-            status_code=400,
-            content={
-                "error": "user_id required via X-User-ID header or user_id query parameter"}
-        )
-
-    validate_user_id(user_id)
 
     async def event_generator():
         try:
@@ -333,7 +324,7 @@ async def stream_span(
 
 @app.get("/metrics/user")
 async def get_user_metrics(
-    user_id: str = Header(..., alias="X-User-ID")
+    user_id: str = Depends(get_user_id_from_token)
 ):
     try:
         metrics = db.get_user_metrics(user_id)
@@ -346,7 +337,7 @@ async def get_user_metrics(
 
 @app.get("/search/traces")
 async def search_traces(
-    user_id: str = Header(..., alias="X-User-ID"),
+    user_id: str = Depends(get_user_id_from_token),
     status: Optional[str] = Query(None, description="Filter by status"),
     model: Optional[str] = Query(None, description="Filter by LLM model"),
     min_cost: Optional[float] = Query(None, description="Minimum cost"),
@@ -406,17 +397,20 @@ async def get_traces_by_agent(agent_id: str, user_id: str, limit: int = 5, offse
         raise HTTPException(status_code=500, detail=str(e))
 
 # get all the agents belonging to a specific user
-@app.get("/agents")
-async def get_agents(user_id: str = Header(..., alias="X-User-ID")):
-    try:
-        agents = db.get_agents_by_userid(user_id)
 
-        return {
-            "agents": agents if agents else [],
-            "count": len(agents) if agents else 0
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/agents")
+async def get_agents(user_id: str = Depends(get_user_id_from_token)):
+    # try:
+    agents = db.get_agents_by_userid(user_id)
+
+    return {
+        "agents": agents if agents else [],
+        "count": len(agents) if agents else 0
+    }
+    # except Exception as e:
+    #     raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.exception_handler(ValidationError)
 async def validation_error_handler(request, exc: ValidationError):

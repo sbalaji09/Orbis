@@ -7,6 +7,7 @@ import Link from "next/link";
 
 export default function LoginForm() {
   const supabase = useSupabase();
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
 
   return (
     <div className="bg-white border-2 border-black shadow-[8px_8px_0_rgba(0,0,0,0.2)] p-8">
@@ -27,7 +28,7 @@ export default function LoginForm() {
         providers={[]}
         view="sign_in"
         showLinks={false}
-        redirectTo={`/auth/callback`}
+        redirectTo={`${origin}/auth/callback`}
       />
       <div className="mt-6 text-center">
         <p className="text-sm text-muted">

@@ -5,9 +5,12 @@ import DashboardClient from "./DashboardClient";
 export const revalidate = 10;
 
 export default async function Dashboard() {
-  const [agents, traces] = await Promise.all([getAgents(), getTraces()]);
-
-  return (
-    <DashboardClient initialAgents={agents} initialTraces={traces} />
-  );
+  try {
+    const [agents, traces] = await Promise.all([getAgents(), getTraces()]);
+    return <DashboardClient initialAgents={agents} initialTraces={traces} />;
+  } catch (error) {
+    console.error("Failed to fetch dashboard data:", error);
+    // Return empty arrays if fetch fails (user might not be authenticated yet)
+    return <DashboardClient initialAgents={[]} initialTraces={[]} />;
+  }
 }
