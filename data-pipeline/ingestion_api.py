@@ -9,6 +9,7 @@ import sys
 from queues.redis_queue import queue
 from auth.auth_middleware import check_api_key
 from rate_limiter import check_rate_limit
+from shared.health_auth import check_health_rate_limit, check_metrics_auth, get_minimal_health
 
 
 # Add backend to path for database access
@@ -256,7 +257,7 @@ async def end_trace(request: Request, end_trace: EndTraceIn):
     }
 
 
-# health check endpoint for kubernetes / docker liveness probes
+# basic health check endpoint for kubernetes / docker liveness probes
 @app.get("/health")
 async def health_check():
     health = get_health()
@@ -264,15 +265,29 @@ async def health_check():
     if health["status"] == "unhealthy":
         raise HTTPException(
             status_code=503,
-            detail=health
+            detail={"status": "unhealthy"}
         )
 
-    return health
+    return {
+        "status": health["status"],
+        "timestamp": health.get("timestamp")
+    }
+
+# detailed health check that requires authentication
+@app.get("/health/detailed")
+async def health_check_detailed(request: Request):
+    check_health_rate_limit(request)
+    check_metrics_auth(request)
+
+    return get_health()
 
 # metrics endpoint for monitoring and observability
 @app.get("/metrics")
-async def metrics():
+async def metrics(request: Request):
+    check_health_rate_limit(request)
+    check_metrics_auth(request)
     return get_metrics()
+
 
 @app.websocket("/ws/dashboard")
 async def dashboard_ws(websocket: WebSocket):
@@ -289,7 +304,10 @@ async def dashboard_ws(websocket: WebSocket):
 
 # metrics endpoint for the DLQ
 @app.get("/dlq/metrics")
-async def get_dlq_metrics():
+async def get_dlq_metrics(request: Request):
+    check_health_rate_limit(request)
+    check_metrics_auth(request)
+    
     try:
         metrics = dlq_processor.get_metrics()
         return {

@@ -1,9 +1,18 @@
-import os
+from prompt_api import router as prompt_router
+from db_connection import db
+from fastapi import FastAPI, HTTPException, Query, Header, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse, JSONResponse
+from typing import Optional
+from datetime import datetime
 import sys
 
-# Add project root to Python path
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-sys.path.insert(0, project_root)
+# add parent directory to path
+sys.path.append(os.path.dirname(__file__))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from shared.health_auth import check_health_rate_limit, check_metrics_auth
 
 from backend.auth_utils import get_user_id_from_token, verify_token_from_query
 from shared.validators import (
@@ -54,16 +63,26 @@ app.add_middleware(CORSMiddleware, **get_cors_config())
 
 
 @app.get("/health")
-async def health_check():
+async def health_check(request: Request):
+    check_health_rate_limit(request)
     return {
         "status": "healthy",
-        "service": "query-api",
         "timestamp": datetime.utcnow().isoformat()
     }
 
+@app.get("/health/detailed")
+async def health_check_detailed(request: Request):
+    check_health_rate_limit(request)
+    check_metrics_auth(request)
+    
+    return {
+        "status": "healthy",
+        "service": "query-api",
+        "timestamp": datetime.utcnow().isoformat(),
+        "database": "connected",  # Could add actual DB check here
+    }
+
 # list all traces for a user with pagination
-
-
 @app.get("/traces")
 async def list_traces(
     user_id: str = Depends(get_user_id_from_token),

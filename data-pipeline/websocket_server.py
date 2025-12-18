@@ -5,13 +5,14 @@ from typing import *
 
 from fastapi.responses import JSONResponse
 from ingestion_api import app
-from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Query, Request, WebSocket, WebSocketDisconnect
 from starlette.websockets import WebSocketState
 import asyncio
 import redis.asyncio as aioredis
 from websocket.connection_manager import ConnectionManager
 from websocket.redis_subscriber import init_redis_subscriber, get_redis_subscriber
 from auth.websocket_auth import validate_api_key, validate_trace_ownership
+from shared.health_auth import check_health_rate_limit, check_metrics_auth
 
 import uuid
 from rate_limiter_ws import (
@@ -222,7 +223,10 @@ async def shutdown_event():
 # health check for websocket
 # returns: status, active_connections, connections_by_type, the reachability of the pub sub, etc.
 @app.get("/ws/health")
-async def websocket_health():
+async def websocket_health(request: Request):
+    check_health_rate_limit(request)
+    check_metrics_auth(request)
+    
     redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
     subscriber = get_redis_subscriber()
 
@@ -245,7 +249,10 @@ async def websocket_health():
 
 # metrics endpoint for monitoring dashboards
 @app.get("/ws/metrics")
-async def websocket_metrics():
+async def websocket_metrics(request: Request):
+    check_health_rate_limit(request)
+    check_metrics_auth(request)
+    
     redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
     subscriber = get_redis_subscriber()
 
