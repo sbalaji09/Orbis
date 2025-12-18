@@ -193,3 +193,5 @@ class DLQProcessor:
                         count += 1
             except Exception:
                 pass
+
+dlq_processor = DLQProcessor()
