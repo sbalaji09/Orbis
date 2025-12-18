@@ -66,12 +66,24 @@ export function CreateAgent({ onAgentCreated }: CreateAgentProps) {
     }
   };
 
-  const handleCopy = async () => {
-    if (result?.api_key) {
-      await navigator.clipboard.writeText(result.api_key);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
+  const handleCopy = async (text: string) => {
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleCopyConfig = async () => {
+    if (!result?.api_key || !result?.agent_id || !session?.user?.id) return;
+
+    const config = `configure(
+    api_key="${result.api_key}",
+    project_id="${result.agent_id}",
+    user_id="${session.user.id}",
+    api_url="http://localhost:8080"
+)`;
+    await navigator.clipboard.writeText(config);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const closeModal = () => {
@@ -87,11 +99,6 @@ export function CreateAgent({ onAgentCreated }: CreateAgentProps) {
     setResult(null);
     // Refresh the page to show the new agent in the list
     router.refresh();
-  };
-
-  const truncateKey = (key: string) => {
-    if (key.length <= 20) return key;
-    return key.substring(0, 20) + "...";
   };
 
   return (
@@ -142,7 +149,7 @@ export function CreateAgent({ onAgentCreated }: CreateAgentProps) {
             className="bg-background border-2 border-black shadow-[8px_8px_0_rgba(0,0,0,0.3)] max-w-md w-full mx-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-5 py-4 bg-success/10 border-b-2 border-black">
+            <div className="px-5 py-4 bg-mustard/10 border-b-2 border-black">
               <h3 className="text-base font-semibold tracking-tight">
                 Agent Created Successfully
               </h3>
@@ -158,18 +165,58 @@ export function CreateAgent({ onAgentCreated }: CreateAgentProps) {
               </div>
 
               <div>
-                <span className="text-xs text-black/60">API Key:</span>
+                <span className="text-xs text-black/60">Agent ID (project_id):</span>
                 <div className="mt-1 flex items-center gap-2">
-                  <code className="flex-1 p-2 bg-white border-2 border-black text-xs font-mono">
-                    {truncateKey(result.api_key || "")}
+                  <code className="flex-1 p-2 bg-white border-2 border-black text-xs font-mono break-all">
+                    {result.agent_id}
                   </code>
                   <button
-                    onClick={handleCopy}
-                    className="px-3 py-2 bg-black text-mustard border-2 border-black text-xs font-medium hover:bg-black/90 transition-colors"
+                    onClick={() => handleCopy(result.agent_id || "")}
+                    className="px-3 py-2 bg-black text-mustard border-2 border-black text-xs font-medium hover:bg-black/90 transition-colors whitespace-nowrap"
                   >
-                    {copied ? "Copied!" : "Copy"}
+                    {copied ? "✓" : "Copy"}
                   </button>
                 </div>
+              </div>
+
+              <div>
+                <span className="text-xs text-black/60">API Key:</span>
+                <div className="mt-1 flex items-center gap-2">
+                  <code className="flex-1 p-2 bg-white border-2 border-black text-xs font-mono break-all">
+                    {result.api_key}
+                  </code>
+                  <button
+                    onClick={() => handleCopy(result.api_key || "")}
+                    className="px-3 py-2 bg-black text-mustard border-2 border-black text-xs font-medium hover:bg-black/90 transition-colors whitespace-nowrap"
+                  >
+                    {copied ? "✓" : "Copy"}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <span className="text-xs text-black/60">User ID:</span>
+                <div className="mt-1 flex items-center gap-2">
+                  <code className="flex-1 p-2 bg-white border-2 border-black text-xs font-mono break-all">
+                    {session?.user?.id}
+                  </code>
+                  <button
+                    onClick={() => handleCopy(session?.user?.id || "")}
+                    className="px-3 py-2 bg-black text-mustard border-2 border-black text-xs font-medium hover:bg-black/90 transition-colors whitespace-nowrap"
+                  >
+                    {copied ? "✓" : "Copy"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="border-t-2 border-black pt-4">
+                <span className="text-xs text-black/60">SDK Configuration:</span>
+                <button
+                  onClick={handleCopyConfig}
+                  className="w-full mt-2 px-4 py-2 bg-mustard text-black border-2 border-black text-sm font-medium hover:bg-mustard/90 transition-colors"
+                >
+                  {copied ? "Copied Configuration!" : "Copy Full Configuration"}
+                </button>
               </div>
 
               <button
