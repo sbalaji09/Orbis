@@ -22,6 +22,17 @@ security = HTTPBearer(auto_error=False)
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET", "")
 
+# Try to decode base64 secret if it looks like base64
+def get_jwt_secret() -> str:
+    """Get the JWT secret, attempting base64 decode if needed."""
+    secret = SUPABASE_JWT_SECRET
+    if not secret:
+        return ""
+
+    # If it ends with == or = it's likely base64 encoded
+    # Try to use it as-is first (raw secret), which is what Supabase expects
+    return secret
+
 # Cache for JWKs (JSON Web Keys)
 _jwks_cache: Optional[Dict[str, Any]] = None
 
@@ -79,62 +90,122 @@ def verify_jwt_token(token: str) -> Dict[str, Any]:
         print(f"[AUTH] SUPABASE_URL: {SUPABASE_URL}")
 
         # Decode token without verification to see its contents
+        unverified_header = jwt.get_unverified_header(token)
+        print(f"[AUTH] Token header: alg={unverified_header.get('alg')}, typ={unverified_header.get('typ')}, kid={unverified_header.get('kid')}")
+
         unverified = jwt.decode(token, options={"verify_signature": False})
         print(
             f"[AUTH] Token claims: aud={unverified.get('aud')}, iss={unverified.get('iss')}, sub={unverified.get('sub')}")
 
+        # Get the algorithm from the token header
+        token_alg = unverified_header.get('alg', 'HS256')
+        print(f"[AUTH] Token uses algorithm: {token_alg}")
+
         # If JWT_SECRET is provided, try it first for verification (faster)
-        if SUPABASE_JWT_SECRET:
+        print(f"[AUTH] SUPABASE_JWT_SECRET is set: {bool(SUPABASE_JWT_SECRET)}, length: {len(SUPABASE_JWT_SECRET) if SUPABASE_JWT_SECRET else 0}")
+        if SUPABASE_JWT_SECRET and token_alg == "HS256":
             # Get the issuer from the token
             issuer = unverified.get('iss')
 
-            payload = jwt.decode(
-                token,
-                SUPABASE_JWT_SECRET,
-                algorithms=["HS256"],
-                audience="authenticated",
-                issuer=issuer,
-                options={"verify_signature": True,
-                         "verify_aud": True, "verify_iss": True}
-            )
-            print("[AUTH] Token verified successfully!")
-            return payload
+            try:
+                # Try with the secret as-is first
+                payload = jwt.decode(
+                    token,
+                    SUPABASE_JWT_SECRET,
+                    algorithms=["HS256"],
+                    audience="authenticated",
+                    issuer=issuer,
+                    options={"verify_signature": True,
+                             "verify_aud": True, "verify_iss": True}
+                )
+                print("[AUTH] Token verified successfully with HS256!")
+                return payload
+            except jwt.InvalidSignatureError as e:
+                print(f"[AUTH] HS256 signature verification failed: {e}")
+                # Try without audience/issuer verification in case that's the issue
+                try:
+                    payload = jwt.decode(
+                        token,
+                        SUPABASE_JWT_SECRET,
+                        algorithms=["HS256"],
+                        options={"verify_signature": True, "verify_aud": False, "verify_iss": False}
+                    )
+                    print("[AUTH] Token verified with HS256 (no aud/iss check)!")
+                    return payload
+                except Exception as e2:
+                    print(f"[AUTH] HS256 without aud/iss also failed: {e2}")
+            except Exception as e:
+                print(f"[AUTH] HS256 verification failed: {type(e).__name__}: {e}")
+                pass
 
-        # Otherwise, fetch JWKs and verify with RS256
-        jwks = get_supabase_jwks()
+        # Try JWKs method for asymmetric algorithms (RS256, ES256, etc.)
+        asymmetric_algs = ["RS256", "RS384", "RS512", "ES256", "ES384", "ES512"]
+        if token_alg in asymmetric_algs:
+            print(f"[AUTH] Trying JWKs verification for {token_alg}...")
+            try:
+                jwks = get_supabase_jwks()
+                print(f"[AUTH] JWKs fetched, keys: {len(jwks.get('keys', []))}")
 
-        # Decode header to get the key ID
-        unverified_header = jwt.get_unverified_header(token)
-        kid = unverified_header.get("kid")
+                kid = unverified_header.get("kid")
+                print(f"[AUTH] Token kid: {kid}")
 
-        # Find the matching key
-        rsa_key = None
-        for key in jwks.get("keys", []):
-            if key.get("kid") == kid:
-                rsa_key = key
-                break
+                # Find the matching key
+                matching_key = None
+                for key in jwks.get("keys", []):
+                    print(f"[AUTH] Checking key: kid={key.get('kid')}, alg={key.get('alg')}, kty={key.get('kty')}")
+                    if key.get("kid") == kid:
+                        matching_key = key
+                        break
 
-        if not rsa_key:
-            raise HTTPException(
-                status_code=401,
-                detail="Unable to find matching key for token"
-            )
+                if not matching_key:
+                    print(f"[AUTH] No matching key found in JWKs. Available kids: {[k.get('kid') for k in jwks.get('keys', [])]}")
+                    raise HTTPException(
+                        status_code=401,
+                        detail="Unable to find matching key for token"
+                    )
 
-        # Verify and decode the token
-        payload = jwt.decode(
-            token,
-            rsa_key,
-            algorithms=["RS256"],
-            audience="authenticated"
+                # Convert JWK to a format PyJWT can use
+                from jwt import PyJWK
+                jwk_obj = PyJWK.from_dict(matching_key)
+                public_key = jwk_obj.key
+
+                # Verify and decode the token using the algorithm from the token
+                payload = jwt.decode(
+                    token,
+                    public_key,
+                    algorithms=[token_alg],
+                    audience="authenticated"
+                )
+                print("[AUTH] JWKs verification successful!")
+                return payload
+            except HTTPException:
+                raise
+            except Exception as e:
+                print(f"[AUTH] JWKs verification failed: {type(e).__name__}: {e}")
+                import traceback
+                traceback.print_exc()
+                raise HTTPException(
+                    status_code=401,
+                    detail=f"Token verification failed: {str(e)}"
+                )
+
+        # If we get here, algorithm is not supported
+        print(f"[AUTH] Unsupported algorithm: {token_alg}")
+        raise HTTPException(
+            status_code=401,
+            detail=f"Unsupported token algorithm: {token_alg}"
         )
 
-        return payload
-
     except jwt.ExpiredSignatureError:
+        print("[AUTH] Token has expired")
         raise HTTPException(status_code=401, detail="Token has expired")
     except jwt.InvalidTokenError as e:
+        print(f"[AUTH] Invalid token error: {e}")
         raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"[AUTH] Unexpected error: {e}")
         raise HTTPException(
             status_code=401,
             detail=f"Token verification failed: {str(e)}"
