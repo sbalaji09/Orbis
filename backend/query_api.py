@@ -6,6 +6,7 @@ from fastapi.responses import StreamingResponse, JSONResponse
 from typing import Optional
 from datetime import datetime
 import sys
+import os
 
 # add parent directory to path
 sys.path.append(os.path.dirname(__file__))
