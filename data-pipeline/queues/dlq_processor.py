@@ -156,3 +156,40 @@ class DLQProcessor:
         redis.set(f"{self.metrics_key}:last_alert", datetime.now(timezone.utc).isoformat())
         redis.incr(f"{self.metrics_key}:alerts_sent")
     
+    # force retry all tasks in DLQ immediately
+    def retry_all(self) -> int:
+        redis = self.dlq.redis_client
+        tasks = redis.lrange(DLQ_NAME, 0, -1)
+
+        count = 0
+        for task_json in tasks:
+            try:
+                task = json.loads(task_json)
+                self._retry_task(task, task_json)
+                count += 1
+            except Exception as e:
+                logger.error(f"Failed to retry task: {e}")
+        
+        return count
+    
+    # removes all tasks older than DLQ_MAX_AGE_HOURS
+    def clear_expired(self) -> int:
+        redis = self.dlq.redis_client
+        tasks = redis.lrange(DLQ_NAME, 0, -1)
+        
+        now = datetime.now(timezone.utc)
+        count = 0
+
+        for task_json in tasks:
+            try:
+                task = json.loads(task_json)
+                failed_at = task.get("failed_at")
+                if failed_at:
+                    failed_time = datetime.fromisoformat(failed_at.replace("Z", "+00:00"))
+                    age_hours = (now - failed_time).total_seconds() / 3600
+
+                    if age_hours > DLQ_MAX_AGE_HOURS:
+                        redis.lrem(DLQ_NAME, 1, task_json)
+                        count += 1
+            except Exception:
+                pass
