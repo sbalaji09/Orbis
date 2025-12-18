@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useWebSocket } from "@/lib/useWebSocket";
 import type { WebSocketMessage } from "@/lib/websocket";
+import {useAuth} from "@/hooks/useAuth";
 
 import { AgentGroup } from "@/components/AgentGroup";
 import { CreateAgent } from "@/components/CreateAgent";
@@ -13,12 +14,13 @@ interface DashboardClientProps {
 }
 
 export default function DashboardClient({initialAgents, initialTraces}: DashboardClientProps) {
-  const apiKey = typeof window !== "undefined" ? localStorage.getItem("X-User-ID") ?? "": "";
+  const { session } = useAuth();
+  const apiKey = session?.access_token ?? "";
 
   const { state, subscribe } = useWebSocket({
     type: "dashboard",
     apiKey,
-    disabled: false
+    disabled: !apiKey
   });
 
   const [traces, setTraces] = useState(initialTraces);
