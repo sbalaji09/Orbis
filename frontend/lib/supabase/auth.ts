@@ -9,10 +9,22 @@ export async function getAuthToken(): Promise<string | null> {
     const supabase = await createClient();
     const {
       data: { session },
+      error,
     } = await supabase.auth.getSession();
-    return session?.access_token ?? null;
+
+    if (error) {
+      console.error("[auth] Failed to get session:", error.message);
+      return null;
+    }
+
+    if (!session) {
+      console.warn("[auth] No active session found");
+      return null;
+    }
+
+    return session.access_token;
   } catch (error) {
-    console.error("Failed to get auth token:", error);
+    console.error("[auth] Failed to get auth token:", error);
     return null;
   }
 }

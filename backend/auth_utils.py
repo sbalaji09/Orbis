@@ -15,7 +15,8 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-security = HTTPBearer()
+# auto_error=False prevents 422 on missing header, we handle it ourselves with 401
+security = HTTPBearer(auto_error=False)
 
 # Supabase configuration from environment
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
@@ -141,7 +142,7 @@ def verify_jwt_token(token: str) -> Dict[str, Any]:
 
 
 def get_user_id_from_token(
-    credentials: HTTPAuthorizationCredentials = Security(security)
+    credentials: Optional[HTTPAuthorizationCredentials] = Security(security)
 ) -> str:
     """
     FastAPI dependency to extract and verify JWT token, returning user_id.
@@ -160,6 +161,12 @@ def get_user_id_from_token(
     Raises:
         HTTPException: If token is invalid or missing
     """
+    if credentials is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Authorization header missing. Please provide a Bearer token."
+        )
+
     token = credentials.credentials
     payload = verify_jwt_token(token)
 
@@ -174,7 +181,7 @@ def get_user_id_from_token(
 
 
 def get_user_from_token(
-    credentials: HTTPAuthorizationCredentials = Security(security)
+    credentials: Optional[HTTPAuthorizationCredentials] = Security(security)
 ) -> Dict[str, Any]:
     """
     FastAPI dependency to extract and verify JWT token, returning full user payload.
@@ -193,6 +200,12 @@ def get_user_from_token(
     Raises:
         HTTPException: If token is invalid or missing
     """
+    if credentials is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Authorization header missing. Please provide a Bearer token."
+        )
+
     token = credentials.credentials
     return verify_jwt_token(token)
 

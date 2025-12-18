@@ -14,26 +14,28 @@ export async function getAgents(): Promise<Agent[]> {
 
     // If no auth headers, user is not authenticated
     if (!authHeaders.Authorization) {
-      console.warn("No authentication token available for getAgents");
+      console.warn("[api-server] No authentication token available for getAgents");
       return [];
     }
 
     const response = await fetch(`${API_BASE_URL}/agents`, {
       headers: {
+        "Content-Type": "application/json",
         ...authHeaders,
       },
       cache: "no-store",
     });
 
     if (!response.ok) {
-      console.error(`Failed to fetch agents: ${response.statusText}`);
+      const errorBody = await response.text().catch(() => "");
+      console.error(`[api-server] Failed to fetch agents: ${response.status} ${response.statusText}`, errorBody);
       return [];
     }
 
     const data = await response.json();
     return data.agents || [];
   } catch (error) {
-    console.error("Error fetching agents:", error);
+    console.error("[api-server] Error fetching agents:", error);
     return [];
   }
 }
@@ -50,7 +52,7 @@ export async function getTraces(
 
     // If no auth headers, user is not authenticated
     if (!authHeaders.Authorization) {
-      console.warn("No authentication token available for getTraces");
+      console.warn("[api-server] No authentication token available for getTraces");
       return [];
     }
 
@@ -63,6 +65,7 @@ export async function getTraces(
       `${API_BASE_URL}/traces?${params.toString()}`,
       {
         headers: {
+          "Content-Type": "application/json",
           ...authHeaders,
         },
         cache: "no-store",
@@ -70,14 +73,15 @@ export async function getTraces(
     );
 
     if (!response.ok) {
-      console.error(`Failed to fetch traces: ${response.statusText}`);
+      const errorBody = await response.text().catch(() => "");
+      console.error(`[api-server] Failed to fetch traces: ${response.status} ${response.statusText}`, errorBody);
       return [];
     }
 
     const data = await response.json();
     return data.traces || [];
   } catch (error) {
-    console.error("Error fetching traces:", error);
+    console.error("[api-server] Error fetching traces:", error);
     return [];
   }
 }
