@@ -112,3 +112,47 @@ class DLQProcessor:
 
         logger.info(f"DLQ processing complete", extra={"summary": summary})
         return summary
+    
+    # move a task from DLQ back to main queue
+    def _retry_task(self, task: dict, task_json: str) -> None:
+        redis = self.dlq.redis_client
+
+        task["retry_count"] = 0
+        task["dlq_retry_count"] = task.get("dlq_retry_count", 0) + 1
+        task["last_dlq_retry"] = datetime.now(timezone.utc).isoformat()
+        task.pop("failed_at", None)
+        task.pop("error_message", None)
+
+        self.main_queue.enqueue(task)
+
+        redis.lrem(DLQ_NAME, 1, task_json)
+
+        logger.info(f"Retried DLQ task", extra={
+            "trace_id": task.get("span", {}).get("trace_id"),
+            "dlq_retry_count": task["dlq_retry_count"],
+        })
+
+    # send alert when DLQ exceeds threshold
+    def _send_alert(self, dlq_length: int) -> None:
+        redis = self.dlq.redis_client
+
+        last_alert = redis.get(f"{self.metrics_key}:last_alert")
+        if last_alert:
+            last_alert_time = datetime.fromisoformat(last_alert.replace("Z", "+00:00"))
+            hours_since_alert = (datetime.now(timezone.utc) - last_alert_time).total_seconds() / 3600
+
+            if hours_since_alert < 1:
+                return
+            
+        logger.warning(
+            f"DLQ ALERT: {dlq_length} tasks in a dead letter queue (threshold: {DLQ_ALERT_THRESHOLD})",
+            extra={
+                "alert_type": "dlq_threshold_exceeded",
+                "dlq_length": dlq_length,
+                "threshold": DLQ_ALERT_THRESHOLD,
+            }
+        )
+
+        redis.set(f"{self.metrics_key}:last_alert", datetime.now(timezone.utc).isoformat())
+        redis.incr(f"{self.metrics_key}:alerts_sent")
+    
