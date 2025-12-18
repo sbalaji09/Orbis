@@ -156,7 +156,7 @@ export function AnimatedDAG() {
 
           {/* Draw edges with curves */}
           <AnimatePresence>
-            {visibleEdges.map((edge) => {
+            {visibleEdges.map((edge, index) => {
               const fromCenter = getNodeCenter(edge.from);
               const toCenter = getNodeCenter(edge.to);
 
@@ -171,7 +171,7 @@ export function AnimatedDAG() {
               } ${toCenter.x} ${toCenter.y - 45}`;
 
               return (
-                <motion.g key={`edge-${edge.from}-${edge.to}`}>
+                <motion.g key={`edge-${edge.from}-${edge.to}-${index}`}>
                   <motion.path
                     d={pathD}
                     stroke="#000000"
