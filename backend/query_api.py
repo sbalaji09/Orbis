@@ -437,7 +437,15 @@ async def get_cost_summary(user_id: str, period: str):
     try:
         validate_user_id(user_id)
 
-        cost_summary = db.get_cost_summary_by_user(user_id, period)
+        loop = asyncio.get_running_loop()
+
+        # run this method in a thread so we don't block the event loop
+        cost_summary = await loop.run_in_executor(
+            None,
+            lambda: db.get_cost_summary_by_user(user_id, period)
+        )
+
+        return cost_summary
     except HTTPException:
         raise
     except Exception as e:
