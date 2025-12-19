@@ -450,7 +450,16 @@ async def get_cost_summary(user_id: str, period: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
 @app.get("/cost/by-agent")
+async def get_cost_by_agent(user_id: str, start_date: str, end_date: str):
+    try:
+        validate_user_id(user_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
 @app.get("/cost/by-model")
 @app.get("/cost/trends")
 @app.get("/cost/token-breakdown")
