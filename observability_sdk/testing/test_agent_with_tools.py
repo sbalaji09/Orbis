@@ -8,9 +8,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from observability_sdk import configure, instrument_all, observe, observe_tool, instrument_http, run_tracked_command
-from observability_sdk.collector.collector import get_collector
 import openai
-import time
 
 GROQ_API_KEY = "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"
 
@@ -361,13 +359,13 @@ Make it engaging and highlight their contributions!
 
 if __name__ == "__main__":
     print("\n🧪 Enhanced GitHub Research Agent - 5 LLM Calls\n")
-    
+
     result = research_github_user("octocat")
-    
+
     print("\n" + "=" * 70)
     print("📊 EXPECTED DASHBOARD")
     print("=" * 70)
-    
+
     print("\n✨ Total Spans: ~15-18")
     print("\n🧠 LLM Spans (5 total - all streaming):")
     print("   1. Planning Research")
@@ -375,7 +373,7 @@ if __name__ == "__main__":
     print("   3. Repository Focus Analysis")
     print("   4. Influence Score Interpretation")
     print("   5. Final Comprehensive Summary")
-    
+
     print("\n🌲 Span Hierarchy:")
     print("   github_research_agent (function)")
     print("   ├─ openai.llama-3.3-70b-versatile #1 (llm, streaming) 🧠")
@@ -392,7 +390,7 @@ if __name__ == "__main__":
     print("   ├─ python_check (tool)")
     print("   │  └─ cli.python (cli)")
     print("   └─ openai.llama-3.3-70b-versatile #5 (llm, streaming) 🧠")
-    
+
     print("\n📈 What You'll See:")
     print("   • 5 LLM streaming spans (green nodes)")
     print("   • 2 HTTP API calls (blue nodes)")
@@ -400,18 +398,13 @@ if __name__ == "__main__":
     print("   • 2 CLI commands (cyan nodes)")
     print("   • All with proper parent-child relationships")
     print("   • Streaming metrics: TTFT, TPS for each LLM call")
-    
+
     print("\n💡 Each LLM call does something different:")
     print("   1. Plans the research approach")
     print("   2. Analyzes the user's profile")
     print("   3. Identifies repository focus areas")
     print("   4. Interprets influence metrics")
     print("   5. Synthesizes everything into final summary")
-    
-    print("\n🚀 Check http://localhost:3000\n")
-    
-    # Flush
-    print("📤 Flushing...")
-    get_collector().flush()
-    time.sleep(2)
-    print("✅ Done!\n")
+
+    print("\n🚀 Check http://localhost:3000")
+    print("✅ Spans auto-flushed! (no manual flush needed)\n")

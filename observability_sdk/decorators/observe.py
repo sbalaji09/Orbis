@@ -1,5 +1,6 @@
 from functools import wraps
 from typing import Optional, Callable, Dict, Any
+import time
 from ..core.span import Span
 from ..collector.collector import get_collector
 from ..collector.config import get_config
@@ -102,6 +103,14 @@ def observe(
                 # send span to collector (replaces print)
                 collector = get_collector()
                 collector.collect(span)
+
+                # auto-flush if this is a root span (no parent) and auto_flush is enabled
+                config = get_config()
+                if config.auto_flush_on_root_span and parent_span is None:
+                    collector.flush()
+                    # wait for HTTP requests to complete
+                    if config.auto_flush_wait_time > 0:
+                        time.sleep(config.auto_flush_wait_time)
         
         return wrapper
     return decorator
