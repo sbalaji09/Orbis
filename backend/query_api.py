@@ -405,8 +405,6 @@ async def search_traces(
         raise HTTPException(status_code=500, detail=str(e))
 
 # get traces based on the specific agent
-
-
 @app.get("/agents/{agent_id}/traces")
 async def get_traces_by_agent(
     agent_id: str,
@@ -433,6 +431,12 @@ async def get_traces_by_agent(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/cost/summary")
+@app.get("/cost/by-agent")
+@app.get("/cost/by-model")
+@app.get("/cost/trends")
+@app.get("/cost/token-breakdown")
 
 @app.exception_handler(ValidationError)
 async def validation_error_handler(request, exc: ValidationError):
