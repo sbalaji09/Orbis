@@ -49,7 +49,24 @@ const navItems: NavItem[] = [
     name: "Traces",
     link: "/dashboard/trace",
   },
-
+  {
+    icon: (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" />
+        <path d="m9 12 2 2 4-4" />
+      </svg>
+    ),
+    name: "Playground",
+    link: "/dashboard/playground",
+  },
   {
     icon: (
       <svg
