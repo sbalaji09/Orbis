@@ -1,6 +1,7 @@
-import datetime
+from datetime import datetime, timedelta, timezone
 import json
 import os
+import re
 import psycopg2
 from psycopg2.extras import RealDictCursor, execute_values
 from psycopg2.pool import SimpleConnectionPool
@@ -1169,9 +1170,90 @@ class SupabaseDB:
     def get_cost_summary_by_user(self, user_id: str, period: str) -> List[Dict[str, Any]]:
         conn = self.get_connection()
         try:
+            now = datetime.now(datetime.timezone.utc)
+            start_date = None
+            end_date = None
+
+            if not period or period.lower() == "all":
+                start_date = None
+                end_date = None
+            else:
+                period = period.strip().lower()
+
+                range_match = re.match(r"^(\d{4}-\d{2}-\d{2})\s*:\s*(\d{4}-\d{2}-\d{2})$", period)
+
+                # calculates the start date
+                if range_match:
+                    s = datetime.fromisoformat(range_match.group(1)).replace(tzinfo=timezone.utc)
+                    e = datetime.fromisoformat(range_match.group(2)).replace(tzinfo=timezone.utc)
+
+                    start_date = s
+                    end_date = e + timedelta(days=1)
+                elif period.endswith("d") and period[:-1].isdigit():
+                    days = int(period[:-1])
+                    start_date = now - timedelta(days=days)
+                    end_date = now + timedelta(seconds=1)
+                elif period == "month":
+                    start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+                    end_date = now + timedelta(seconds=1)
+                elif period == "year":
+                    start_date = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+                    end_date = now + timedelta(seconds=1)
+                else:
+                    raise ValueError(f"Unsupported period format: {period}")
+
+            query = """
+                SELECT
+                    date_trunc('day', created_at AT TIME ZONE 'UTC')::date AS day,
+                    COALESCE(model, 'unknown') AS model,
+                    SUM(cost)::numeric(18,6) AS total_cost,
+                    COUNT(*) AS call_count
+                FROM prompts
+                WHERE user_id = %s
+            """
+            params = [user_id]
+
+            if start_date is not None:
+                query += " AND created_at >= %s"
+                params.append(start_date)
+            if end_date is not None:
+                query += " AND created_at < %s"
+                params.append(end_date)
+            
+            query += """
+                GROUP BY day, model
+                ORDER BY day DESC, model
+            """
+
+
             with conn.cursor() as cur:
-                query = """
-                """
+                cur.execute(query, params)
+                rows = cur.fetchall()
+
+                # gives column names in order
+                columns = [col.name for col in cur.description] if hasattr(cur, "description") else ["day", "model", "total_cost", "call_count"]
+
+                results: List[Dict[str, Any]] = []
+                for row in rows:
+                    row_dict = dict(zip(columns, row))
+                    day_val = row_dict.get("day")
+                    if isinstance(day_val, datetime):
+                        day_str = day_val.date().isoformat()
+                    else:
+                        try:
+                            day_str = day_val.isoformat()
+                        except Exception:
+                            day_str = str(day_val)
+
+                    results.append({
+                        "date": day_str,
+                        "model": row_dict.get("model"),
+                        "total_cost": float(row_dict.get("total_cost")) if row_dict.get("total_cost") is not None else 0.0,
+                        "call_count": int(row_dict.get("call_count") or 0),
+                    })
+            return results
+
+
         except Exception as e:
             raise Exception(f"Failed to get prompt analytics: {e}")
         finally:
