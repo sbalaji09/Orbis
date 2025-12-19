@@ -1312,6 +1312,61 @@ class SupabaseDB:
             raise Exception(f"Failed to get prompt analytics: {e}")
         finally:
             self.return_connection(conn)
+    
+    def get_cost_by_model(self, user_id: str, start_date: str, end_date: str) -> List[Dict[str, Any]]:
+        conn = self.get_connection()
+        try:
+            try:
+                start_dt = datetime.fromisoformat(start_date).replace(
+                    hour=0, minute=0, second=0, microsecond=0, tzinfo=timezone.utc
+                )
+                end_dt = datetime.fromisoformat(end_date).replace(
+                    hour=0, minute=0, second=0, microsecond=0, tzinfo=timezone.utc
+                )
+            except ValueError:
+                raise ValueError("start_date and end_date must be in YYYY-MM-DD format")
+            
+            if end_dt < start_dt:
+                raise ValueError("end_date must be greater than or equal to start_date")
+            
+            end_dt_exclusive = end_dt + timedelta(days=1)
+
+            query = """
+                SELECT
+                    COALESCE(model_name, 'unknown') AS model,
+                    SUM(cost)::numeric(18,6) AS total_cost,
+                    COUNT(*) AS call_count
+                FROM prompts
+                WHERE user_id = %s
+                AND created_at >= %s
+                AND created_at < %s
+                GROUP BY model
+                ORDER BY total_cost DESC
+            """
+            params = [user_id, start_dt, end_dt_exclusive]
+            with conn.cursor() as cur:
+                cur.execute(query, params)
+                rows = cur.fetchall()
+
+                columns = [col.name for col in cur.description] if hasattr(cur, "description") else [
+                    "model", "total_cost", "call_count"
+                ]
+
+                results: List[Dict[str, Any]] = []
+                for row in rows:
+                    row_dict = dict(zip(columns, row))
+                    results.append({
+                        "model": row_dict.get("model"),
+                        "total_cost": float(row_dict.get("total_cost") or 0.0),
+                        "call_count": int(row_dict.get("call_count") or 0),
+                    })
+
+                return results
+        except Exception as e:
+            raise Exception(f"Failed to get prompt analytics: {e}")
+        finally:
+            self.return_connection(conn)
+
     # closes all the connections in the pool
     def close(self):
         self.pool.closeall()
