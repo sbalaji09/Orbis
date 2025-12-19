@@ -1271,22 +1271,24 @@ class SupabaseDB:
                 )
             except ValueError:
                 raise ValueError("start_date and end_date must be in YYYY-MM-DD format")
-            
+
             if end_dt < start_dt:
                 raise ValueError("end_date must be greater than or equal to start_date")
-            
+
             end_dt_exclusive = end_dt + timedelta(days=1)
 
             query = """
                 SELECT
-                    COALESCE(agent_name, 'unknown') AS agent,
-                    SUM(cost)::numeric(18,6) AS total_cost,
-                    COUNT(*) AS call_count
-                FROM prompts
-                WHERE user_id = %s
-                AND created_at >= %s
-                AND created_at < %s
-                GROUP BY agent
+                    COALESCE(a.agent_name, 'unknown') AS agent,
+                    COALESCE(SUM(s.cost), 0)::numeric(18,6) AS total_cost,
+                    COUNT(s.span_id) AS call_count
+                FROM traces t
+                LEFT JOIN agents a ON t.agent_id = a.agent_id
+                LEFT JOIN spans s ON t.trace_id = s.trace_id
+                WHERE t.user_id = %s
+                AND t.start_time >= %s
+                AND t.start_time < %s
+                GROUP BY a.agent_name
                 ORDER BY total_cost DESC
             """
             params = [user_id, start_dt, end_dt_exclusive]
@@ -1309,7 +1311,7 @@ class SupabaseDB:
 
                 return results
         except Exception as e:
-            raise Exception(f"Failed to get prompt analytics: {e}")
+            raise Exception(f"Failed to get cost by agent: {e}")
         finally:
             self.return_connection(conn)
     
@@ -1325,22 +1327,23 @@ class SupabaseDB:
                 )
             except ValueError:
                 raise ValueError("start_date and end_date must be in YYYY-MM-DD format")
-            
+
             if end_dt < start_dt:
                 raise ValueError("end_date must be greater than or equal to start_date")
-            
+
             end_dt_exclusive = end_dt + timedelta(days=1)
 
             query = """
                 SELECT
-                    COALESCE(model_name, 'unknown') AS model,
-                    SUM(cost)::numeric(18,6) AS total_cost,
-                    COUNT(*) AS call_count
-                FROM prompts
-                WHERE user_id = %s
-                AND created_at >= %s
-                AND created_at < %s
-                GROUP BY model
+                    COALESCE(s.llm_model, 'unknown') AS model,
+                    COALESCE(SUM(s.cost), 0)::numeric(18,6) AS total_cost,
+                    COUNT(s.span_id) AS call_count
+                FROM traces t
+                JOIN spans s ON t.trace_id = s.trace_id
+                WHERE t.user_id = %s
+                AND t.start_time >= %s
+                AND t.start_time < %s
+                GROUP BY s.llm_model
                 ORDER BY total_cost DESC
             """
             params = [user_id, start_dt, end_dt_exclusive]
@@ -1363,7 +1366,7 @@ class SupabaseDB:
 
                 return results
         except Exception as e:
-            raise Exception(f"Failed to get prompt analytics: {e}")
+            raise Exception(f"Failed to get cost by model: {e}")
         finally:
             self.return_connection(conn)
 
