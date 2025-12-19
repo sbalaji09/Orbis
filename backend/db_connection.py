@@ -1370,6 +1370,68 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
 
+
+    def get_cost_trends(self, user_id: str, days: int) -> List[Dict[str, Any]]:
+        if days is None or not isinstance(days, int) or days < 1:
+            raise ValueError("`days` must be an integer >= 1")
+
+        conn = self.get_connection()
+        try:
+            now = datetime.now(timezone.utc)
+
+            start_dt = (now - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0, microsecond=0)
+            end_dt = now.replace(hour=0, minute=0, second=0, microsecond=0)  # today's date at 00:00
+
+            start_date_str = start_dt.date().isoformat()
+            end_date_str = end_dt.date().isoformat()
+
+            query = """
+                WITH days AS (
+                    SELECT generate_series(%s::date, %s::date, INTERVAL '1 day') AS day
+                )
+                SELECT
+                    d.day::date AS day,
+                    COALESCE(SUM(p.cost), 0)::numeric(18,6) AS total_cost,
+                    COALESCE(COUNT(p.*), 0) AS call_count
+                FROM days d
+                LEFT JOIN prompts p
+                ON p.user_id = %s
+                AND (p.created_at AT TIME ZONE 'UTC')::date = d.day::date
+                GROUP BY d.day
+                ORDER BY d.day ASC
+            """
+            params = [start_date_str, end_date_str, user_id]
+
+            with conn.cursor() as cur:
+                cur.execute(query, params)
+                rows = cur.fetchall()
+
+                columns = [col.name for col in cur.description] if hasattr(cur, "description") else ["day", "total_cost", "call_count"]
+
+                results: List[Dict[str, Any]] = []
+                for row in rows:
+                    row_dict = dict(zip(columns, row))
+                    day_val = row_dict.get("day")
+                    # day_val should be a date object; convert to ISO string YYYY-MM-DD
+                    try:
+                        day_str = day_val.isoformat()
+                    except Exception:
+                        day_str = str(day_val)
+
+                    total_cost = row_dict.get("total_cost")
+                    call_count = row_dict.get("call_count")
+
+                    results.append({
+                        "date": day_str,
+                        "total_cost": float(total_cost) if total_cost is not None else 0.0,
+                        "call_count": int(call_count or 0),
+                    })
+
+            return results
+        except Exception as e:
+            raise Exception(f"Failed to get cost by model: {e}")
+        finally:
+            self.return_connection(conn)
     # closes all the connections in the pool
     def close(self):
         self.pool.closeall()
