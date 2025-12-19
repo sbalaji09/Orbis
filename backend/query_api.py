@@ -455,6 +455,15 @@ async def get_cost_summary(user_id: str, period: str):
 async def get_cost_by_agent(user_id: str, start_date: str, end_date: str):
     try:
         validate_user_id(user_id)
+
+        loop = asyncio.get_running_loop()
+
+        cost_by_agent = await loop.run_in_executor(
+            None,
+            lambda: db.get_cost_by_agent_by_user(user_id, start_date, end_date)
+        )
+
+        return cost_by_agent
     except HTTPException:
         raise
     except Exception as e:
