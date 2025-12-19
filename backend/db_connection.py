@@ -1165,6 +1165,17 @@ class SupabaseDB:
             raise Exception(f"Failed to get prompt analytics: {e}")
         finally:
             self.return_connection(conn)
+    
+    def get_cost_summary_by_user(self, user_id: str, period: str) -> List[Dict[str, Any]]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                query = """
+                """
+        except Exception as e:
+            raise Exception(f"Failed to get prompt analytics: {e}")
+        finally:
+            self.return_connection(conn)
 
     # closes all the connections in the pool
     def close(self):

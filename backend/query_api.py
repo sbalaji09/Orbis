@@ -433,6 +433,15 @@ async def get_traces_by_agent(
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/cost/summary")
+async def get_cost_summary(user_id: str, period: str):
+    try:
+        validate_user_id(user_id)
+
+        cost_summary = db.get_cost_summary_by_user(user_id, period)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 @app.get("/cost/by-agent")
 @app.get("/cost/by-model")
 @app.get("/cost/trends")
