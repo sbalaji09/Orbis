@@ -72,9 +72,37 @@ export function OutputCard({
 
       {/* Output */}
       <div className="p-4 flex-1 overflow-y-auto">
-        <pre className="text-xs font-mono whitespace-pre-wrap leading-relaxed text-black">
-          {output.output}
-        </pre>
+        {output.error ? (
+          <div className="border-2 border-red-500 bg-red-50 p-4">
+            <div className="flex items-start gap-2">
+              <svg
+                className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <div>
+                <p className="text-xs font-semibold text-red-700 mb-1">
+                  Error generating response
+                </p>
+                <p className="text-xs font-mono text-red-600">
+                  {output.error}
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <pre className="text-xs font-mono whitespace-pre-wrap leading-relaxed text-black">
+            {output.output}
+          </pre>
+        )}
       </div>
 
       {/* Footer - Detailed Stats */}

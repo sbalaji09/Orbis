@@ -23,6 +23,7 @@ export interface ModelOutput {
   latency: number;
   totalCost: number;
   timestamp: number;
+  error?: string;
 }
 
 export const AVAILABLE_MODELS: ModelConfig[] = [
@@ -79,35 +80,44 @@ export default function App() {
     if (!inputPrompt.trim() || selectedModels.length === 0) return;
 
     setIsGenerating(true);
-    const newOutputs: ModelOutput[] = [];
 
-    // Simulate API calls to different models
-    for (const model of selectedModels) {
-      const startTime = Date.now();
-      
-      // Mock response generation
-      await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 1200));
-      
-      const inputTokens = Math.floor(inputPrompt.split(/\s+/).length * 1.3);
-      const outputTokens = Math.floor(100 + Math.random() * 400);
-      const latency = (Date.now() - startTime) / 1000;
-      const totalCost = 
-        (inputTokens * model.costPerInputToken) + 
-        (outputTokens * model.costPerOutputToken);
-
-      newOutputs.push({
-        model,
-        output: `[Mock response from ${model.name}]\n\nThis is a simulated response demonstrating the capabilities of ${model.name} by ${model.provider}. In a production environment, this would be the actual model output.\n\nThe response includes various formatting and demonstrates the model's ability to understand and respond to the prompt: "${inputPrompt.substring(0, 50)}..."\n\nKey points:\n• Feature A\n• Feature B\n• Feature C\n\nThis helps you compare outputs across different models side-by-side.`,
-        inputTokens,
-        outputTokens,
-        latency,
-        totalCost,
-        timestamp: Date.now(),
+    try {
+      // Call the API with selected models
+      const response = await fetch('/api/playground/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt: inputPrompt,
+          models: selectedModels.map(m => m.id),
+        }),
       });
-    }
 
-    setOutputs(newOutputs);
-    setIsGenerating(false);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to generate responses' }));
+        throw new Error(errorData.error || 'Failed to generate responses');
+      }
+
+      const data = await response.json();
+      setOutputs(data.outputs || []);
+    } catch (error) {
+      console.error('Error generating outputs:', error);
+      // Show error outputs for all selected models
+      const errorOutputs: ModelOutput[] = selectedModels.map(model => ({
+        model,
+        output: '',
+        inputTokens: 0,
+        outputTokens: 0,
+        latency: 0,
+        totalCost: 0,
+        timestamp: Date.now(),
+        error: error instanceof Error ? error.message : 'Failed to generate response',
+      }));
+      setOutputs(errorOutputs);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleLoadFromTrace = (tracePrompt: string) => {

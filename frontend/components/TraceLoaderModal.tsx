@@ -1,4 +1,4 @@
-import { useState, Fragment } from "react";
+import { useState, Fragment, useEffect } from "react";
 import {
   Dialog,
   Transition,
@@ -13,50 +13,48 @@ interface TraceLoaderModalProps {
   onLoad: (prompt: string) => void;
 }
 
-// Mock trace data
-const MOCK_TRACES = [
-  {
-    id: "trace-001",
-    timestamp: "2024-12-19T10:30:00Z",
-    prompt: "Explain the concept of neural networks in simple terms for a beginner",
-    model: "gpt-4",
-    status: "success",
-  },
-  {
-    id: "trace-002",
-    timestamp: "2024-12-19T09:15:00Z",
-    prompt: "Write a Python function that calculates the Fibonacci sequence up to n terms",
-    model: "grok-4-1",
-    status: "success",
-  },
-  {
-    id: "trace-003",
-    timestamp: "2024-12-19T08:45:00Z",
-    prompt: "What are the key differences between React and Vue.js? Provide a comparison table.",
-    model: "deepseek-v3",
-    status: "success",
-  },
-  {
-    id: "trace-004",
-    timestamp: "2024-12-18T16:20:00Z",
-    prompt: "Create a SQL query to find the top 10 customers by total purchase amount in the last 90 days",
-    model: "mistral-large",
-    status: "success",
-  },
-  {
-    id: "trace-005",
-    timestamp: "2024-12-18T14:10:00Z",
-    prompt: "Explain quantum computing and its potential applications in cryptography",
-    model: "gpt-5",
-    status: "success",
-  },
-];
+interface TraceData {
+  id: string;
+  timestamp: string;
+  prompt: string;
+  model: string;
+  status: string;
+}
 
 export function TraceLoaderModal({ isOpen, onClose, onLoad }: TraceLoaderModalProps) {
   const [selectedTrace, setSelectedTrace] = useState<string | null>(null);
+  const [traces, setTraces] = useState<TraceData[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch traces when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchTraces();
+    }
+  }, [isOpen]);
+
+  const fetchTraces = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/playground/traces');
+      if (!response.ok) {
+        throw new Error('Failed to fetch traces');
+      }
+      const data = await response.json();
+      setTraces(data.traces || []);
+    } catch (err) {
+      console.error('Error fetching traces:', err);
+      setError('Failed to load traces. Please try again.');
+      setTraces([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleLoad = () => {
-    const trace = MOCK_TRACES.find((t) => t.id === selectedTrace);
+    const trace = traces.find((t) => t.id === selectedTrace);
     if (trace) {
       onLoad(trace.prompt);
     }
@@ -134,7 +132,26 @@ export function TraceLoaderModal({ isOpen, onClose, onLoad }: TraceLoaderModalPr
 
                 {/* Traces List */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-3">
-                  {MOCK_TRACES.map((trace) => (
+                  {isLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <div className="animate-spin rounded-full h-8 w-8 border-2 border-babyblue border-t-transparent" />
+                    </div>
+                  ) : error ? (
+                    <div className="text-center py-12">
+                      <p className="text-sm text-red-600 mb-4">{error}</p>
+                      <button
+                        onClick={fetchTraces}
+                        className="px-4 py-2 text-sm font-medium border-2 border-black bg-white hover:bg-black/5 transition-colors"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  ) : traces.length === 0 ? (
+                    <div className="text-center py-12">
+                      <p className="text-sm text-black/40">No traces found with prompts</p>
+                    </div>
+                  ) : (
+                    traces.map((trace) => (
                     <button
                       key={trace.id}
                       onClick={() => setSelectedTrace(trace.id)}
@@ -166,7 +183,7 @@ export function TraceLoaderModal({ isOpen, onClose, onLoad }: TraceLoaderModalPr
                         {trace.prompt}
                       </p>
                     </button>
-                  ))}
+                  )))}
                 </div>
 
                 {/* Footer */}
