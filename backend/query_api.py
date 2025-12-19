@@ -488,6 +488,20 @@ async def get_cost_by_model(user_id: str, start_date: str, end_date: str):
         raise HTTPException(status_code=500, detail=str(e))
     
 @app.get("/cost/trends")
+async def get_cost_trends(user_id: str, days: int):
+    try:
+        validate_user_id(user_id)
+
+        loop = asyncio.get_running_loop()
+
+        cost_trends = await loop.run_in_executor(
+            None,
+            lambda: db.get_cost_trends(user_id, days)
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 @app.get("/cost/token-breakdown")
 
 @app.exception_handler(ValidationError)
