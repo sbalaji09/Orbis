@@ -470,6 +470,23 @@ async def get_cost_by_agent(user_id: str, start_date: str, end_date: str):
         raise HTTPException(status_code=500, detail=str(e))
     
 @app.get("/cost/by-model")
+async def get_cost_by_model(user_id: str, start_date: str, end_date: str):
+    try:
+        validate_user_id(user_id)
+
+        loop = asyncio.get_running_loop()
+
+        cost_by_agent = await loop.run_in_executor(
+            None,
+            lambda: db.get_cost_by_model(user_id, start_date, end_date)
+        )
+
+        return cost_by_agent
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
 @app.get("/cost/trends")
 @app.get("/cost/token-breakdown")
 
