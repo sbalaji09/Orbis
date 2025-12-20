@@ -1,6 +1,7 @@
 import { ModelOutput } from "@/app/dashboard/playground/PlaygroundClient";
 import { ModelLogo } from "./ModelLogo";
 import ReactMarkdown from "react-markdown";
+import { safeIsJson } from "@/lib/json-guardrail";
 
 interface OutputCardProps {
   output: ModelOutput;
@@ -111,12 +112,7 @@ export function OutputCard({
   const guardrailBadges: Array<{ label: string; pass: boolean }> = [];
   if (!output.error && guardrails) {
     if (guardrails.requireJson) {
-      let pass = false;
-      try {
-        JSON.parse(output.output);
-        pass = true;
-      } catch {}
-      guardrailBadges.push({ label: "JSON", pass });
+      guardrailBadges.push({ label: "JSON", pass: safeIsJson(output.output) });
     }
     const mustContainValues = Array.isArray(guardrails.mustContain)
       ? guardrails.mustContain

@@ -1,6 +1,7 @@
 import { ModelOutput } from "@/app/dashboard/playground/PlaygroundClient";
 import { Guardrails } from "@/components/OutputCard";
 import { useMemo } from "react";
+import { safeIsJson } from "@/lib/json-guardrail";
 
 function parseMustContain(mustContain?: Guardrails["mustContain"]): string[] {
   if (!mustContain) return [];
@@ -9,15 +10,6 @@ function parseMustContain(mustContain?: Guardrails["mustContain"]): string[] {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-}
-
-function safeIsJson(text: string): boolean {
-  try {
-    JSON.parse(text);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 function fmtDelta(delta: number, digits: number, unit = ""): string {

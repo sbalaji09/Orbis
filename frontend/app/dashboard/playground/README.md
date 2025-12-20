@@ -341,6 +341,6 @@ curl -X POST http://localhost:3000/api/playground/generate \
 
 - [ ] Persist baselines/runs to Supabase for cross-device + team sharing
 - [ ] Batch/dataset mode (CSV inputs, aggregates, pass rate)
-- [ ] More robust JSON guardrail (extract fenced JSON blocks)
+- [x] More robust JSON guardrail (accept fenced JSON blocks)
 - [ ] “Approve/promote” baseline flow with notes and audit trail
 - [ ] Saved/shareable regression reports

@@ -144,6 +144,8 @@ export const AVAILABLE_MODELS: ModelConfig[] = [
 ];
 
 export default function App() {
+  const JSON_OUTPUT_INSTRUCTIONS =
+    "Return valid JSON wrapped in a Markdown ```json code block, and nothing else (no extra text).";
   const [inputPrompt, setInputPrompt] = useState("");
   const [outputs, setOutputs] = useState<ModelOutput[]>([]);
   const [previousOutputs, setPreviousOutputs] = useState<ModelOutput[] | null>(
@@ -547,6 +549,10 @@ export default function App() {
     setCompareRunBId(null);
     if (!options.preserveReport) setShowRegressionReport(false);
 
+    const generationPrompt = guardrailsDraft.requireJson
+      ? `${JSON_OUTPUT_INSTRUCTIONS}\n\n${inputPrompt}`
+      : inputPrompt;
+
     try {
       // Call the API with selected models
       const response = await fetch('/api/playground/generate', {
@@ -555,7 +561,7 @@ export default function App() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          prompt: inputPrompt,
+          prompt: generationPrompt,
           models: selectedModels.map(m => m.id),
           customModels: (() => {
             const entries = selectedModels
