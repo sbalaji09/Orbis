@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import {
   LineChart,
   Line,
@@ -34,10 +34,13 @@ interface CostDashboardClientProps {
 
 const COLORS = ["#5b5fff", "#e8c302", "#10b981", "#f59e0b", "#dc2626", "#8b5cf6", "#06b6d4"];
 
-const PERIODS = [
-  { label: "7D", value: 7 },
-  { label: "14D", value: 14 },
-  { label: "30D", value: 30 },
+const PERIOD_OPTIONS = [
+  { label: "Last 7 days", value: 7 },
+  { label: "Last 14 days", value: 14 },
+  { label: "Last 30 days", value: 30 },
+  { label: "Last 60 days", value: 60 },
+  { label: "Last 90 days", value: 90 },
+  { label: "Custom", value: -1 },
 ];
 
 export default function CostDashboardClient({
@@ -49,10 +52,26 @@ export default function CostDashboardClient({
   const token = session?.access_token ?? null;
 
   const [selectedPeriod, setSelectedPeriod] = useState(30);
+  const [customDays, setCustomDays] = useState("");
+  const [showCustomInput, setShowCustomInput] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [trends, setTrends] = useState<CostTrend[]>(initialTrends);
   const [byAgent, setByAgent] = useState<CostByAgent[]>(initialByAgent);
   const [byModel, setByModel] = useState<CostByModel[]>(initialByModel);
   const [isLoading, setIsLoading] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const hasFetchedRef = useRef(false);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Helper to calculate date range from days
   const getDateRange = useCallback((days: number) => {
@@ -66,6 +85,11 @@ export default function CostDashboardClient({
 
   // Fetch data when period changes
   useEffect(() => {
+    // Skip if this is the initial render with 30 days (already have server data)
+    if (selectedPeriod === 30 && !hasFetchedRef.current) {
+      return;
+    }
+
     const fetchData = async () => {
       if (!token) return;
 
@@ -89,11 +113,40 @@ export default function CostDashboardClient({
       }
     };
 
-    // Only fetch if period changed from initial (30)
-    if (selectedPeriod !== 30 || trends !== initialTrends) {
-      fetchData();
+    hasFetchedRef.current = true;
+    fetchData();
+  }, [selectedPeriod, token, getDateRange]);
+
+  // Handle period selection
+  const handlePeriodSelect = (value: number) => {
+    if (value === -1) {
+      setShowCustomInput(true);
+      setIsDropdownOpen(false);
+    } else {
+      setShowCustomInput(false);
+      setSelectedPeriod(value);
+      setIsDropdownOpen(false);
     }
-  }, [selectedPeriod, token, getDateRange, initialTrends, trends]);
+  };
+
+  // Handle custom days submit
+  const handleCustomSubmit = () => {
+    const days = parseInt(customDays, 10);
+    if (days > 0 && days <= 365) {
+      setSelectedPeriod(days);
+      setShowCustomInput(false);
+      setCustomDays("");
+    }
+  };
+
+  // Get display label for current period
+  const getPeriodLabel = () => {
+    const preset = PERIOD_OPTIONS.find(p => p.value === selectedPeriod);
+    if (preset && preset.value !== -1) {
+      return preset.label;
+    }
+    return `Last ${selectedPeriod} days`;
+  };
 
   // Calculate summary metrics
   const metrics = useMemo(() => {
@@ -101,20 +154,26 @@ export default function CostDashboardClient({
     const totalCalls = trends.reduce((sum, d) => sum + d.call_count, 0);
     const avgCostPerDay = trends.length > 0 ? totalCost / trends.length : 0;
 
-    // Calculate trend (compare last 7 days to previous 7 days)
-    const recentDays = trends.slice(-7);
-    const previousDays = trends.slice(-14, -7);
+    // Calculate trend based on available data
+    // Compare second half to first half of the period
+    const midpoint = Math.floor(trends.length / 2);
+    const recentDays = trends.slice(midpoint);
+    const previousDays = trends.slice(0, midpoint);
     const recentTotal = recentDays.reduce((sum, d) => sum + d.total_cost, 0);
     const previousTotal = previousDays.reduce((sum, d) => sum + d.total_cost, 0);
     const trendPct = previousTotal > 0 ? ((recentTotal - previousTotal) / previousTotal) * 100 : 0;
+
+    // Calculate the comparison period length for display
+    const comparisonDays = Math.floor(selectedPeriod / 2);
 
     return {
       totalCost,
       totalCalls,
       avgCostPerDay,
       trendPct,
+      comparisonDays,
     };
-  }, [trends]);
+  }, [trends, selectedPeriod]);
 
   // Format currency
   const formatCost = (value: number) => `$${value.toFixed(4)}`;
@@ -142,24 +201,76 @@ export default function CostDashboardClient({
           </p>
         </div>
 
-        {/* Period Selector */}
+        {/* Period Selector Dropdown */}
         <div className="flex items-center gap-4 mb-6">
-          <div className="flex gap-2">
-            {PERIODS.map((period) => (
-              <button
-                key={period.value}
-                onClick={() => setSelectedPeriod(period.value)}
-                disabled={isLoading}
-                className={`px-4 py-2 text-sm font-medium border-2 border-black transition-all ${
-                  selectedPeriod === period.value
-                    ? "bg-babyblue text-white shadow-[2px_2px_0_rgba(0,0,0,1)]"
-                    : "bg-white hover:bg-gray-50"
-                } ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
+          <div className="relative" ref={dropdownRef}>
+            <button
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              disabled={isLoading}
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-2 border-black bg-white hover:bg-gray-50 transition-all ${
+                isLoading ? "opacity-50 cursor-not-allowed" : ""
+              }`}
+            >
+              <span>{getPeriodLabel()}</span>
+              <svg
+                className={`w-4 h-4 transition-transform ${isDropdownOpen ? "rotate-180" : ""}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
               >
-                {period.label}
-              </button>
-            ))}
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {isDropdownOpen && (
+              <div className="absolute top-full left-0 mt-1 w-48 bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] z-50">
+                {PERIOD_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => handlePeriodSelect(option.value)}
+                    className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors ${
+                      selectedPeriod === option.value && option.value !== -1
+                        ? "bg-babyblue/10 text-babyblue font-medium"
+                        : ""
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
+
+          {/* Custom Days Input */}
+          {showCustomInput && (
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min="1"
+                max="365"
+                value={customDays}
+                onChange={(e) => setCustomDays(e.target.value)}
+                placeholder="Days (1-365)"
+                className="w-32 px-3 py-2 text-sm border-2 border-black focus:outline-none focus:ring-2 focus:ring-babyblue"
+              />
+              <button
+                onClick={handleCustomSubmit}
+                className="px-4 py-2 text-sm font-medium border-2 border-black bg-babyblue text-white hover:bg-babyblue/90"
+              >
+                Apply
+              </button>
+              <button
+                onClick={() => {
+                  setShowCustomInput(false);
+                  setCustomDays("");
+                }}
+                className="px-4 py-2 text-sm font-medium border-2 border-black bg-white hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+
           {isLoading && (
             <div className="flex items-center gap-2 text-sm text-muted">
               <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
@@ -215,12 +326,12 @@ export default function CostDashboardClient({
               <svg className="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
               </svg>
-              <span className="text-xs font-medium text-muted uppercase tracking-wide">7D Trend</span>
+              <span className="text-xs font-medium text-muted uppercase tracking-wide">Trend</span>
             </div>
             <div className={`text-2xl font-bold font-mono ${metrics.trendPct >= 0 ? "text-error" : "text-success"}`}>
               {metrics.trendPct >= 0 ? "+" : ""}{metrics.trendPct.toFixed(1)}%
             </div>
-            <div className="text-xs text-muted mt-1">vs previous 7 days</div>
+            <div className="text-xs text-muted mt-1">vs previous {metrics.comparisonDays}D</div>
           </div>
         </div>
 
