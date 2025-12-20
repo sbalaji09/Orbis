@@ -22,11 +22,11 @@ A powerful comparison tool for testing and evaluating multiple AI models side-by
 | Model | Provider | Input Cost | Output Cost |
 |-------|----------|------------|-------------|
 | Grok 4.1 Fast | xAI | $0.20/M tokens | $0.50/M tokens |
-| GPT-5 (placeholder uses GPT‑4o) | OpenAI | $5.00/M tokens | $15.00/M tokens |
+| GPT-4o | OpenAI | $2.50/M tokens | $10.00/M tokens |
 | Llama 3.3 70B | Groq | $0.59/M tokens | $0.79/M tokens |
-| Gemini 2.5 Pro | Google | $1.25/M tokens | $10.00/M tokens |
+| Gemini 2.5 Flash Lite | Google | $0.10/M tokens | $0.40/M tokens |
 | Mistral Large | Mistral AI | $0.50/M tokens | $1.50/M tokens |
-| DeepSeek V3 | DeepSeek | $0.28/M tokens | $0.42/M tokens |
+| DeepSeek Chat | DeepSeek | $0.28/M tokens | $0.42/M tokens |
 
 ## Setup
 
@@ -52,6 +52,38 @@ MISTRAL_API_KEY=...
 DEEPSEEK_API_KEY=...
 GEMINI_API_KEY=...
 ```
+
+### Optional: Demo/Sandbox Keys (Orbis-hosted)
+
+If you want the playground to work for new users *without* them pasting keys immediately, you can configure server-side demo keys.
+
+These are read only by the Next.js server (never exposed to the browser):
+
+```bash
+# Optional: Orbis demo keys (fallback if the main key is missing)
+ORBIS_DEMO_GROQ_API_KEY=gsk_...
+ORBIS_DEMO_OPENAI_API_KEY=sk-...
+ORBIS_DEMO_XAI_API_KEY=xai-...
+ORBIS_DEMO_MISTRAL_API_KEY=...
+ORBIS_DEMO_DEEPSEEK_API_KEY=...
+ORBIS_DEMO_GEMINI_API_KEY=...
+```
+
+The API route will use `*_API_KEY` first, and fall back to `ORBIS_DEMO_*` if the primary key is not configured.
+
+### Per-User Provider Keys (Supabase)
+
+If you want users to connect provider keys in the UI (recommended), set up:
+
+1) Run `frontend/supabase/provider_api_keys.sql` in the Supabase SQL editor.
+2) Run `frontend/supabase/playground_persistence.sql` in the Supabase SQL editor (baselines, runs, last state).
+3) Set `ORBIS_PROVIDER_KEYS_ENCRYPTION_KEY` on the Next.js server (base64-encoded 32 bytes).
+   - Example command: `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`
+
+When configured, the playground will use keys in this order:
+1) `*_API_KEY` (BYOK server env)
+2) `ORBIS_DEMO_*_API_KEY` (optional demo sandbox env)
+3) Supabase-stored per-user key (via the Provider Keys panel)
 
 #### Where to Get API Keys:
 
@@ -91,7 +123,7 @@ Generates responses from selected models in parallel.
 ```json
 {
   "prompt": "Explain quantum computing",
-  "models": ["gpt-5", "grok-4-1", "deepseek-v3"]
+  "models": ["gpt-4o", "grok-4-1", "deepseek-chat"]
 }
 ```
 
@@ -100,7 +132,7 @@ Generates responses from selected models in parallel.
 {
   "outputs": [
     {
-      "model": { "id": "gpt-5", "name": "GPT-5", ... },
+      "model": { "id": "gpt-4o", "name": "GPT-4o", ... },
       "output": "Quantum computing is...",
       "inputTokens": 45,
       "outputTokens": 312,
@@ -247,7 +279,7 @@ The playground includes comprehensive error handling:
 - Check that the key format is correct (starts with correct prefix)
 
 ### Slow Response Times
-- Some models (GPT-5/GPT-4o) are slower than others
+- Some models (OpenAI / Mistral) can be slower than others
 - Groq and DeepSeek typically respond fastest
 - Network latency affects all models equally
 
@@ -295,7 +327,7 @@ NEW_PROVIDER_API_KEY=...
 # Test API endpoint directly
 curl -X POST http://localhost:3000/api/playground/generate \
   -H "Content-Type: application/json" \
-  -d '{"prompt":"Hello","models":["gpt-5"]}'
+  -d '{"prompt":"Hello","models":["gpt-4o"]}'
 ```
 
 ## Security

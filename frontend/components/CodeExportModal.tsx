@@ -40,7 +40,7 @@ type ExportTarget =
 
 function getExportTarget(modelId: string): ExportTarget | null {
   switch (modelId) {
-    case "gpt-5":
+    case "gpt-4o":
       return {
         kind: "openai_compat",
         provider: "OpenAI",
@@ -71,7 +71,7 @@ function getExportTarget(modelId: string): ExportTarget | null {
         baseURL: "https://api.mistral.ai/v1",
         modelName: "mistral-large-latest",
       };
-    case "deepseek-v3":
+    case "deepseek-chat":
       return {
         kind: "openai_compat",
         provider: "DeepSeek",
@@ -79,7 +79,7 @@ function getExportTarget(modelId: string): ExportTarget | null {
         baseURL: "https://api.deepseek.com/v1",
         modelName: "deepseek-chat",
       };
-    case "gemini-2.5-pro":
+    case "gemini-2.5-flash-lite":
       return {
         kind: "gemini",
         provider: "Google",
@@ -281,7 +281,7 @@ export function CodeExportModal({
 }: CodeExportModalProps) {
   const [selectedLanguage, setSelectedLanguage] = useState<Language>("python");
   const [selectedModelId, setSelectedModelId] = useState<string>(
-    defaultModelId ?? availableModels[0]?.id ?? "gpt-5"
+    defaultModelId ?? availableModels[0]?.id ?? "gpt-4o"
   );
   const [copied, setCopied] = useState(false);
 

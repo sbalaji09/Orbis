@@ -13,7 +13,7 @@ export function ModelLogo({ provider, size = 24 }: ModelLogoProps) {
       case "OpenAI":
         return "/logos/openai.svg";
       case "Groq":
-        return "/logos/meta.svg"; // Using Meta logo for Llama
+        return "/logos/groq.svg";
       case "Google":
         return "/logos/gemini.svg";
       case "Mistral AI":

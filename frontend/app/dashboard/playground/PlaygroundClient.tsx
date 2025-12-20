@@ -8,6 +8,7 @@ import { TraceLoaderModal } from "@/components/TraceLoaderModal";
 import { Guardrails } from "@/components/OutputCard";
 import { ModelLogo } from "@/components/ModelLogo";
 import { RegressionReport } from "@/components/RegressionReport";
+import { ProviderKeysPanel } from "@/components/ProviderKeysPanel";
 
 export interface ModelConfig {
   id: string;
@@ -53,6 +54,44 @@ type PlaygroundRun = {
   outputs: ModelOutput[];
 };
 
+type RemoteBaseline = {
+  id: string;
+  name: string;
+  prompt: string;
+  outputs: ModelOutput[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+type RemoteRun = {
+  id: string;
+  name: string;
+  prompt: string;
+  outputs: ModelOutput[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+type RemotePlaygroundState = {
+  inputPrompt?: string;
+  outputs?: ModelOutput[];
+  previousOutputs?: ModelOutput[] | null;
+  baseline?: ActiveBaseline | null;
+  guardrailsDraft?: Partial<{
+    requireJson: boolean;
+    mustContain: string;
+    maxLatencySec: string;
+    maxTotalCost: string;
+  }>;
+  compareRunAId?: string | null;
+  compareRunBId?: string | null;
+  compareLabel?: string | null;
+  inputPanel?: {
+    selectedModelIds?: string[];
+    customModels?: ModelConfig[];
+  };
+};
+
 export const AVAILABLE_MODELS: ModelConfig[] = [
   {
     id: "grok-4-1",
@@ -63,11 +102,11 @@ export const AVAILABLE_MODELS: ModelConfig[] = [
     color: "#e91e8c",
   },
   {
-    id: "gpt-5",
-    name: "GPT-5",
+    id: "gpt-4o",
+    name: "GPT-4o",
     provider: "OpenAI",
-    costPerInputToken: 0.000005,
-    costPerOutputToken: 0.000015,
+    costPerInputToken: 0.0000025,
+    costPerOutputToken: 0.00001,
     color: "#5b5fff",
   },
   {
@@ -79,11 +118,11 @@ export const AVAILABLE_MODELS: ModelConfig[] = [
     color: "#e8c302",
   },
   {
-    id: "gemini-2.5-pro",
-    name: "Gemini 2.5 Pro",
+    id: "gemini-2.5-flash-lite",
+    name: "Gemini 2.5 Flash Lite",
     provider: "Google",
-    costPerInputToken: 0.00000125, // $1.25/M
-    costPerOutputToken: 0.00001,    // $10/M
+    costPerInputToken: 0.0000001, // $0.10/M
+    costPerOutputToken: 0.0000004, // $0.40/M
     color: "#4285f4",
   },
   {
@@ -95,8 +134,8 @@ export const AVAILABLE_MODELS: ModelConfig[] = [
     color: "#ff7b54",
   },
   {
-    id: "deepseek-v3",
-    name: "DeepSeek V3",
+    id: "deepseek-chat",
+    name: "DeepSeek Chat",
     provider: "DeepSeek",
     costPerInputToken: 0.00000028,
     costPerOutputToken: 0.00000042,
@@ -133,6 +172,49 @@ export default function App() {
     maxLatencySec: "",
     maxTotalCost: "",
   });
+  const [providerAvailability, setProviderAvailability] = useState<
+    Record<string, boolean>
+  >({});
+  const [selectedModelsDraft, setSelectedModelsDraft] = useState<ModelConfig[]>(
+    []
+  );
+  const [remoteSyncEnabled, setRemoteSyncEnabled] = useState(false);
+  const [restoreToken, setRestoreToken] = useState(0);
+  const [restoredInputPanel, setRestoredInputPanel] = useState<{
+    selectedModelIds: string[];
+    customModels: ModelConfig[];
+  } | null>(null);
+  const [customModelsDraft, setCustomModelsDraft] = useState<ModelConfig[]>([]);
+
+  const inputPanelInitial = useMemo(() => {
+    const selectedIds = restoredInputPanel?.selectedModelIds ?? [];
+    const custom = restoredInputPanel?.customModels ?? [];
+    const byId = new Map<string, ModelConfig>([
+      ...AVAILABLE_MODELS.map((m) => [m.id, m] as const),
+      ...custom.map((m) => [m.id, m] as const),
+    ]);
+    const selectedModels = selectedIds
+      .map((id) => byId.get(id))
+      .filter(Boolean)
+      .slice(0, 4) as ModelConfig[];
+
+    return {
+      selectedModels,
+      customModels: custom,
+    };
+  }, [restoredInputPanel]);
+
+  const providerKeysRef = useRef<HTMLDivElement | null>(null);
+  const inputPanelRef = useRef<HTMLDivElement | null>(null);
+  const resultsRef = useRef<HTMLDivElement | null>(null);
+
+  const providerLabels = useMemo(() => {
+    return Array.from(new Set(AVAILABLE_MODELS.map((m) => m.provider)));
+  }, []);
+
+  const connectedProvidersCount = providerLabels.filter(
+    (p) => providerAvailability[p]
+  ).length;
 
   const guardrails: Guardrails = useMemo(
     () => ({
@@ -163,6 +245,7 @@ export default function App() {
   const skipPersistBaselinesRef = useRef(true);
   const skipPersistRunHistoryRef = useRef(true);
   const skipPersistPlaygroundStateRef = useRef(true);
+  const skipRemoteStatePersistRef = useRef(true);
 
   useEffect(() => {
     try {
@@ -219,6 +302,163 @@ export default function App() {
   }, [runHistory]);
 
   useEffect(() => {
+    let cancelled = false;
+
+    const loadRemote = async () => {
+      try {
+        const [stateRes, baselinesRes, runsRes] = await Promise.all([
+          fetch("/api/playground/state"),
+          fetch("/api/playground/baselines"),
+          fetch(`/api/playground/runs?limit=${RUN_HISTORY_LIMIT}`),
+        ]);
+
+        if (cancelled) return;
+
+        if (stateRes.status === 401 || baselinesRes.status === 401 || runsRes.status === 401) {
+          setRemoteSyncEnabled(false);
+          return;
+        }
+
+        setRemoteSyncEnabled(
+          stateRes.ok && baselinesRes.ok && runsRes.ok
+        );
+
+        if (baselinesRes.ok) {
+          const data = (await baselinesRes.json()) as { baselines?: RemoteBaseline[] };
+          const remote = (data.baselines ?? [])
+            .map((b) => ({
+              id: b.id,
+              name: b.name,
+              createdAt: Date.parse(b.createdAt),
+              prompt: b.prompt,
+              outputs: (Array.isArray(b.outputs) ? b.outputs : []) as ModelOutput[],
+            }))
+            .filter((b) => Number.isFinite(b.createdAt))
+            .slice(0, 50);
+
+          setSavedBaselines((local) => {
+            const seen = new Set(remote.map((b) => b.id));
+            const merged = [...remote, ...local.filter((b) => !seen.has(b.id))];
+            return merged.slice(0, 50);
+          });
+        }
+
+        if (runsRes.ok) {
+          const data = (await runsRes.json()) as { runs?: RemoteRun[] };
+          const remote = (data.runs ?? [])
+            .map((r) => ({
+              id: r.id,
+              name: r.name,
+              createdAt: Date.parse(r.createdAt),
+              prompt: r.prompt,
+              outputs: (Array.isArray(r.outputs) ? r.outputs : []) as ModelOutput[],
+            }))
+            .filter((r) => Number.isFinite(r.createdAt))
+            .slice(0, RUN_HISTORY_LIMIT);
+
+          setRunHistory((local) => {
+            const seen = new Set(remote.map((r) => r.id));
+            const merged = [...remote, ...local.filter((r) => !seen.has(r.id))];
+            return merged.slice(0, RUN_HISTORY_LIMIT);
+          });
+        }
+
+        if (stateRes.ok) {
+          const data = (await stateRes.json()) as { state?: RemotePlaygroundState | null };
+          const state = data.state;
+          if (state && typeof state === "object") {
+            skipRemoteStatePersistRef.current = true;
+
+            if (typeof state.inputPrompt === "string") setInputPrompt(state.inputPrompt);
+            if (Array.isArray(state.outputs)) setOutputs(state.outputs);
+            if (Array.isArray(state.previousOutputs) || state.previousOutputs === null) {
+              setPreviousOutputs(state.previousOutputs ?? null);
+            }
+            if (state.baseline === null) setBaseline(null);
+            if (state.baseline && typeof state.baseline === "object") {
+              setBaseline(state.baseline);
+            }
+            if (state.guardrailsDraft && typeof state.guardrailsDraft === "object") {
+              setGuardrailsDraft((prev) => ({ ...prev, ...state.guardrailsDraft }));
+            }
+            if (typeof state.compareRunAId === "string" || state.compareRunAId === null) {
+              setCompareRunAId(state.compareRunAId ?? null);
+            }
+            if (typeof state.compareRunBId === "string" || state.compareRunBId === null) {
+              setCompareRunBId(state.compareRunBId ?? null);
+            }
+            if (typeof state.compareLabel === "string" || state.compareLabel === null) {
+              setCompareLabel(state.compareLabel ?? null);
+            }
+
+            const selectedModelIds = Array.isArray(state.inputPanel?.selectedModelIds)
+              ? state.inputPanel!.selectedModelIds!.filter((v) => typeof v === "string")
+              : [];
+            const customModels = Array.isArray(state.inputPanel?.customModels)
+              ? state.inputPanel!.customModels!.filter((m: any) => m && typeof m.id === "string")
+              : [];
+            setRestoredInputPanel({ selectedModelIds, customModels });
+            setCustomModelsDraft(customModels as ModelConfig[]);
+            setRestoreToken((t) => t + 1);
+          }
+        }
+      } catch {
+        setRemoteSyncEnabled(false);
+      }
+    };
+
+    loadRemote();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!remoteSyncEnabled) return;
+    if (skipRemoteStatePersistRef.current) {
+      skipRemoteStatePersistRef.current = false;
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      fetch("/api/playground/state", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          state: {
+            inputPrompt,
+            outputs,
+            previousOutputs,
+            baseline,
+            guardrailsDraft,
+            compareRunAId,
+            compareRunBId,
+            compareLabel,
+            inputPanel: {
+              selectedModelIds: selectedModelsDraft.map((m) => m.id),
+              customModels: customModelsDraft,
+            },
+          } satisfies RemotePlaygroundState,
+        }),
+      }).catch(() => {});
+    }, 800);
+
+    return () => clearTimeout(timeout);
+  }, [
+    remoteSyncEnabled,
+    inputPrompt,
+    outputs,
+    previousOutputs,
+    baseline,
+    guardrailsDraft,
+    compareRunAId,
+    compareRunBId,
+    compareLabel,
+    selectedModelsDraft,
+    customModelsDraft,
+  ]);
+
+  useEffect(() => {
     try {
       const raw = localStorage.getItem(PLAYGROUND_STATE_STORAGE_KEY);
       if (!raw) return;
@@ -239,6 +479,17 @@ export default function App() {
       }
       if (typeof parsed.compareLabel === "string" || parsed.compareLabel === null) {
         setCompareLabel(parsed.compareLabel);
+      }
+      if (parsed.inputPanel && typeof parsed.inputPanel === "object") {
+        const selectedModelIds = Array.isArray(parsed.inputPanel.selectedModelIds)
+          ? parsed.inputPanel.selectedModelIds.filter((v: any) => typeof v === "string")
+          : [];
+        const customModels = Array.isArray(parsed.inputPanel.customModels)
+          ? parsed.inputPanel.customModels.filter((m: any) => m && typeof m.id === "string")
+          : [];
+        setRestoredInputPanel({ selectedModelIds, customModels });
+        setCustomModelsDraft(customModels);
+        setRestoreToken((t) => t + 1);
       }
     } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -262,6 +513,10 @@ export default function App() {
           compareRunAId,
           compareRunBId,
           compareLabel,
+          inputPanel: {
+            selectedModelIds: selectedModelsDraft.map((m) => m.id),
+            customModels: customModelsDraft,
+          },
         })
       );
     } catch {}
@@ -274,6 +529,8 @@ export default function App() {
     compareRunAId,
     compareRunBId,
     compareLabel,
+    selectedModelsDraft,
+    customModelsDraft,
   ]);
 
   const handleGenerate = async (
@@ -300,6 +557,33 @@ export default function App() {
         body: JSON.stringify({
           prompt: inputPrompt,
           models: selectedModels.map(m => m.id),
+          customModels: (() => {
+            const entries = selectedModels
+              .filter((m) => m.id.startsWith("custom:"))
+              .map((m) => [
+                m.id,
+                {
+                  provider:
+                    m.provider === "Google"
+                      ? "gemini"
+                      : m.provider === "OpenAI"
+                      ? "openai"
+                      : m.provider === "xAI"
+                      ? "xai"
+                      : m.provider === "Groq"
+                      ? "groq"
+                      : m.provider === "Mistral AI"
+                      ? "mistral"
+                      : m.provider === "DeepSeek"
+                      ? "deepseek"
+                      : "openai",
+                  modelName: m.name,
+                  costPerInputToken: m.costPerInputToken,
+                  costPerOutputToken: m.costPerOutputToken,
+                },
+              ] as const);
+            return entries.length ? Object.fromEntries(entries) : undefined;
+          })(),
         }),
       });
 
@@ -327,6 +611,19 @@ export default function App() {
         outputs: nextOutputs,
       };
       setRunHistory((prev) => [run, ...prev].slice(0, RUN_HISTORY_LIMIT));
+
+      if (remoteSyncEnabled) {
+        fetch("/api/playground/runs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: run.id,
+            name: run.name,
+            prompt: run.prompt,
+            outputs: run.outputs,
+          }),
+        }).catch(() => {});
+      }
     } catch (error) {
       console.error('Error generating outputs:', error);
       // Show error outputs for all selected models
@@ -351,6 +648,19 @@ export default function App() {
     await handleGenerate(selectedModels, { preserveReport: true });
   };
 
+  const handleProviderStatus = (
+    providers: Array<{ label: string; available?: boolean }>
+  ) => {
+    const next: Record<string, boolean> = {};
+    for (const p of providers) {
+      if (typeof p.available === "boolean") next[p.label] = p.available;
+      if (p.label.startsWith("Google") && typeof p.available === "boolean") {
+        next["Google"] = p.available;
+      }
+    }
+    setProviderAvailability(next);
+  };
+
   const handleLoadFromTrace = (tracePrompt: string) => {
     setInputPrompt(tracePrompt);
     setShowTraceLoader(false);
@@ -362,9 +672,9 @@ export default function App() {
     if (m.includes("grok")) return "grok-4-1";
     if (m.includes("llama-3.3-70b")) return "groq-llama";
     if (m.includes("mistral-large")) return "mistral-large";
-    if (m.includes("deepseek")) return "deepseek-v3";
-    if (m.includes("gpt")) return "gpt-5";
-    if (m.includes("gemini")) return "gemini-2.5-pro";
+    if (m.includes("deepseek")) return "deepseek-chat";
+    if (m.includes("gpt")) return "gpt-4o";
+    if (m.includes("gemini")) return "gemini-2.5-flash-lite";
     return null;
   };
 
@@ -441,6 +751,19 @@ export default function App() {
     };
     setSavedBaselines((prev) => [newBaseline, ...prev].slice(0, 50));
     setBaselineNameDraft("");
+
+    if (remoteSyncEnabled) {
+      fetch("/api/playground/baselines", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: newBaseline.id,
+          name: newBaseline.name,
+          prompt: newBaseline.prompt,
+          outputs: newBaseline.outputs,
+        }),
+      }).catch(() => {});
+    }
   };
 
   const loadSavedBaseline = (b: SavedBaseline) => {
@@ -454,6 +777,14 @@ export default function App() {
     setSavedBaselines((prev) => prev.filter((b) => b.id !== baselineId));
     if (baseline?.source === "saved" && baseline.id === baselineId) {
       setBaseline(null);
+    }
+
+    if (remoteSyncEnabled) {
+      fetch("/api/playground/baselines", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: baselineId }),
+      }).catch(() => {});
     }
   };
 
@@ -489,6 +820,14 @@ export default function App() {
       delete next[runId];
       return next;
     });
+
+    if (remoteSyncEnabled) {
+      fetch("/api/playground/runs", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: runId }),
+      }).catch(() => {});
+    }
   };
 
   const startRenamingRun = (run: PlaygroundRun) => {
@@ -509,13 +848,30 @@ export default function App() {
   const saveRunName = (runId: string) => {
     const nextName = (runRenameDrafts[runId] ?? "").trim();
     if (!nextName) return;
-    setRunHistory((prev) =>
-      prev.map((r) => (r.id === runId ? { ...r, name: nextName } : r))
-    );
+    const run = runHistory.find((r) => r.id === runId);
+    if (!run) return;
+    setRunHistory((prev) => prev.map((r) => (r.id === runId ? { ...r, name: nextName } : r)));
     cancelRenamingRun(runId);
+
+    if (remoteSyncEnabled) {
+      fetch("/api/playground/runs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: run.id,
+          name: nextName,
+          prompt: run.prompt,
+          outputs: run.outputs,
+        }),
+      }).catch(() => {});
+    }
   };
 
-    return (
+  const scrollTo = (ref: { current: HTMLElement | null }) => {
+    ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  return (
     <div className="h-full w-full bg-background p-6">
         <div className="max-w-[1800px] mx-auto pb-12">
         {/* Header */}
@@ -570,6 +926,168 @@ export default function App() {
           </div>
         </div>
 
+        {/* Quick Start */}
+        <div className="mb-6 border-2 border-black bg-card shadow-[4px_4px_0_rgba(0,0,0,0.15)]">
+          <div className="px-6 py-4 bg-black/5 border-b-2 border-black">
+            <h2 className="text-base font-semibold tracking-tight">Quick Start</h2>
+            <p className="text-xs text-black/60 mt-1 font-mono">
+              {`// Connect a key → pick models → generate → save baselines`}
+            </p>
+          </div>
+          <div className="p-6">
+            <div className="grid grid-cols-3 gap-4">
+              <div className="p-4 border-2 border-black bg-white shadow-[3px_3px_0_rgba(0,0,0,0.12)]">
+                <p className="text-[10px] text-black/50 uppercase tracking-wide">
+                  Step 1
+                </p>
+                <p className="text-sm font-semibold mt-1">Connect provider keys</p>
+                <p className="text-[10px] text-black/60 font-mono mt-1">
+                  {`// ${connectedProvidersCount}/${providerLabels.length} connected`}
+                </p>
+                <button
+                  onClick={() => scrollTo(providerKeysRef)}
+                  className="mt-3 px-3 py-2 text-xs font-medium border-2 border-black bg-mustard text-black hover:bg-mustard/90 transition-colors shadow-[2px_2px_0_rgba(0,0,0,0.1)]"
+                >
+                  Open keys
+                </button>
+              </div>
+
+              <div className="p-4 border-2 border-black bg-white shadow-[3px_3px_0_rgba(0,0,0,0.12)]">
+                <p className="text-[10px] text-black/50 uppercase tracking-wide">
+                  Step 2
+                </p>
+                <p className="text-sm font-semibold mt-1">Pick models + prompt</p>
+                <p className="text-[10px] text-black/60 font-mono mt-1">
+                  {`// ${selectedModelsDraft.length}/4 selected · ${
+                    inputPrompt.trim() ? "prompt ready" : "add a prompt"
+                  }`}
+                </p>
+                <button
+                  onClick={() => scrollTo(inputPanelRef)}
+                  className="mt-3 px-3 py-2 text-xs font-medium border-2 border-black bg-white hover:bg-black/5 transition-colors shadow-[2px_2px_0_rgba(0,0,0,0.1)]"
+                >
+                  Jump to input
+                </button>
+              </div>
+
+              <div className="p-4 border-2 border-black bg-white shadow-[3px_3px_0_rgba(0,0,0,0.12)]">
+                <p className="text-[10px] text-black/50 uppercase tracking-wide">
+                  Step 3
+                </p>
+                <p className="text-sm font-semibold mt-1">Generate + compare</p>
+                <p className="text-[10px] text-black/60 font-mono mt-1">
+                  {`// ${outputs.length ? "results ready" : "run once to see results"}`}
+                </p>
+                <button
+                  onClick={() => scrollTo(resultsRef)}
+                  className="mt-3 px-3 py-2 text-xs font-medium border-2 border-black bg-babyblue text-white hover:bg-babyblue/90 transition-colors shadow-[2px_2px_0_rgba(0,0,0,0.1)]"
+                >
+                  View results
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Provider Keys */}
+        <div ref={providerKeysRef} id="provider-keys" className="scroll-mt-24">
+          <ProviderKeysPanel onStatus={handleProviderStatus} />
+        </div>
+
+        {/* Input Panel */}
+        <div ref={inputPanelRef} id="prompt" className="scroll-mt-24">
+          <InputPanel
+            inputPrompt={inputPrompt}
+            setInputPrompt={setInputPrompt}
+            onGenerate={handleGenerate}
+            onRunReport={handleRunReport}
+            isGenerating={isGenerating}
+            availableModels={AVAILABLE_MODELS}
+            providerAvailability={providerAvailability}
+            onSelectionChange={setSelectedModelsDraft}
+            onCustomModelsChange={setCustomModelsDraft}
+            restoreToken={restoreToken}
+            initialSelectedModels={inputPanelInitial.selectedModels}
+            initialCustomModels={inputPanelInitial.customModels}
+          />
+        </div>
+
+        {/* Checks */}
+        <div className="mb-6 border-2 border-black bg-white shadow-[4px_4px_0_rgba(0,0,0,0.15)]">
+          <div className="px-6 py-4 bg-black/5 border-b-2 border-black">
+            <h2 className="text-base font-semibold tracking-tight">
+              Checks (optional)
+            </h2>
+            <p className="text-xs text-black/60 mt-1 font-mono">
+              {`// Only affects badges + the report (does not change generation)`}
+            </p>
+          </div>
+          <div className="p-6">
+            <div className="grid grid-cols-4 gap-4">
+              <label className="flex items-center gap-2 text-xs font-medium">
+                <input
+                  type="checkbox"
+                  checked={guardrailsDraft.requireJson}
+                  onChange={(e) =>
+                    setGuardrailsDraft((p) => ({
+                      ...p,
+                      requireJson: e.target.checked,
+                    }))
+                  }
+                  className="w-4 h-4 border-2 border-black"
+                />
+                Require JSON output
+              </label>
+
+              <label className="block">
+                <span className="text-[10px] text-black/60 uppercase tracking-wide">
+                  Must contain (comma-separated)
+                </span>
+                <input
+                  value={guardrailsDraft.mustContain}
+                  onChange={(e) =>
+                    setGuardrailsDraft((p) => ({ ...p, mustContain: e.target.value }))
+                  }
+                  placeholder="e.g. followers, repos, stars"
+                  className="mt-1 w-full px-3 py-2 border-2 border-black font-mono text-xs focus:outline-none focus:ring-2 focus:ring-babyblue/50"
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-[10px] text-black/60 uppercase tracking-wide">
+                  Max latency (s)
+                </span>
+                <input
+                  value={guardrailsDraft.maxLatencySec}
+                  onChange={(e) =>
+                    setGuardrailsDraft((p) => ({ ...p, maxLatencySec: e.target.value }))
+                  }
+                  inputMode="decimal"
+                  placeholder="e.g. 2.0"
+                  className="mt-1 w-full px-3 py-2 border-2 border-black font-mono text-xs focus:outline-none focus:ring-2 focus:ring-babyblue/50"
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-[10px] text-black/60 uppercase tracking-wide">
+                  Max cost ($)
+                </span>
+                <input
+                  value={guardrailsDraft.maxTotalCost}
+                  onChange={(e) =>
+                    setGuardrailsDraft((p) => ({ ...p, maxTotalCost: e.target.value }))
+                  }
+                  inputMode="decimal"
+                  placeholder="e.g. 0.01"
+                  className="mt-1 w-full px-3 py-2 border-2 border-black font-mono text-xs focus:outline-none focus:ring-2 focus:ring-babyblue/50"
+                />
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div ref={resultsRef} id="results" className="scroll-mt-24" />
+
         {/* Baseline Banner */}
         {baseline && (
           <div className="mb-6 border-2 border-black bg-white shadow-[4px_4px_0_rgba(0,0,0,0.15)]">
@@ -600,14 +1118,46 @@ export default function App() {
           </div>
         )}
 
+        {/* Regression Report */}
+        {showRegressionReport && outputs.length > 0 && (
+          <div className="mb-6">
+            <RegressionReport
+              outputs={outputs}
+              guardrails={guardrails}
+              compareToOutputs={(baseline?.outputs ?? previousOutputs) ?? null}
+              compareToLabel={baseline ? "baseline" : compareLabel ?? "previous run"}
+            />
+          </div>
+        )}
+
+        {/* Model Comparison */}
+        {outputs.length > 0 && (
+          <ModelComparison
+            outputs={outputs}
+            inputPrompt={inputPrompt}
+            previousOutputs={(baseline?.outputs ?? previousOutputs) ?? undefined}
+            guardrails={guardrails}
+            compareToLabel={baseline ? "baseline" : compareLabel ?? undefined}
+          />
+        )}
+
+        {/* Empty State */}
+        {outputs.length === 0 && !isGenerating && (
+          <div className="mt-6 border-2 border-dashed border-black/20 bg-white/50 shadow-[4px_4px_0_rgba(0,0,0,0.05)] p-12 text-center">
+            <p className="text-sm text-black/40">
+              Enter a prompt and select models to start comparing outputs
+            </p>
+          </div>
+        )}
+
         {/* Baseline Library */}
-        <div className="mb-6 border-2 border-black bg-white shadow-[4px_4px_0_rgba(0,0,0,0.15)]">
+        <div className="mt-6 mb-6 border-2 border-black bg-white shadow-[4px_4px_0_rgba(0,0,0,0.15)]">
           <div className="px-6 py-4 bg-babyblue/10 border-b-2 border-black">
             <h2 className="text-base font-semibold tracking-tight">
               Baseline Library
             </h2>
             <p className="text-xs text-black/60 mt-1 font-mono">
-              {`// Save and reload approved outputs for regression checks`}
+              {`// Save an approved run, then replay to catch regressions`}
             </p>
           </div>
           <div className="p-6 space-y-4">
@@ -634,7 +1184,7 @@ export default function App() {
 
             {savedBaselines.length === 0 ? (
               <p className="text-xs text-black/40 font-mono">
-                {`// No saved baselines yet. Run the playground and click "Save Current Run".`}
+                {`// No saved baselines yet. Run once, then click "Save Current Run".`}
               </p>
             ) : (
               <div className="border-2 border-black/10 max-h-[220px] overflow-auto">
@@ -698,14 +1248,19 @@ export default function App() {
           <div className="p-6 space-y-4">
             <div className="flex items-center justify-between gap-3">
               <p className="text-[10px] text-black/50 font-mono">
-                {compareLabel
+            {compareLabel
                   ? `// Comparing: ${compareLabel}`
                   : compareRunAId || compareRunBId
                   ? "// Select both A and B, then Compare"
                   : `// Last ${RUN_HISTORY_LIMIT} runs`}
               </p>
               <button
-                onClick={() => setRunHistory([])}
+                onClick={() => {
+                  setRunHistory([]);
+                  if (remoteSyncEnabled) {
+                    fetch("/api/playground/runs?all=1", { method: "DELETE" }).catch(() => {});
+                  }
+                }}
                 disabled={runHistory.length === 0}
                 className="px-3 py-2 text-xs font-medium border-2 border-black bg-black text-mustard hover:bg-black/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-[2px_2px_0_rgba(0,0,0,0.1)]"
               >
@@ -837,122 +1392,6 @@ export default function App() {
             </div>
           </div>
         </div>
-
-        {/* Guardrails */}
-        <div className="mb-6 border-2 border-black bg-white shadow-[4px_4px_0_rgba(0,0,0,0.15)]">
-          <div className="px-6 py-4 bg-black/5 border-b-2 border-black">
-            <h2 className="text-base font-semibold tracking-tight">
-              Guardrails
-            </h2>
-            <p className="text-xs text-black/60 mt-1 font-mono">
-              {`// Lightweight checks to catch regressions during replay`}
-            </p>
-          </div>
-          <div className="p-6">
-            <div className="grid grid-cols-4 gap-4">
-              <label className="flex items-center gap-2 text-xs font-medium">
-                <input
-                  type="checkbox"
-                  checked={guardrailsDraft.requireJson}
-                  onChange={(e) =>
-                    setGuardrailsDraft((p) => ({
-                      ...p,
-                      requireJson: e.target.checked,
-                    }))
-                  }
-                  className="w-4 h-4 border-2 border-black"
-                />
-                Require JSON output
-              </label>
-
-              <label className="block">
-                <span className="text-[10px] text-black/60 uppercase tracking-wide">
-                  Must contain (comma-separated)
-                </span>
-                <input
-                  value={guardrailsDraft.mustContain}
-                  onChange={(e) =>
-                    setGuardrailsDraft((p) => ({ ...p, mustContain: e.target.value }))
-                  }
-                  placeholder="e.g. followers, repos, stars"
-                  className="mt-1 w-full px-3 py-2 border-2 border-black font-mono text-xs focus:outline-none focus:ring-2 focus:ring-babyblue/50"
-                />
-              </label>
-
-              <label className="block">
-                <span className="text-[10px] text-black/60 uppercase tracking-wide">
-                  Max latency (s)
-                </span>
-                <input
-                  value={guardrailsDraft.maxLatencySec}
-                  onChange={(e) =>
-                    setGuardrailsDraft((p) => ({ ...p, maxLatencySec: e.target.value }))
-                  }
-                  inputMode="decimal"
-                  placeholder="e.g. 2.0"
-                  className="mt-1 w-full px-3 py-2 border-2 border-black font-mono text-xs focus:outline-none focus:ring-2 focus:ring-babyblue/50"
-                />
-              </label>
-
-              <label className="block">
-                <span className="text-[10px] text-black/60 uppercase tracking-wide">
-                  Max cost ($)
-                </span>
-                <input
-                  value={guardrailsDraft.maxTotalCost}
-                  onChange={(e) =>
-                    setGuardrailsDraft((p) => ({ ...p, maxTotalCost: e.target.value }))
-                  }
-                  inputMode="decimal"
-                  placeholder="e.g. 0.01"
-                  className="mt-1 w-full px-3 py-2 border-2 border-black font-mono text-xs focus:outline-none focus:ring-2 focus:ring-babyblue/50"
-                />
-              </label>
-            </div>
-          </div>
-        </div>
-
-        {/* Input Panel */}
-        <InputPanel
-          inputPrompt={inputPrompt}
-          setInputPrompt={setInputPrompt}
-          onGenerate={handleGenerate}
-          onRunReport={handleRunReport}
-          isGenerating={isGenerating}
-          availableModels={AVAILABLE_MODELS}
-        />
-
-        {/* Regression Report */}
-        {showRegressionReport && outputs.length > 0 && (
-          <div className="mb-6">
-            <RegressionReport
-              outputs={outputs}
-              guardrails={guardrails}
-              compareToOutputs={(baseline?.outputs ?? previousOutputs) ?? null}
-              compareToLabel={baseline ? "baseline" : compareLabel ?? "previous run"}
-            />
-          </div>
-        )}
-
-        {/* Model Comparison */}
-        {outputs.length > 0 && (
-          <ModelComparison
-            outputs={outputs}
-            inputPrompt={inputPrompt}
-            previousOutputs={(baseline?.outputs ?? previousOutputs) ?? undefined}
-            guardrails={guardrails}
-            compareToLabel={baseline ? "baseline" : compareLabel ?? undefined}
-          />
-        )}
-
-        {/* Empty State */}
-        {outputs.length === 0 && !isGenerating && (
-          <div className="mt-6 border-2 border-dashed border-black/20 bg-white/50 shadow-[4px_4px_0_rgba(0,0,0,0.05)] p-12 text-center">
-            <p className="text-sm text-black/40">
-              Enter a prompt and select models to start comparing outputs
-            </p>
-          </div>
-        )}
       </div>
 
       {/* Modals */}

@@ -4,6 +4,9 @@ import {
   getCachedResponse,
   setCachedResponse,
 } from "@/lib/playground-cache";
+import { createClient as createSupabaseClient } from "@/lib/supabase/server";
+import { ProviderKeyProvider } from "@/lib/provider-keys";
+import { decryptProviderKey } from "@/lib/provider-keys.server";
 
 interface ModelConfig {
   id: string;
@@ -16,6 +19,15 @@ interface ModelConfig {
 interface GenerateRequest {
   prompt: string;
   models: string[];
+  customModels?: Record<
+    string,
+    {
+      provider: ProviderKeyProvider;
+      modelName: string;
+      costPerInputToken?: number;
+      costPerOutputToken?: number;
+    }
+  >;
 }
 
 interface ModelOutput {
@@ -39,12 +51,12 @@ const MODEL_CONFIGS: Record<string, ModelConfig> = {
     costPerInputToken: 0.0000002,
     costPerOutputToken: 0.0000005,
   },
-  "gpt-5": {
-    id: "gpt-5",
-    name: "GPT-5",
+  "gpt-4o": {
+    id: "gpt-4o",
+    name: "GPT-4o",
     provider: "OpenAI",
-    costPerInputToken: 0.000005,
-    costPerOutputToken: 0.000015,
+    costPerInputToken: 0.0000025,
+    costPerOutputToken: 0.00001,
   },
   "groq-llama": {
     id: "groq-llama",
@@ -53,12 +65,12 @@ const MODEL_CONFIGS: Record<string, ModelConfig> = {
     costPerInputToken: 0.00000059,
     costPerOutputToken: 0.00000079,
   },
-  "gemini-2.5-pro": {
-    id: "gemini-2.5-pro",
-    name: "Gemini 2.5 Pro",
+  "gemini-2.5-flash-lite": {
+    id: "gemini-2.5-flash-lite",
+    name: "Gemini 2.5 Flash Lite",
     provider: "Google",
-    costPerInputToken: 0.00000125,
-    costPerOutputToken: 0.00001,
+    costPerInputToken: 0.0000001,
+    costPerOutputToken: 0.0000004,
   },
   "mistral-large": {
     id: "mistral-large",
@@ -67,64 +79,82 @@ const MODEL_CONFIGS: Record<string, ModelConfig> = {
     costPerInputToken: 0.0000005,
     costPerOutputToken: 0.0000015,
   },
-  "deepseek-v3": {
-    id: "deepseek-v3",
-    name: "DeepSeek V3",
+  "deepseek-chat": {
+    id: "deepseek-chat",
+    name: "DeepSeek Chat",
     provider: "DeepSeek",
     costPerInputToken: 0.00000028,
     costPerOutputToken: 0.00000042,
   },
 };
 
-// Initialize API clients
-function getOpenAIClient() {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error("OPENAI_API_KEY not configured");
-  return new OpenAI({ apiKey });
+function getEnvOrDemoProviderKey(primaryEnvVar: string) {
+  // Normal (BYOK) key
+  const primary = process.env[primaryEnvVar];
+  if (primary) return primary;
+
+  // Optional Orbis-hosted demo/sandbox key fallback (server-side only)
+  // Example: OPENAI_API_KEY -> ORBIS_DEMO_OPENAI_API_KEY
+  const demo = process.env[`ORBIS_DEMO_${primaryEnvVar}`];
+  if (demo) return demo;
+
+  return null;
 }
 
-function getXAIClient() {
-  const apiKey = process.env.XAI_API_KEY;
-  if (!apiKey) throw new Error("XAI_API_KEY not configured");
+function openAICompatClient(apiKey: string, baseURL?: string) {
   return new OpenAI({
     apiKey,
-    baseURL: "https://api.x.ai/v1",
+    ...(baseURL ? { baseURL } : {}),
   });
 }
 
-function getGroqClient() {
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) throw new Error("GROQ_API_KEY not configured");
-  return new OpenAI({
-    apiKey,
-    baseURL: "https://api.groq.com/openai/v1",
-  });
+async function getUserProviderKey(
+  provider: ProviderKeyProvider
+): Promise<string | null> {
+  try {
+    const supabase = await createSupabaseClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return null;
+
+    const { data, error } = await supabase
+      .from("provider_api_keys")
+      .select("encrypted_key")
+      .eq("user_id", user.id)
+      .eq("provider", provider)
+      .maybeSingle();
+
+    if (error || !data?.encrypted_key) return null;
+    return decryptProviderKey(data.encrypted_key);
+  } catch {
+    return null;
+  }
 }
 
-function getMistralClient() {
-  const apiKey = process.env.MISTRAL_API_KEY;
-  if (!apiKey) throw new Error("MISTRAL_API_KEY not configured");
-  return new OpenAI({
-    apiKey,
-    baseURL: "https://api.mistral.ai/v1",
-  });
+async function resolveProviderKey(
+  envVar: string,
+  provider: ProviderKeyProvider
+): Promise<string> {
+  const envOrDemo = getEnvOrDemoProviderKey(envVar);
+  if (envOrDemo) return envOrDemo;
+  const userKey = await getUserProviderKey(provider);
+  if (userKey) return userKey;
+  throw new Error(
+    `${envVar} not configured and no saved key found for provider '${provider}' (connect a key in the UI or set ORBIS_DEMO_${envVar})`
+  );
 }
 
-function getDeepSeekClient() {
-  const apiKey = process.env.DEEPSEEK_API_KEY;
-  if (!apiKey) throw new Error("DEEPSEEK_API_KEY not configured");
-  return new OpenAI({
-    apiKey,
-    baseURL: "https://api.deepseek.com/v1",
-  });
-}
-
-async function callGemini(prompt: string): Promise<{ content: string; inputTokens: number; outputTokens: number }> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("GEMINI_API_KEY not configured");
+async function callGemini(
+  prompt: string,
+  modelName: string
+): Promise<{ content: string; inputTokens: number; outputTokens: number }> {
+  const apiKey = await resolveProviderKey("GEMINI_API_KEY", "gemini");
 
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+      modelName
+    )}:generateContent?key=${apiKey}`,
     {
       method: "POST",
       headers: {
@@ -164,9 +194,32 @@ async function callGemini(prompt: string): Promise<{ content: string; inputToken
 async function callModel(
   modelId: string,
   prompt: string,
+  customModels: GenerateRequest["customModels"] | undefined,
   retries = 2
 ): Promise<ModelOutput> {
-  const modelConfig = MODEL_CONFIGS[modelId];
+  const custom = customModels?.[modelId];
+  const modelConfig: ModelConfig | undefined = custom
+    ? {
+        id: modelId,
+        name: custom.modelName,
+        provider:
+          custom.provider === "gemini"
+            ? "Google"
+            : custom.provider === "openai"
+            ? "OpenAI"
+            : custom.provider === "xai"
+            ? "xAI"
+            : custom.provider === "groq"
+            ? "Groq"
+            : custom.provider === "mistral"
+            ? "Mistral AI"
+            : custom.provider === "deepseek"
+            ? "DeepSeek"
+            : "OpenAI",
+        costPerInputToken: custom.costPerInputToken ?? 0,
+        costPerOutputToken: custom.costPerOutputToken ?? 0,
+      }
+    : MODEL_CONFIGS[modelId];
 
   if (!modelConfig) {
     return {
@@ -202,39 +255,84 @@ async function callModel(
       let outputTokens: number;
 
       // Handle Gemini separately since it uses a different API
-      if (modelId === "gemini-2.5-pro") {
-        const geminiResponse = await callGemini(prompt);
+      if (modelId === "gemini-2.5-flash-lite" || custom?.provider === "gemini") {
+        const geminiModel =
+          custom?.provider === "gemini"
+            ? custom.modelName
+            : "gemini-2.5-flash-lite";
+        const geminiResponse = await callGemini(prompt, geminiModel);
         output = geminiResponse.content;
         inputTokens = geminiResponse.inputTokens;
         outputTokens = geminiResponse.outputTokens;
       } else {
         let client: OpenAI;
         let modelName: string;
+        let apiKey: string;
+        let baseURL: string | undefined;
 
         // Get the appropriate client and model name for each provider
-        switch (modelId) {
-          case "gpt-5":
-            client = getOpenAIClient();
-            modelName = "gpt-4o"; // Using GPT-4o as GPT-5 placeholder
-            break;
-          case "grok-4-1":
-            client = getXAIClient();
-            modelName = "grok-4-1-fast-reasoning";
-            break;
-          case "groq-llama":
-            client = getGroqClient();
-            modelName = "llama-3.3-70b-versatile";
-            break;
-          case "mistral-large":
-            client = getMistralClient();
-            modelName = "mistral-large-latest";
-            break;
-          case "deepseek-v3":
-            client = getDeepSeekClient();
-            modelName = "deepseek-chat";
-            break;
-          default:
-            throw new Error(`Unsupported model: ${modelId}`);
+        if (custom) {
+          modelName = custom.modelName;
+          switch (custom.provider) {
+            case "openai":
+              apiKey = await resolveProviderKey("OPENAI_API_KEY", "openai");
+              baseURL = undefined;
+              break;
+            case "xai":
+              apiKey = await resolveProviderKey("XAI_API_KEY", "xai");
+              baseURL = "https://api.x.ai/v1";
+              break;
+            case "groq":
+              apiKey = await resolveProviderKey("GROQ_API_KEY", "groq");
+              baseURL = "https://api.groq.com/openai/v1";
+              break;
+            case "mistral":
+              apiKey = await resolveProviderKey("MISTRAL_API_KEY", "mistral");
+              baseURL = "https://api.mistral.ai/v1";
+              break;
+            case "deepseek":
+              apiKey = await resolveProviderKey("DEEPSEEK_API_KEY", "deepseek");
+              baseURL = "https://api.deepseek.com/v1";
+              break;
+            default:
+              throw new Error(`Unsupported provider: ${custom.provider}`);
+          }
+          client = openAICompatClient(apiKey, baseURL);
+        } else {
+          switch (modelId) {
+            case "gpt-4o":
+              apiKey = await resolveProviderKey("OPENAI_API_KEY", "openai");
+              baseURL = undefined;
+              client = openAICompatClient(apiKey, baseURL);
+              modelName = "gpt-4o";
+              break;
+            case "grok-4-1":
+              apiKey = await resolveProviderKey("XAI_API_KEY", "xai");
+              baseURL = "https://api.x.ai/v1";
+              client = openAICompatClient(apiKey, baseURL);
+              modelName = "grok-4-1-fast-reasoning";
+              break;
+            case "groq-llama":
+              apiKey = await resolveProviderKey("GROQ_API_KEY", "groq");
+              baseURL = "https://api.groq.com/openai/v1";
+              client = openAICompatClient(apiKey, baseURL);
+              modelName = "llama-3.3-70b-versatile";
+              break;
+            case "mistral-large":
+              apiKey = await resolveProviderKey("MISTRAL_API_KEY", "mistral");
+              baseURL = "https://api.mistral.ai/v1";
+              client = openAICompatClient(apiKey, baseURL);
+              modelName = "mistral-large-latest";
+              break;
+            case "deepseek-chat":
+              apiKey = await resolveProviderKey("DEEPSEEK_API_KEY", "deepseek");
+              baseURL = "https://api.deepseek.com/v1";
+              client = openAICompatClient(apiKey, baseURL);
+              modelName = "deepseek-chat";
+              break;
+            default:
+              throw new Error(`Unsupported model: ${modelId}`);
+          }
         }
 
         // Make the API call
@@ -311,7 +409,7 @@ async function callModel(
 export async function POST(request: NextRequest) {
   try {
     const body: GenerateRequest = await request.json();
-    const { prompt, models } = body;
+    const { prompt, models, customModels } = body;
 
     if (!prompt || !prompt.trim()) {
       return NextResponse.json(
@@ -336,7 +434,7 @@ export async function POST(request: NextRequest) {
 
     // Call all models in parallel
     const results = await Promise.all(
-      models.map((modelId) => callModel(modelId, prompt))
+      models.map((modelId) => callModel(modelId, prompt, customModels))
     );
 
     return NextResponse.json({
