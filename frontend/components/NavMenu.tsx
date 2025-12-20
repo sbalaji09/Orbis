@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ReactElement } from "react";
-import { Logo } from "./Logo";
+import { OrbisLogo } from "./OrbisLogo";
 import { useAuth } from "@/hooks/useAuth";
 
 interface NavItem {
@@ -107,13 +107,10 @@ export default function NavMenu() {
         {/* <div className="w-8 h-8 bg-mustard border-2 border-black flex items-center justify-center group-hover:shadow-[2px_2px_0_rgba(0,0,0,0.2)] transition-all">
           <span className="text-white font-bold text-lg">O</span>
         </div> */}
-        <Logo className="w-12 h-12" />
+        <OrbisLogo className="w-12 h-12" />
         <div className="flex flex-col gap-0">
           <span className="text-base font-semibold tracking-tight leading-none">
-            $ orbis.ai
-          </span>
-          <span className="text-[9px] text-black/40 font-medium uppercase tracking-wider">
-            {`// observability`}
+            orbis
           </span>
         </div>
       </Link>
