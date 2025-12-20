@@ -11,6 +11,7 @@ interface TraceLoaderModalProps {
   isOpen: boolean;
   onClose: () => void;
   onLoad: (prompt: string) => void;
+  onReplay?: (traceId: string) => void;
 }
 
 interface TraceData {
@@ -21,7 +22,12 @@ interface TraceData {
   status: string;
 }
 
-export function TraceLoaderModal({ isOpen, onClose, onLoad }: TraceLoaderModalProps) {
+export function TraceLoaderModal({
+  isOpen,
+  onClose,
+  onLoad,
+  onReplay,
+}: TraceLoaderModalProps) {
   const [selectedTrace, setSelectedTrace] = useState<string | null>(null);
   const [traces, setTraces] = useState<TraceData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -69,6 +75,11 @@ export function TraceLoaderModal({ isOpen, onClose, onLoad }: TraceLoaderModalPr
     if (trace) {
       onLoad(trace.prompt);
     }
+  };
+
+  const handleReplay = () => {
+    if (!selectedTrace) return;
+    onReplay?.(selectedTrace);
   };
 
   const formatTimestamp = (timestamp: string) => {
@@ -214,6 +225,15 @@ export function TraceLoaderModal({ isOpen, onClose, onLoad }: TraceLoaderModalPr
                     >
                       Cancel
                     </button>
+                    {onReplay && (
+                      <button
+                        onClick={handleReplay}
+                        disabled={!selectedTrace}
+                        className="px-4 py-2 text-sm font-medium border-2 border-black bg-mustard text-black hover:bg-mustard/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-[3px_3px_0_rgba(0,0,0,0.2)]"
+                      >
+                        Replay & Set Baseline
+                      </button>
+                    )}
                     <button
                       onClick={handleLoad}
                       disabled={!selectedTrace}

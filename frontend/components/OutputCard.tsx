@@ -6,12 +6,20 @@ interface OutputCardProps {
   output: ModelOutput;
   compareTo?: ModelOutput | null;
   showDiff?: boolean;
+  guardrails?: Guardrails;
   isCheapest: boolean;
   isFastest: boolean;
   isMostEfficient: boolean;
 }
 
 type DiffLine = { type: "equal" | "add" | "remove"; value: string };
+
+export interface Guardrails {
+  requireJson?: boolean;
+  mustContain?: string | string[];
+  maxLatencySec?: number;
+  maxTotalCost?: number;
+}
 
 function buildLineDiff(before: string, after: string): DiffLine[] | null {
   const beforeLines = before.split("\n");
@@ -65,6 +73,7 @@ export function OutputCard({
   output,
   compareTo = null,
   showDiff = false,
+  guardrails,
   isCheapest,
   isFastest,
   isMostEfficient,
@@ -74,6 +83,43 @@ export function OutputCard({
   if (isCheapest) badges.push({ label: "Cheapest", color: "bg-green" });
   if (isFastest) badges.push({ label: "Fastest", color: "bg-babyblue" });
   if (isMostEfficient) badges.push({ label: "Efficient", color: "bg-mustard" });
+
+  const guardrailBadges: Array<{ label: string; pass: boolean }> = [];
+  if (!output.error && guardrails) {
+    if (guardrails.requireJson) {
+      let pass = false;
+      try {
+        JSON.parse(output.output);
+        pass = true;
+      } catch {}
+      guardrailBadges.push({ label: "JSON", pass });
+    }
+    const mustContainValues = Array.isArray(guardrails.mustContain)
+      ? guardrails.mustContain
+      : guardrails.mustContain
+          ?.split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+    if (mustContainValues?.length) {
+      const missing = mustContainValues.filter((s) => !output.output.includes(s));
+      guardrailBadges.push({
+        label: "Contains",
+        pass: missing.length === 0,
+      });
+    }
+    if (typeof guardrails.maxLatencySec === "number") {
+      guardrailBadges.push({
+        label: "Latency",
+        pass: output.latency <= guardrails.maxLatencySec,
+      });
+    }
+    if (typeof guardrails.maxTotalCost === "number") {
+      guardrailBadges.push({
+        label: "Cost",
+        pass: output.totalCost <= guardrails.maxTotalCost,
+      });
+    }
+  }
 
   return (
     <div className="border-2 border-black bg-white shadow-[3px_3px_0_rgba(0,0,0,0.1)] flex flex-col h-full">
@@ -89,14 +135,25 @@ export function OutputCard({
               </p>
             </div>
           </div>
-          {badges.length > 0 && (
-            <div className="flex gap-1">
+          {(badges.length > 0 || guardrailBadges.length > 0) && (
+            <div className="flex gap-1 flex-wrap justify-end">
               {badges.map((badge) => (
                 <span
                   key={badge.label}
                   className={`px-1.5 py-0.5 ${badge.color} text-white text-[8px] font-bold uppercase tracking-wide border border-black`}
                 >
                   {badge.label}
+                </span>
+              ))}
+              {guardrailBadges.map((b) => (
+                <span
+                  key={b.label}
+                  className={`px-1.5 py-0.5 ${
+                    b.pass ? "bg-green" : "bg-red-500"
+                  } text-white text-[8px] font-bold uppercase tracking-wide border border-black`}
+                  title={b.pass ? "Guardrail passed" : "Guardrail failed"}
+                >
+                  {b.label}
                 </span>
               ))}
             </div>
@@ -238,7 +295,7 @@ export function OutputCard({
                 </div>
               )
             ) : (
-              <div className="text-xs prose prose-sm max-w-none prose-headings:font-semibold prose-p:leading-relaxed prose-pre:bg-black/5 prose-pre:border-2 prose-pre:border-black/10 prose-code:text-xs prose-ul:my-2 prose-ol:my-2">
+              <div className="text-xs prose prose-sm max-w-none prose-headings:font-semibold prose-p:leading-relaxed prose-pre:bg-black/5 prose-pre:text-black prose-pre:border-2 prose-pre:border-black/10 prose-code:text-xs prose-code:text-black prose-ul:my-2 prose-ol:my-2">
                 <ReactMarkdown>{output.output}</ReactMarkdown>
               </div>
             )}

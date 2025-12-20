@@ -1,17 +1,19 @@
 import { ModelOutput } from "@/app/dashboard/playground/PlaygroundClient";
-import { OutputCard } from "@/components/OutputCard";
+import { OutputCard, Guardrails } from "@/components/OutputCard";
 import { useMemo, useState } from "react";
 
 interface ModelComparisonProps {
   outputs: ModelOutput[];
   inputPrompt: string;
   previousOutputs?: ModelOutput[];
+  guardrails?: Guardrails;
 }
 
 export function ModelComparison({
   outputs,
   inputPrompt,
   previousOutputs,
+  guardrails,
 }: ModelComparisonProps) {
   const [diffMode, setDiffMode] = useState(false);
 
@@ -174,6 +176,7 @@ export function ModelComparison({
               output={output}
               compareTo={previousByModelId?.get(output.model.id) ?? null}
               showDiff={diffMode}
+              guardrails={guardrails}
               isCheapest={output.model.id === cheapestOutput.model.id}
               isFastest={output.model.id === fastestOutput.model.id}
               isMostEfficient={output.model.id === mostEfficientOutput.model.id}
