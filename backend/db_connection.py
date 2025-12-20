@@ -1202,22 +1202,22 @@ class SupabaseDB:
 
             query = """
                 SELECT
-                    date_trunc('day', t.created_at AT TIME ZONE 'UTC')::date AS day,
-                    COALESCE(s.model, 'unknown') AS model,
+                    date_trunc('day', t.start_time AT TIME ZONE 'UTC')::date AS day,
+                    COALESCE(s.llm_model, 'unknown') AS model,
                     COALESCE(SUM(s.cost), 0)::numeric(18,6) AS total_cost,
                     COUNT(*) AS call_count
                 FROM traces t
                 JOIN spans s
-                ON s.trace_id = t.id
+                ON s.trace_id = t.trace_id
                 WHERE t.user_id = %s
             """
             params = [user_id]
 
             if start_date is not None:
-                query += " AND t.created_at >= %s"
+                query += " AND t.start_time >= %s"
                 params.append(start_date)
             if end_date is not None:
-                query += " AND t.created_at < %s"
+                query += " AND t.start_time < %s"
                 params.append(end_date)
 
             query += """
@@ -1390,9 +1390,9 @@ class SupabaseDB:
                 FROM days d
                 LEFT JOIN traces t
                 ON t.user_id = %s
-                AND (t.created_at AT TIME ZONE 'UTC')::date = d.day::date
+                AND (t.start_time AT TIME ZONE 'UTC')::date = d.day::date
                 LEFT JOIN spans s
-                ON s.trace_id = t.id
+                ON s.trace_id = t.trace_id
                 GROUP BY d.day
                 ORDER BY d.day ASC
             """
@@ -1441,16 +1441,16 @@ class SupabaseDB:
 
         query = f"""
             SELECT
-                date_trunc('day', t.created_at AT TIME ZONE 'UTC')::date AS day,
-                COALESCE(s.model, 'unknown') AS model,
+                date_trunc('day', t.start_time AT TIME ZONE 'UTC')::date AS day,
+                COALESCE(s.llm_model, 'unknown') AS model,
                 COALESCE(SUM(s.prompt_tokens), 0) AS input_tokens,
                 COALESCE(SUM(s.completion_tokens), 0) AS output_tokens,
                 COALESCE(SUM({cached_expr}), 0) AS cached_input_tokens
             FROM traces t
             JOIN spans s
-            ON s.trace_id = t.id
+            ON s.trace_id = t.trace_id
             WHERE t.user_id = %s
-            AND t.created_at >= %s
+            AND t.start_time >= %s
             GROUP BY day, model
             ORDER BY day ASC, model ASC
         """
@@ -1493,7 +1493,7 @@ class SupabaseDB:
 
                 breakdown[day_str]["by_model"][model]["input"] += in_tok
                 breakdown[day_str]["by_model"][model]["output"] += out_tok
-                
+
             return [breakdown[k] for k in sorted(breakdown.keys())]
 
         except Exception as e:
