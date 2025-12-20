@@ -6,6 +6,7 @@ interface InputPanelProps {
   inputPrompt: string;
   setInputPrompt: (prompt: string) => void;
   onGenerate: (selectedModels: ModelConfig[]) => void;
+  onRunReport?: (selectedModels: ModelConfig[]) => void;
   isGenerating: boolean;
   availableModels: ModelConfig[];
 }
@@ -14,6 +15,7 @@ export function InputPanel({
   inputPrompt,
   setInputPrompt,
   onGenerate,
+  onRunReport,
   isGenerating,
   availableModels,
 }: InputPanelProps) {
@@ -35,6 +37,11 @@ export function InputPanel({
   const handleGenerate = () => {
     if (selectedModels.length === 0) return;
     onGenerate(selectedModels);
+  };
+
+  const handleRunReport = () => {
+    if (selectedModels.length === 0) return;
+    onRunReport?.(selectedModels);
   };
 
   return (
@@ -132,20 +139,43 @@ export function InputPanel({
               </>
             )}
           </p>
-          <button
-            onClick={handleGenerate}
-            disabled={isGenerating || !inputPrompt.trim() || selectedModels.length === 0}
-            className="px-6 py-3 bg-black text-mustard border-2 border-black font-medium hover:bg-black/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-[4px_4px_0_rgba(0,0,0,0.2)]"
-          >
-            {isGenerating ? (
-              <span className="flex items-center gap-2">
-                <div className="animate-spin rounded-full h-4 w-4 border-2 border-mustard border-t-transparent" />
-                Generating...
-              </span>
-            ) : (
-              "Generate & Compare"
+          <div className="flex items-center gap-2">
+            {onRunReport && (
+              <button
+                onClick={handleRunReport}
+                disabled={
+                  isGenerating || !inputPrompt.trim() || selectedModels.length === 0
+                }
+                className="px-5 py-3 bg-babyblue text-white border-2 border-black font-medium hover:bg-babyblue/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-[4px_4px_0_rgba(0,0,0,0.2)]"
+              >
+                {isGenerating ? (
+                  <span className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                    Running...
+                  </span>
+                ) : (
+                  "Run Report"
+                )}
+              </button>
             )}
-          </button>
+
+            <button
+              onClick={handleGenerate}
+              disabled={
+                isGenerating || !inputPrompt.trim() || selectedModels.length === 0
+              }
+              className="px-6 py-3 bg-black text-mustard border-2 border-black font-medium hover:bg-black/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-[4px_4px_0_rgba(0,0,0,0.2)]"
+            >
+              {isGenerating ? (
+                <span className="flex items-center gap-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-mustard border-t-transparent" />
+                  Generating...
+                </span>
+              ) : (
+                "Generate & Compare"
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>

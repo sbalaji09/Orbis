@@ -21,6 +21,19 @@ export interface Guardrails {
   maxTotalCost?: number;
 }
 
+function formatDelta(
+  delta: number,
+  options: { unit?: string; digits?: number } = {}
+): { text: string; direction: "up" | "down" | "flat" } {
+  const unit = options.unit ?? "";
+  const digits = options.digits ?? 0;
+  const abs = Math.abs(delta);
+  const rounded = digits > 0 ? abs.toFixed(digits) : Math.round(abs).toString();
+  const sign = delta > 0 ? "+" : delta < 0 ? "-" : "±";
+  const direction = delta > 0 ? "up" : delta < 0 ? "down" : "flat";
+  return { text: `${sign}${rounded}${unit}`, direction };
+}
+
 function buildLineDiff(before: string, after: string): DiffLine[] | null {
   const beforeLines = before.split("\n");
   const afterLines = after.split("\n");
@@ -83,6 +96,17 @@ export function OutputCard({
   if (isCheapest) badges.push({ label: "Cheapest", color: "bg-green" });
   if (isFastest) badges.push({ label: "Fastest", color: "bg-babyblue" });
   if (isMostEfficient) badges.push({ label: "Efficient", color: "bg-mustard" });
+
+  const metricsDelta = compareTo
+    ? {
+        tokens:
+          output.inputTokens +
+          output.outputTokens -
+          (compareTo.inputTokens + compareTo.outputTokens),
+        cost: output.totalCost - compareTo.totalCost,
+        latency: output.latency - compareTo.latency,
+      }
+    : null;
 
   const guardrailBadges: Array<{ label: string; pass: boolean }> = [];
   if (!output.error && guardrails) {
@@ -167,18 +191,63 @@ export function OutputCard({
             <p className="text-xs font-semibold font-mono">
               {(output.inputTokens + output.outputTokens).toLocaleString()}
             </p>
+            {metricsDelta && (
+              <p
+                className={`text-[9px] font-mono ${
+                  formatDelta(metricsDelta.tokens).direction === "up"
+                    ? "text-error"
+                    : formatDelta(metricsDelta.tokens).direction === "down"
+                    ? "text-green"
+                    : "text-black/40"
+                }`}
+                title="Delta vs compare-to"
+              >
+                {formatDelta(metricsDelta.tokens).text}
+              </p>
+            )}
           </div>
           <div className="text-center">
             <p className="text-[9px] text-black/40 uppercase">Cost</p>
             <p className="text-xs font-semibold font-mono">
               ${output.totalCost.toFixed(6)}
             </p>
+            {metricsDelta && (
+              <p
+                className={`text-[9px] font-mono ${
+                  formatDelta(metricsDelta.cost, { digits: 6 }).direction === "up"
+                    ? "text-error"
+                    : formatDelta(metricsDelta.cost, { digits: 6 }).direction ===
+                      "down"
+                    ? "text-green"
+                    : "text-black/40"
+                }`}
+                title="Delta vs compare-to"
+              >
+                ${formatDelta(metricsDelta.cost, { digits: 6 }).text.replace("±", "+")}
+              </p>
+            )}
           </div>
           <div className="text-center">
             <p className="text-[9px] text-black/40 uppercase">Time</p>
             <p className="text-xs font-semibold font-mono">
               {output.latency.toFixed(2)}s
             </p>
+            {metricsDelta && (
+              <p
+                className={`text-[9px] font-mono ${
+                  formatDelta(metricsDelta.latency, { unit: "s", digits: 2 })
+                    .direction === "up"
+                    ? "text-error"
+                    : formatDelta(metricsDelta.latency, { unit: "s", digits: 2 })
+                        .direction === "down"
+                    ? "text-green"
+                    : "text-black/40"
+                }`}
+                title="Delta vs compare-to"
+              >
+                {formatDelta(metricsDelta.latency, { unit: "s", digits: 2 }).text.replace("±", "+")}
+              </p>
+            )}
           </div>
         </div>
       </div>

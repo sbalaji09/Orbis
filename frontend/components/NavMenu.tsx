@@ -56,12 +56,13 @@ const navItems: NavItem[] = [
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
-        strokeWidth="2"
+        strokeWidth="1.5"
         strokeLinecap="round"
         strokeLinejoin="round"
       >
-        <path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" />
-        <path d="m9 12 2 2 4-4" />
+        <path d="M12 4.5 15.5 10H8.5L12 4.5z" vectorEffect="non-scaling-stroke" />
+        <circle cx="8" cy="17" r="2.25" vectorEffect="non-scaling-stroke" />
+        <rect x="14" y="14.75" width="4.5" height="4.5" rx="0.5" vectorEffect="non-scaling-stroke" />
       </svg>
     ),
     name: "Playground",
@@ -132,7 +133,7 @@ export default function NavMenu() {
                       : "bg-transparent text-black/60 border-transparent hover:text-foreground hover:bg-black/5"
                   }`}
                 >
-                  <span className="w-4 h-4">{item.icon}</span>
+                  <span className={item.name === "Playground" ? "w-6 h-6" : "w-4 h-4"}>{item.icon}</span>
                   <span>{item.name}</span>
                   {item.badge && (
                     <span className="px-1.5 py-0.5 text-[9px] font-semibold bg-babyblue/10 text-babyblue border border-babyblue uppercase tracking-wide">

@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ModelComparison } from "@/components/ModelComparison";
 import { InputPanel } from "@/components/InputPanel";
 import { CodeExportModal } from "@/components/CodeExportModal";
 import { TraceLoaderModal } from "@/components/TraceLoaderModal";
 import { Guardrails } from "@/components/OutputCard";
 import { ModelLogo } from "@/components/ModelLogo";
+import { RegressionReport } from "@/components/RegressionReport";
 
 export interface ModelConfig {
   id: string;
@@ -28,6 +29,29 @@ export interface ModelOutput {
   error?: string;
   cached?: boolean;
 }
+
+type SavedBaseline = {
+  id: string;
+  name: string;
+  createdAt: number;
+  prompt: string;
+  outputs: ModelOutput[];
+};
+
+type ActiveBaseline = SavedBaseline & { source: "saved" | "trace" };
+
+const BASELINES_STORAGE_KEY = "orbis.playground.baselines.v1";
+const RUN_HISTORY_STORAGE_KEY = "orbis.playground.runHistory.v1";
+const PLAYGROUND_STATE_STORAGE_KEY = "orbis.playground.state.v1";
+const RUN_HISTORY_LIMIT = 10;
+
+type PlaygroundRun = {
+  id: string;
+  createdAt: number;
+  name: string;
+  prompt: string;
+  outputs: ModelOutput[];
+};
 
 export const AVAILABLE_MODELS: ModelConfig[] = [
   {
@@ -86,16 +110,23 @@ export default function App() {
   const [previousOutputs, setPreviousOutputs] = useState<ModelOutput[] | null>(
     null
   );
+  const [baseline, setBaseline] = useState<ActiveBaseline | null>(null);
+  const [savedBaselines, setSavedBaselines] = useState<SavedBaseline[]>([]);
+  const [baselineNameDraft, setBaselineNameDraft] = useState("");
+  const [runHistory, setRunHistory] = useState<PlaygroundRun[]>([]);
+  const [compareRunAId, setCompareRunAId] = useState<string | null>(null);
+  const [compareRunBId, setCompareRunBId] = useState<string | null>(null);
+  const [compareLabel, setCompareLabel] = useState<string | null>(null);
+  const [runRenameDrafts, setRunRenameDrafts] = useState<Record<string, string>>(
+    {}
+  );
+  const [showRegressionReport, setShowRegressionReport] = useState(false);
   const [lastSelectedModels, setLastSelectedModels] = useState<ModelConfig[]>(
     []
   );
   const [isGenerating, setIsGenerating] = useState(false);
   const [showCodeExport, setShowCodeExport] = useState(false);
   const [showTraceLoader, setShowTraceLoader] = useState(false);
-  const [baselineTraceId, setBaselineTraceId] = useState<string | null>(null);
-  const [baselineModelLabel, setBaselineModelLabel] = useState<string | null>(
-    null
-  );
   const [guardrailsDraft, setGuardrailsDraft] = useState({
     requireJson: false,
     mustContain: "",
@@ -103,35 +134,161 @@ export default function App() {
     maxTotalCost: "",
   });
 
-  const guardrails: Guardrails = {
-    requireJson: guardrailsDraft.requireJson,
-    mustContain: (() => {
-      const values = guardrailsDraft.mustContain
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-      return values.length ? values : undefined;
-    })(),
-    maxLatencySec: (() => {
-      const v = guardrailsDraft.maxLatencySec.trim();
-      if (!v) return undefined;
-      const n = Number(v);
-      return Number.isFinite(n) ? n : undefined;
-    })(),
-    maxTotalCost: (() => {
-      const v = guardrailsDraft.maxTotalCost.trim();
-      if (!v) return undefined;
-      const n = Number(v);
-      return Number.isFinite(n) ? n : undefined;
-    })(),
-  };
+  const guardrails: Guardrails = useMemo(
+    () => ({
+      requireJson: guardrailsDraft.requireJson,
+      mustContain: (() => {
+        const values = guardrailsDraft.mustContain
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+        return values.length ? values : undefined;
+      })(),
+      maxLatencySec: (() => {
+        const v = guardrailsDraft.maxLatencySec.trim();
+        if (!v) return undefined;
+        const n = Number(v);
+        return Number.isFinite(n) ? n : undefined;
+      })(),
+      maxTotalCost: (() => {
+        const v = guardrailsDraft.maxTotalCost.trim();
+        if (!v) return undefined;
+        const n = Number(v);
+        return Number.isFinite(n) ? n : undefined;
+      })(),
+    }),
+    [guardrailsDraft]
+  );
 
-  const handleGenerate = async (selectedModels: ModelConfig[]) => {
+  const skipPersistBaselinesRef = useRef(true);
+  const skipPersistRunHistoryRef = useRef(true);
+  const skipPersistPlaygroundStateRef = useRef(true);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(BASELINES_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return;
+      setSavedBaselines(
+        parsed
+          .filter((b) => b && typeof b.id === "string" && Array.isArray(b.outputs))
+          .slice(0, 50)
+      );
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (skipPersistBaselinesRef.current) {
+      skipPersistBaselinesRef.current = false;
+      return;
+    }
+    try {
+      localStorage.setItem(
+        BASELINES_STORAGE_KEY,
+        JSON.stringify(savedBaselines.slice(0, 50))
+      );
+    } catch {}
+  }, [savedBaselines]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(RUN_HISTORY_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return;
+      setRunHistory(
+        parsed
+          .filter((r) => r && typeof r.id === "string" && Array.isArray(r.outputs))
+          .slice(0, RUN_HISTORY_LIMIT)
+      );
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (skipPersistRunHistoryRef.current) {
+      skipPersistRunHistoryRef.current = false;
+      return;
+    }
+    try {
+      localStorage.setItem(
+        RUN_HISTORY_STORAGE_KEY,
+        JSON.stringify(runHistory.slice(0, RUN_HISTORY_LIMIT))
+      );
+    } catch {}
+  }, [runHistory]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(PLAYGROUND_STATE_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (typeof parsed !== "object" || !parsed) return;
+      if (typeof parsed.inputPrompt === "string") setInputPrompt(parsed.inputPrompt);
+      if (Array.isArray(parsed.outputs)) setOutputs(parsed.outputs);
+      if (Array.isArray(parsed.previousOutputs)) setPreviousOutputs(parsed.previousOutputs);
+      if (parsed.baseline && typeof parsed.baseline === "object") setBaseline(parsed.baseline);
+      if (parsed.guardrailsDraft && typeof parsed.guardrailsDraft === "object") {
+        setGuardrailsDraft((prev) => ({ ...prev, ...parsed.guardrailsDraft }));
+      }
+      if (typeof parsed.compareRunAId === "string" || parsed.compareRunAId === null) {
+        setCompareRunAId(parsed.compareRunAId);
+      }
+      if (typeof parsed.compareRunBId === "string" || parsed.compareRunBId === null) {
+        setCompareRunBId(parsed.compareRunBId);
+      }
+      if (typeof parsed.compareLabel === "string" || parsed.compareLabel === null) {
+        setCompareLabel(parsed.compareLabel);
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    // Prevent the initial empty render from overwriting saved session state.
+    if (skipPersistPlaygroundStateRef.current) {
+      skipPersistPlaygroundStateRef.current = false;
+      return;
+    }
+    try {
+      localStorage.setItem(
+        PLAYGROUND_STATE_STORAGE_KEY,
+        JSON.stringify({
+          inputPrompt,
+          outputs,
+          previousOutputs,
+          baseline,
+          guardrailsDraft,
+          compareRunAId,
+          compareRunBId,
+          compareLabel,
+        })
+      );
+    } catch {}
+  }, [
+    inputPrompt,
+    outputs,
+    previousOutputs,
+    baseline,
+    guardrailsDraft,
+    compareRunAId,
+    compareRunBId,
+    compareLabel,
+  ]);
+
+  const handleGenerate = async (
+    selectedModels: ModelConfig[],
+    options: { preserveReport?: boolean } = {}
+  ) => {
     if (!inputPrompt.trim() || selectedModels.length === 0) return;
 
     setIsGenerating(true);
-    if (outputs.length > 0) setPreviousOutputs(outputs);
+    if (!baseline && outputs.length > 0) setPreviousOutputs(outputs);
     setLastSelectedModels(selectedModels);
+    setCompareLabel(null);
+    setCompareRunAId(null);
+    setCompareRunBId(null);
+    if (!options.preserveReport) setShowRegressionReport(false);
 
     try {
       // Call the API with selected models
@@ -152,7 +309,24 @@ export default function App() {
       }
 
       const data = await response.json();
-      setOutputs(data.outputs || []);
+      const nextOutputs = data.outputs || [];
+      setOutputs(nextOutputs);
+
+      const promptSnippet = inputPrompt
+        .trim()
+        .replace(/\s+/g, " ")
+        .slice(0, 36);
+      const modelsLabel = selectedModels.map((m) => m.name).join(" + ");
+      const runName = `${promptSnippet || "Run"} · ${modelsLabel || "models"}`;
+
+      const run: PlaygroundRun = {
+        id: createBaselineId(),
+        createdAt: Date.now(),
+        name: runName,
+        prompt: inputPrompt,
+        outputs: nextOutputs,
+      };
+      setRunHistory((prev) => [run, ...prev].slice(0, RUN_HISTORY_LIMIT));
     } catch (error) {
       console.error('Error generating outputs:', error);
       // Show error outputs for all selected models
@@ -170,6 +344,11 @@ export default function App() {
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleRunReport = async (selectedModels: ModelConfig[]) => {
+    setShowRegressionReport(true);
+    await handleGenerate(selectedModels, { preserveReport: true });
   };
 
   const handleLoadFromTrace = (tracePrompt: string) => {
@@ -224,18 +403,116 @@ export default function App() {
         timestamp: Date.now(),
       };
 
-      setBaselineTraceId(traceId);
-      setBaselineModelLabel(
-        `${baselineModel.name}${baselineModel.provider ? ` (${baselineModel.provider})` : ""}`
-      );
       setInputPrompt(data.prompt ?? "");
-      setPreviousOutputs([baselineOutput]);
-      setOutputs([baselineOutput]);
+      const traceBaseline: ActiveBaseline = {
+        id: traceId,
+        name: `Trace ${traceId}`,
+        createdAt: Date.now(),
+        prompt: data.prompt ?? "",
+        outputs: [baselineOutput],
+        source: "trace",
+      };
+      setBaseline(traceBaseline);
+      setOutputs(traceBaseline.outputs);
       setShowTraceLoader(false);
     } catch (e) {
       console.error("Error replaying trace:", e);
       setShowTraceLoader(false);
     }
+  };
+
+  const createBaselineId = () => {
+    if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+      return crypto.randomUUID();
+    }
+    return `b_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  };
+
+  const saveCurrentRunAsBaseline = () => {
+    if (!inputPrompt.trim() || outputs.length === 0) return;
+    const name =
+      baselineNameDraft.trim() || `Baseline · ${new Date().toLocaleString()}`;
+    const newBaseline: SavedBaseline = {
+      id: createBaselineId(),
+      name,
+      createdAt: Date.now(),
+      prompt: inputPrompt,
+      outputs,
+    };
+    setSavedBaselines((prev) => [newBaseline, ...prev].slice(0, 50));
+    setBaselineNameDraft("");
+  };
+
+  const loadSavedBaseline = (b: SavedBaseline) => {
+    setBaseline({ ...b, source: "saved" });
+    setInputPrompt(b.prompt);
+    setOutputs(b.outputs);
+    setShowTraceLoader(false);
+  };
+
+  const deleteSavedBaseline = (baselineId: string) => {
+    setSavedBaselines((prev) => prev.filter((b) => b.id !== baselineId));
+    if (baseline?.source === "saved" && baseline.id === baselineId) {
+      setBaseline(null);
+    }
+  };
+
+  const compareRuns = () => {
+    if (!compareRunAId || !compareRunBId) return;
+    const runA = runHistory.find((r) => r.id === compareRunAId);
+    const runB = runHistory.find((r) => r.id === compareRunBId);
+    if (!runA || !runB) return;
+
+    setBaseline(null);
+    setPreviousOutputs(runA.outputs);
+    setOutputs(runB.outputs);
+    setInputPrompt(runB.prompt);
+    setCompareLabel(`${runB.name} vs ${runA.name}`);
+  };
+
+  const loadRun = (runId: string) => {
+    const run = runHistory.find((r) => r.id === runId);
+    if (!run) return;
+    setBaseline(null);
+    setPreviousOutputs(null);
+    setOutputs(run.outputs);
+    setInputPrompt(run.prompt);
+    setCompareLabel(null);
+  };
+
+  const deleteRun = (runId: string) => {
+    setRunHistory((prev) => prev.filter((r) => r.id !== runId));
+    if (compareRunAId === runId) setCompareRunAId(null);
+    if (compareRunBId === runId) setCompareRunBId(null);
+    setRunRenameDrafts((prev) => {
+      const next = { ...prev };
+      delete next[runId];
+      return next;
+    });
+  };
+
+  const startRenamingRun = (run: PlaygroundRun) => {
+    setRunRenameDrafts((prev) => ({
+      ...prev,
+      [run.id]: prev[run.id] ?? run.name,
+    }));
+  };
+
+  const cancelRenamingRun = (runId: string) => {
+    setRunRenameDrafts((prev) => {
+      const next = { ...prev };
+      delete next[runId];
+      return next;
+    });
+  };
+
+  const saveRunName = (runId: string) => {
+    const nextName = (runRenameDrafts[runId] ?? "").trim();
+    if (!nextName) return;
+    setRunHistory((prev) =>
+      prev.map((r) => (r.id === runId ? { ...r, name: nextName } : r))
+    );
+    cancelRenamingRun(runId);
   };
 
     return (
@@ -259,12 +536,6 @@ export default function App() {
                   className="px-3 py-2 text-xs font-medium border-2 border-black bg-white hover:bg-black/5 transition-colors shadow-[2px_2px_0_rgba(0,0,0,0.1)]"
                 >
                   Load from Trace
-                </button>
-                <button
-                  onClick={() => setShowTraceLoader(true)}
-                  className="px-3 py-2 text-xs font-medium border-2 border-black bg-mustard text-black hover:bg-mustard/90 transition-colors shadow-[2px_2px_0_rgba(0,0,0,0.1)]"
-                >
-                  Replay Trace
                 </button>
                 <button
                   onClick={() => setShowCodeExport(true)}
@@ -300,21 +571,20 @@ export default function App() {
         </div>
 
         {/* Baseline Banner */}
-        {baselineTraceId && (
+        {baseline && (
           <div className="mb-6 border-2 border-black bg-white shadow-[4px_4px_0_rgba(0,0,0,0.15)]">
             <div className="px-6 py-3 bg-black/5 border-b-2 border-black flex items-center justify-between gap-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide">
-                  Replay Baseline Loaded
+                  Baseline Loaded
                 </p>
                 <p className="text-[10px] text-black/60 font-mono mt-1">
-                  {`// Trace ${baselineTraceId} · ${baselineModelLabel ?? "baseline"}`}
+                  {`// ${baseline.source === "trace" ? "Trace" : "Saved"} · ${baseline.name}`}
                 </p>
               </div>
               <button
                 onClick={() => {
-                  setBaselineTraceId(null);
-                  setBaselineModelLabel(null);
+                  setBaseline(null);
                   setPreviousOutputs(null);
                 }}
                 className="px-3 py-2 text-xs font-medium border-2 border-black bg-white hover:bg-black/5 transition-colors shadow-[2px_2px_0_rgba(0,0,0,0.1)]"
@@ -329,6 +599,244 @@ export default function App() {
             </div>
           </div>
         )}
+
+        {/* Baseline Library */}
+        <div className="mb-6 border-2 border-black bg-white shadow-[4px_4px_0_rgba(0,0,0,0.15)]">
+          <div className="px-6 py-4 bg-babyblue/10 border-b-2 border-black">
+            <h2 className="text-base font-semibold tracking-tight">
+              Baseline Library
+            </h2>
+            <p className="text-xs text-black/60 mt-1 font-mono">
+              {`// Save and reload approved outputs for regression checks`}
+            </p>
+          </div>
+          <div className="p-6 space-y-4">
+            <div className="flex items-end gap-3">
+              <label className="flex-1">
+                <span className="text-[10px] text-black/60 uppercase tracking-wide">
+                  Baseline name
+                </span>
+                <input
+                  value={baselineNameDraft}
+                  onChange={(e) => setBaselineNameDraft(e.target.value)}
+                  placeholder="e.g. Octocat plan v1"
+                  className="mt-1 w-full px-3 py-2 border-2 border-black font-mono text-xs focus:outline-none focus:ring-2 focus:ring-babyblue/50"
+                />
+              </label>
+              <button
+                onClick={saveCurrentRunAsBaseline}
+                disabled={!inputPrompt.trim() || outputs.length === 0}
+                className="px-4 py-2 text-xs font-medium border-2 border-black bg-mustard text-black hover:bg-mustard/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-[3px_3px_0_rgba(0,0,0,0.2)]"
+              >
+                Save Current Run
+              </button>
+            </div>
+
+            {savedBaselines.length === 0 ? (
+              <p className="text-xs text-black/40 font-mono">
+                {`// No saved baselines yet. Run the playground and click "Save Current Run".`}
+              </p>
+            ) : (
+              <div className="border-2 border-black/10 max-h-[220px] overflow-auto">
+                {savedBaselines.map((b) => (
+                  <div
+                    key={b.id}
+                    className="px-4 py-3 border-b border-black/10 last:border-b-0 flex items-center justify-between gap-4 bg-white"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold truncate">{b.name}</p>
+                      <p className="text-[10px] text-black/40 font-mono truncate">
+                        {`${new Date(b.createdAt).toLocaleString()} · ${b.outputs.length} model${
+                          b.outputs.length === 1 ? "" : "s"
+                        }`}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <button
+                        onClick={() => loadSavedBaseline(b)}
+                        className="px-3 py-2 text-xs font-medium border-2 border-black bg-white hover:bg-black/5 transition-colors shadow-[2px_2px_0_rgba(0,0,0,0.1)]"
+                      >
+                        Load
+                      </button>
+                      <button
+                        onClick={() => deleteSavedBaseline(b.id)}
+                        className="px-3 py-2 text-xs font-medium border-2 border-black bg-black text-mustard hover:bg-black/90 transition-colors shadow-[2px_2px_0_rgba(0,0,0,0.1)]"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Run History */}
+        <div className="mb-6 border-2 border-black bg-white shadow-[4px_4px_0_rgba(0,0,0,0.15)]">
+          <div className="px-6 py-4 bg-green/10 border-b-2 border-black flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-base font-semibold tracking-tight">
+                Run History
+              </h2>
+              <p className="text-xs text-black/60 mt-1 font-mono">
+                {`// Pick any two runs to diff A/B`}
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setCompareRunAId(null);
+                setCompareRunBId(null);
+                setCompareLabel(null);
+              }}
+              className="px-3 py-2 text-xs font-medium border-2 border-black bg-white hover:bg-black/5 transition-colors shadow-[2px_2px_0_rgba(0,0,0,0.1)]"
+            >
+              Clear A/B
+            </button>
+          </div>
+
+          <div className="p-6 space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[10px] text-black/50 font-mono">
+                {compareLabel
+                  ? `// Comparing: ${compareLabel}`
+                  : compareRunAId || compareRunBId
+                  ? "// Select both A and B, then Compare"
+                  : `// Last ${RUN_HISTORY_LIMIT} runs`}
+              </p>
+              <button
+                onClick={() => setRunHistory([])}
+                disabled={runHistory.length === 0}
+                className="px-3 py-2 text-xs font-medium border-2 border-black bg-black text-mustard hover:bg-black/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-[2px_2px_0_rgba(0,0,0,0.1)]"
+              >
+                Clear History
+              </button>
+            </div>
+
+            {runHistory.length === 0 ? (
+              <p className="text-xs text-black/40 font-mono">
+                {`// No runs yet. Click Generate to create one.`}
+              </p>
+            ) : (
+              <div className="border-2 border-black/10 max-h-[260px] overflow-auto">
+                {runHistory.map((run) => {
+                  const isA = compareRunAId === run.id;
+                  const isB = compareRunBId === run.id;
+                  const isRenaming = Object.prototype.hasOwnProperty.call(
+                    runRenameDrafts,
+                    run.id
+                  );
+                  const draft = runRenameDrafts[run.id] ?? run.name;
+                  return (
+                    <div
+                      key={run.id}
+                      className="px-4 py-3 border-b border-black/10 last:border-b-0 flex items-center justify-between gap-4 bg-white"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          {(isA || isB) && (
+                            <span
+                              className={`px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide border border-black text-white ${
+                                isA ? "bg-mustard" : "bg-babyblue"
+                              }`}
+                            >
+                              {isA ? "A" : "B"}
+                            </span>
+                          )}
+                          {isRenaming ? (
+                            <input
+                              value={draft}
+                              onChange={(e) =>
+                                setRunRenameDrafts((prev) => ({
+                                  ...prev,
+                                  [run.id]: e.target.value,
+                                }))
+                              }
+                              className="px-2 py-1 border-2 border-black font-mono text-xs w-[420px] max-w-full focus:outline-none focus:ring-2 focus:ring-babyblue/50"
+                            />
+                          ) : (
+                            <p className="text-sm font-semibold truncate">
+                              {run.name}
+                            </p>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-black/40 font-mono truncate">
+                          {`${new Date(run.createdAt).toLocaleString()} · ${run.outputs.length} model${
+                            run.outputs.length === 1 ? "" : "s"
+                          }`}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <button
+                          onClick={() => setCompareRunAId(run.id)}
+                          className="px-2.5 py-2 text-xs font-medium border-2 border-black bg-white hover:bg-black/5 transition-colors shadow-[2px_2px_0_rgba(0,0,0,0.1)]"
+                        >
+                          Set A
+                        </button>
+                        <button
+                          onClick={() => setCompareRunBId(run.id)}
+                          className="px-2.5 py-2 text-xs font-medium border-2 border-black bg-white hover:bg-black/5 transition-colors shadow-[2px_2px_0_rgba(0,0,0,0.1)]"
+                        >
+                          Set B
+                        </button>
+                        {isRenaming ? (
+                          <>
+                            <button
+                              onClick={() => saveRunName(run.id)}
+                              className="px-2.5 py-2 text-xs font-medium border-2 border-black bg-babyblue text-white hover:bg-babyblue/90 transition-colors shadow-[2px_2px_0_rgba(0,0,0,0.1)]"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => cancelRenamingRun(run.id)}
+                              className="px-2.5 py-2 text-xs font-medium border-2 border-black bg-white hover:bg-black/5 transition-colors shadow-[2px_2px_0_rgba(0,0,0,0.1)]"
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => startRenamingRun(run)}
+                            className="px-2.5 py-2 text-xs font-medium border-2 border-black bg-white hover:bg-black/5 transition-colors shadow-[2px_2px_0_rgba(0,0,0,0.1)]"
+                          >
+                            Rename
+                          </button>
+                        )}
+                        <button
+                          onClick={() => loadRun(run.id)}
+                          className="px-2.5 py-2 text-xs font-medium border-2 border-black bg-mustard text-black hover:bg-mustard/90 transition-colors shadow-[2px_2px_0_rgba(0,0,0,0.1)]"
+                        >
+                          Load
+                        </button>
+                        <button
+                          onClick={() => deleteRun(run.id)}
+                          className="px-2.5 py-2 text-xs font-medium border-2 border-black bg-black text-mustard hover:bg-black/90 transition-colors shadow-[2px_2px_0_rgba(0,0,0,0.1)]"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] text-black/50 font-mono">
+                {compareRunAId && compareRunBId
+                  ? "// Click Compare to set B as current and A as baseline"
+                  : "// Set both A and B to compare"}
+              </p>
+              <button
+                onClick={compareRuns}
+                disabled={!compareRunAId || !compareRunBId}
+                className="px-4 py-2 text-xs font-medium border-2 border-black bg-babyblue text-white hover:bg-babyblue/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-[3px_3px_0_rgba(0,0,0,0.2)]"
+              >
+                Compare A/B
+              </button>
+            </div>
+          </div>
+        </div>
 
         {/* Guardrails */}
         <div className="mb-6 border-2 border-black bg-white shadow-[4px_4px_0_rgba(0,0,0,0.15)]">
@@ -409,17 +917,31 @@ export default function App() {
           inputPrompt={inputPrompt}
           setInputPrompt={setInputPrompt}
           onGenerate={handleGenerate}
+          onRunReport={handleRunReport}
           isGenerating={isGenerating}
           availableModels={AVAILABLE_MODELS}
         />
+
+        {/* Regression Report */}
+        {showRegressionReport && outputs.length > 0 && (
+          <div className="mb-6">
+            <RegressionReport
+              outputs={outputs}
+              guardrails={guardrails}
+              compareToOutputs={(baseline?.outputs ?? previousOutputs) ?? null}
+              compareToLabel={baseline ? "baseline" : compareLabel ?? "previous run"}
+            />
+          </div>
+        )}
 
         {/* Model Comparison */}
         {outputs.length > 0 && (
           <ModelComparison
             outputs={outputs}
             inputPrompt={inputPrompt}
-            previousOutputs={previousOutputs ?? undefined}
+            previousOutputs={(baseline?.outputs ?? previousOutputs) ?? undefined}
             guardrails={guardrails}
+            compareToLabel={baseline ? "baseline" : compareLabel ?? undefined}
           />
         )}
 

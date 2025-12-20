@@ -109,6 +109,18 @@ export async function GET(
     const prompt = extractUserPrompt(promptRaw);
     const output = extractOutputText(outputRaw);
 
+    const durationRaw = llmSpan.duration;
+    const durationMs =
+      typeof durationRaw === "number"
+        ? durationRaw
+        : durationRaw
+          ? Number(durationRaw)
+          : null;
+    const latencySec =
+      typeof durationMs === "number" && Number.isFinite(durationMs)
+        ? durationMs / 1000
+        : null;
+
     // guardrails: keep payloads reasonable
     const maxLen = 50_000;
     const promptTrimmed = prompt.length > maxLen ? prompt.slice(0, maxLen) : prompt;
@@ -122,12 +134,7 @@ export async function GET(
       provider: llmSpan.provider || null,
       promptTokens: llmSpan.prompt_tokens ?? null,
       completionTokens: llmSpan.completion_tokens ?? null,
-      latencySec:
-        typeof llmSpan.duration === "number"
-          ? llmSpan.duration
-          : llmSpan.duration
-          ? Number(llmSpan.duration)
-          : null,
+      latencySec,
       totalCost: llmSpan.cost ?? null,
       spanId: llmSpan.span_id ?? null,
     });
@@ -138,4 +145,3 @@ export async function GET(
     );
   }
 }
-

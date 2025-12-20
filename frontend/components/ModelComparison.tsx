@@ -7,6 +7,7 @@ interface ModelComparisonProps {
   inputPrompt: string;
   previousOutputs?: ModelOutput[];
   guardrails?: Guardrails;
+  compareToLabel?: string;
 }
 
 export function ModelComparison({
@@ -14,6 +15,7 @@ export function ModelComparison({
   inputPrompt,
   previousOutputs,
   guardrails,
+  compareToLabel,
 }: ModelComparisonProps) {
   const [diffMode, setDiffMode] = useState(false);
 
@@ -21,6 +23,8 @@ export function ModelComparison({
     if (!previousOutputs || previousOutputs.length === 0) return null;
     return new Map(previousOutputs.map((o) => [o.model.id, o]));
   }, [previousOutputs]);
+
+  const compareLabel = compareToLabel ?? "previous run";
 
   // Calculate cheapest
   const cheapestOutput = outputs.reduce((prev, current) =>
@@ -138,7 +142,7 @@ export function ModelComparison({
               }`}
               title={
                 previousByModelId
-                  ? "Compare to previous run"
+                  ? `Compare to ${compareLabel}`
                   : "Run the playground twice to enable diff mode"
               }
             >
@@ -163,6 +167,11 @@ export function ModelComparison({
               {!previousByModelId && (
                 <span className="text-[10px] text-black/50 font-mono">
                   Run again to enable
+                </span>
+              )}
+              {previousByModelId && compareToLabel && (
+                <span className="text-[10px] text-black/50 font-mono">
+                  {`vs ${compareLabel}`}
                 </span>
               )}
             </label>
