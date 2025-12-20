@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 import json
 import os
 import re
+import sqlite3
 import psycopg2
 from psycopg2.extras import RealDictCursor, execute_values
 from psycopg2.pool import SimpleConnectionPool
@@ -1432,6 +1433,55 @@ class SupabaseDB:
             raise Exception(f"Failed to get cost by model: {e}")
         finally:
             self.return_connection(conn)
+    
+    def get_token_breakdown(self, user_id: str, days: int) -> List[Dict[str, Any]]:
+        since = datetime.utcnow() - timedelta(days=days)
+
+        query = """
+        SELECT
+            DATE(timestamp) as day,
+            model,
+            SUM(input_tokens) as input_tokens,
+            SUM(output_tokens) as output_tokens,
+            SUM(COALESCE(cached_input_tokens, 0)) as cached_input_tokens
+        FROM token_usage
+        WHERE user_id = ?
+        AND timestamp >= ?
+        GROUP BY day, model
+        ORDER BY day ASC
+        """
+
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(query, (user_id, since))
+        rows = cursor.fetchall()
+        conn.close()
+
+        breakdown: Dict[str, Dict[str, Any]] = {}
+
+        for day, model, in_tok, out_tok, cached_tok in rows:
+            if day not in breakdown:
+                breakdown[day] = {
+                    "date": day,
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "cached_input_tokens": 0,
+                    "total_tokens": 0,
+                    "by_model": {}
+                }
+
+            breakdown[day]["input_tokens"] += in_tok
+            breakdown[day]["output_tokens"] += out_tok
+            breakdown[day]["cached_input_tokens"] += cached_tok
+            breakdown[day]["total_tokens"] += in_tok + out_tok
+
+            breakdown[day]["by_model"][model] = {
+                "input": in_tok,
+                "output": out_tok
+            }
+
+        return list(breakdown.values())
+    
     # closes all the connections in the pool
     def close(self):
         self.pool.closeall()

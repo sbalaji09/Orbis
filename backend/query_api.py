@@ -498,11 +498,30 @@ async def get_cost_trends(user_id: str, days: int):
             None,
             lambda: db.get_cost_trends(user_id, days)
         )
+
+        return cost_trends
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
 @app.get("/cost/token-breakdown")
+async def get_token_breakdown(user_id: str, days: int):
+    try:
+        validate_user_id(user_id)
+
+        loop = asyncio.get_running_loop()
+
+        token_breakdown = await loop.run_in_executor(
+            None,
+            lambda: db.get
+        )
+
+        return token_breakdown
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.exception_handler(ValidationError)
 async def validation_error_handler(request, exc: ValidationError):
