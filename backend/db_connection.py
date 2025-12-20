@@ -1180,14 +1180,11 @@ class SupabaseDB:
                 end_date = None
             else:
                 period = period.strip().lower()
-
                 range_match = re.match(r"^(\d{4}-\d{2}-\d{2})\s*:\s*(\d{4}-\d{2}-\d{2})$", period)
 
-                # calculates the start date
                 if range_match:
                     s = datetime.fromisoformat(range_match.group(1)).replace(tzinfo=timezone.utc)
                     e = datetime.fromisoformat(range_match.group(2)).replace(tzinfo=timezone.utc)
-
                     start_date = s
                     end_date = e + timedelta(days=1)
                 elif period.endswith("d") and period[:-1].isdigit():
@@ -1205,46 +1202,42 @@ class SupabaseDB:
 
             query = """
                 SELECT
-                    date_trunc('day', created_at AT TIME ZONE 'UTC')::date AS day,
-                    COALESCE(model, 'unknown') AS model,
-                    SUM(cost)::numeric(18,6) AS total_cost,
+                    date_trunc('day', t.created_at AT TIME ZONE 'UTC')::date AS day,
+                    COALESCE(s.model, 'unknown') AS model,
+                    COALESCE(SUM(s.cost), 0)::numeric(18,6) AS total_cost,
                     COUNT(*) AS call_count
-                FROM prompts
-                WHERE user_id = %s
+                FROM traces t
+                JOIN spans s
+                ON s.trace_id = t.id
+                WHERE t.user_id = %s
             """
             params = [user_id]
 
             if start_date is not None:
-                query += " AND created_at >= %s"
+                query += " AND t.created_at >= %s"
                 params.append(start_date)
             if end_date is not None:
-                query += " AND created_at < %s"
+                query += " AND t.created_at < %s"
                 params.append(end_date)
-            
+
             query += """
                 GROUP BY day, model
                 ORDER BY day DESC, model
             """
 
-
             with conn.cursor() as cur:
                 cur.execute(query, params)
                 rows = cur.fetchall()
-
-                # gives column names in order
                 columns = [col.name for col in cur.description] if hasattr(cur, "description") else ["day", "model", "total_cost", "call_count"]
 
                 results: List[Dict[str, Any]] = []
                 for row in rows:
                     row_dict = dict(zip(columns, row))
                     day_val = row_dict.get("day")
-                    if isinstance(day_val, datetime):
-                        day_str = day_val.date().isoformat()
-                    else:
-                        try:
-                            day_str = day_val.isoformat()
-                        except Exception:
-                            day_str = str(day_val)
+                    try:
+                        day_str = day_val.isoformat()
+                    except Exception:
+                        day_str = str(day_val)
 
                     results.append({
                         "date": day_str,
@@ -1252,11 +1245,11 @@ class SupabaseDB:
                         "total_cost": float(row_dict.get("total_cost")) if row_dict.get("total_cost") is not None else 0.0,
                         "call_count": int(row_dict.get("call_count") or 0),
                     })
+
             return results
 
-
         except Exception as e:
-            raise Exception(f"Failed to get prompt analytics: {e}")
+            raise Exception(f"Failed to get cost summary by user: {e}")
         finally:
             self.return_connection(conn)
 
