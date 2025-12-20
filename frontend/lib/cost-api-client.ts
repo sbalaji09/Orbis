@@ -1,0 +1,164 @@
+/**
+ * Client-side cost API functions
+ * These functions accept a token parameter for use in Client Components
+ */
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+export interface CostTrend {
+  date: string;
+  total_cost: number;
+  call_count: number;
+  [key: string]: string | number;
+}
+
+export interface CostByAgent {
+  agent: string;
+  total_cost: number;
+  call_count: number;
+  [key: string]: string | number;
+}
+
+export interface CostByModel {
+  model: string;
+  total_cost: number;
+  call_count: number;
+  [key: string]: string | number;
+}
+
+export interface TokenBreakdown {
+  date: string;
+  input_tokens: number;
+  output_tokens: number;
+  cached_input_tokens: number;
+  total_tokens: number;
+  by_model: Record<string, { input: number; output: number }>;
+}
+
+function getHeaders(token: string | null): HeadersInit {
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
+function isoDateOnly(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+export async function fetchCostTrends(
+  days: number,
+  token: string | null
+): Promise<CostTrend[]> {
+  try {
+    const url = new URL(`${API_BASE_URL}/cost/trends`);
+    url.searchParams.set("days", String(days));
+
+    const response = await fetch(url.toString(), {
+      headers: getHeaders(token),
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      console.error(`Failed to fetch cost trends: ${response.statusText}`);
+      return [];
+    }
+
+    const data = await response.json();
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error("Error fetching cost trends:", error);
+    return [];
+  }
+}
+
+export async function fetchCostByAgent(
+  startDate: string | undefined,
+  endDate: string | undefined,
+  token: string | null
+): Promise<CostByAgent[]> {
+  try {
+    const end = endDate ?? isoDateOnly(new Date());
+    const start = startDate ?? isoDateOnly(new Date(Date.now() - 29 * 24 * 60 * 60 * 1000));
+
+    const url = new URL(`${API_BASE_URL}/cost/by-agent`);
+    url.searchParams.set("start_date", start);
+    url.searchParams.set("end_date", end);
+
+    const response = await fetch(url.toString(), {
+      headers: getHeaders(token),
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      console.error(`Failed to fetch cost by agent: ${response.statusText}`);
+      return [];
+    }
+
+    const data = await response.json();
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error("Error fetching cost by agent:", error);
+    return [];
+  }
+}
+
+export async function fetchCostByModel(
+  startDate: string | undefined,
+  endDate: string | undefined,
+  token: string | null
+): Promise<CostByModel[]> {
+  try {
+    const end = endDate ?? isoDateOnly(new Date());
+    const start = startDate ?? isoDateOnly(new Date(Date.now() - 29 * 24 * 60 * 60 * 1000));
+
+    const url = new URL(`${API_BASE_URL}/cost/by-model`);
+    url.searchParams.set("start_date", start);
+    url.searchParams.set("end_date", end);
+
+    const response = await fetch(url.toString(), {
+      headers: getHeaders(token),
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      console.error(`Failed to fetch cost by model: ${response.statusText}`);
+      return [];
+    }
+
+    const data = await response.json();
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error("Error fetching cost by model:", error);
+    return [];
+  }
+}
+
+export async function fetchTokenBreakdown(
+  days: number,
+  token: string | null
+): Promise<TokenBreakdown[]> {
+  try {
+    const url = new URL(`${API_BASE_URL}/cost/token-breakdown`);
+    url.searchParams.set("days", String(days));
+
+    const response = await fetch(url.toString(), {
+      headers: getHeaders(token),
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      console.error(`Failed to fetch token breakdown: ${response.statusText}`);
+      return [];
+    }
+
+    const data = await response.json();
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error("Error fetching token breakdown:", error);
+    return [];
+  }
+}

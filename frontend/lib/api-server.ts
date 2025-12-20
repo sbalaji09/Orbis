@@ -238,11 +238,10 @@ function unwrapList(data: any) {
   return [];
 }
 
-export async function getCostSummary(userId: string, period: string) {
+export async function getCostSummary(period: string) {
   try {
     const authHeaders = await getAuthHeaders();
     const url = new URL(`${API_BASE_URL}/cost/summary`);
-    url.searchParams.set("user_id", userId);
     url.searchParams.set("period", period);
 
     const response = await fetch(url.toString(), {
@@ -251,7 +250,7 @@ export async function getCostSummary(userId: string, period: string) {
     });
 
     if (!response.ok) {
-      console.error(`Failed to fetch prompt analytics: ${response.statusText}`);
+      console.error(`Failed to fetch cost summary: ${response.statusText}`);
       return [];
     }
 
@@ -267,7 +266,7 @@ function isoDateOnly(d: Date) {
   return d.toISOString().slice(0, 10);
 }
 
-export async function getCostByAgent(userId: string, startDate?: string, endDate?: string) {
+export async function getCostByAgent(startDate?: string, endDate?: string) {
   try {
     const authHeaders = await getAuthHeaders();
 
@@ -277,7 +276,6 @@ export async function getCostByAgent(userId: string, startDate?: string, endDate
       isoDateOnly(new Date(Date.now() - 29 * 24 * 60 * 60 * 1000));
 
     const url = new URL(`${API_BASE_URL}/cost/by-agent`);
-    url.searchParams.set("user_id", userId);
     url.searchParams.set("start_date", start);
     url.searchParams.set("end_date", end);
 
@@ -299,7 +297,7 @@ export async function getCostByAgent(userId: string, startDate?: string, endDate
   }
 }
 
-export async function getCostByModel(userId: string, startDate?: string, endDate?: string) {
+export async function getCostByModel(startDate?: string, endDate?: string) {
   try {
     const authHeaders = await getAuthHeaders();
 
@@ -309,7 +307,6 @@ export async function getCostByModel(userId: string, startDate?: string, endDate
       isoDateOnly(new Date(Date.now() - 29 * 24 * 60 * 60 * 1000));
 
     const url = new URL(`${API_BASE_URL}/cost/by-model`);
-    url.searchParams.set("user_id", userId);
     url.searchParams.set("start_date", start);
     url.searchParams.set("end_date", end);
 
@@ -331,12 +328,11 @@ export async function getCostByModel(userId: string, startDate?: string, endDate
   }
 }
 
-export async function getCostTrends(userId: string, days: number) {
+export async function getCostTrends(days: number) {
   try {
     const authHeaders = await getAuthHeaders();
 
     const url = new URL(`${API_BASE_URL}/cost/trends`);
-    url.searchParams.set("user_id", userId);
     url.searchParams.set("days", String(days));
 
     const response = await fetch(url.toString(), {
