@@ -5,6 +5,7 @@ import { ModelComparison } from "@/components/ModelComparison";
 import { InputPanel } from "@/components/InputPanel";
 import { CodeExportModal } from "@/components/CodeExportModal";
 import { TraceLoaderModal } from "@/components/TraceLoaderModal";
+import { ModelLogo } from "@/components/ModelLogo";
 
 export interface ModelConfig {
   id: string;
@@ -51,6 +52,14 @@ export const AVAILABLE_MODELS: ModelConfig[] = [
     costPerInputToken: 0.00000059,
     costPerOutputToken: 0.00000079,
     color: "#e8c302",
+  },
+  {
+    id: "gemini-2.5-pro",
+    name: "Gemini 2.5 Pro",
+    provider: "Google",
+    costPerInputToken: 0.00000125, // $1.25/M
+    costPerOutputToken: 0.00001,    // $10/M
+    color: "#4285f4",
   },
   {
     id: "mistral-large",
@@ -168,12 +177,13 @@ export default function App() {
               {AVAILABLE_MODELS.map((model) => (
                 <div
                   key={model.id}
-                  className="px-2 py-1 border border-black/20 bg-white text-[10px] font-mono"
+                  className="px-2 py-1 border border-black/20 bg-white text-[10px] font-mono flex items-center gap-2"
                 >
-                  <span className="font-semibold">{model.name}</span>
-                  <span className="text-black/40 ml-1">
-                    ({model.provider})
-                  </span>
+                  <ModelLogo provider={model.provider} size={14} />
+                  <div className="leading-tight">
+                    <span className="font-semibold">{model.name}</span>
+                    <span className="text-black/40 ml-1">({model.provider})</span>
+                  </div>
                 </div>
               ))}
             </div>

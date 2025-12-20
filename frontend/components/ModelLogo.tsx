@@ -1,8 +1,48 @@
+import Image from "next/image";
+
 interface ModelLogoProps {
   provider: string;
   size?: number;
 }
 
 export function ModelLogo({ provider, size = 24 }: ModelLogoProps) {
-  return null;
+  const getLogoPath = () => {
+    switch (provider) {
+      case "xAI":
+        return "/logos/grok.svg";
+      case "OpenAI":
+        return "/logos/openai.svg";
+      case "Groq":
+        return "/logos/meta.svg"; // Using Meta logo for Llama
+      case "Google":
+        return "/logos/gemini.svg";
+      case "Mistral AI":
+        return "/logos/mistral.svg";
+      case "DeepSeek":
+        return "/logos/deepseek.svg";
+      default:
+        return null;
+    }
+  };
+
+  const logoPath = getLogoPath();
+
+  if (!logoPath) {
+    // Fallback for unknown providers
+    return (
+      <div style={{ width: size, height: size }} className="flex items-center justify-center bg-black/10 rounded-sm border border-black/20">
+        <span className="text-black/40 text-xs font-bold">{provider[0]}</span>
+      </div>
+    );
+  }
+
+  return (
+    <Image
+      src={logoPath}
+      alt={`${provider} logo`}
+      width={size}
+      height={size}
+      className="object-contain"
+    />
+  );
 }

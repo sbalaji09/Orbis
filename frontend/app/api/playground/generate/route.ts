@@ -53,6 +53,13 @@ const MODEL_CONFIGS: Record<string, ModelConfig> = {
     costPerInputToken: 0.00000059,
     costPerOutputToken: 0.00000079,
   },
+  "gemini-2.5-pro": {
+    id: "gemini-2.5-pro",
+    name: "Gemini 2.5 Pro",
+    provider: "Google",
+    costPerInputToken: 0.00000125,
+    costPerOutputToken: 0.00001,
+  },
   "mistral-large": {
     id: "mistral-large",
     name: "Mistral Large",
@@ -112,6 +119,48 @@ function getDeepSeekClient() {
   });
 }
 
+async function callGemini(prompt: string): Promise<{ content: string; inputTokens: number; outputTokens: number }> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY not configured");
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: prompt,
+              },
+            ],
+          },
+        ],
+        generationConfig: {
+          maxOutputTokens: 1000,
+          temperature: 0.7,
+        },
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Gemini API error: ${error}`);
+  }
+
+  const data = await response.json();
+  const content = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  const inputTokens = data.usageMetadata?.promptTokenCount || 0;
+  const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+
+  return { content, inputTokens, outputTokens };
+}
+
 async function callModel(
   modelId: string,
   prompt: string,
@@ -148,58 +197,72 @@ async function callModel(
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      let client: OpenAI;
-      let modelName: string;
+      let output: string;
+      let inputTokens: number;
+      let outputTokens: number;
 
-      // Get the appropriate client and model name for each provider
-      switch (modelId) {
-        case "gpt-5":
-          client = getOpenAIClient();
-          modelName = "gpt-4o"; // Using GPT-4o as GPT-5 placeholder
-          break;
-        case "grok-4-1":
-          client = getXAIClient();
-          modelName = "grok-4-1-fast-reasoning";
-          break;
-        case "groq-llama":
-          client = getGroqClient();
-          modelName = "llama-3.3-70b-versatile";
-          break;
-        case "mistral-large":
-          client = getMistralClient();
-          modelName = "mistral-large-latest";
-          break;
-        case "deepseek-v3":
-          client = getDeepSeekClient();
-          modelName = "deepseek-chat";
-          break;
-        default:
-          throw new Error(`Unsupported model: ${modelId}`);
+      // Handle Gemini separately since it uses a different API
+      if (modelId === "gemini-2.5-pro") {
+        const geminiResponse = await callGemini(prompt);
+        output = geminiResponse.content;
+        inputTokens = geminiResponse.inputTokens;
+        outputTokens = geminiResponse.outputTokens;
+      } else {
+        let client: OpenAI;
+        let modelName: string;
+
+        // Get the appropriate client and model name for each provider
+        switch (modelId) {
+          case "gpt-5":
+            client = getOpenAIClient();
+            modelName = "gpt-4o"; // Using GPT-4o as GPT-5 placeholder
+            break;
+          case "grok-4-1":
+            client = getXAIClient();
+            modelName = "grok-4-1-fast-reasoning";
+            break;
+          case "groq-llama":
+            client = getGroqClient();
+            modelName = "llama-3.3-70b-versatile";
+            break;
+          case "mistral-large":
+            client = getMistralClient();
+            modelName = "mistral-large-latest";
+            break;
+          case "deepseek-v3":
+            client = getDeepSeekClient();
+            modelName = "deepseek-chat";
+            break;
+          default:
+            throw new Error(`Unsupported model: ${modelId}`);
+        }
+
+        // Make the API call
+        const response = await client.chat.completions.create({
+          model: modelName,
+          messages: [
+            {
+              role: "user",
+              content: prompt,
+            },
+          ],
+          max_tokens: 1000,
+          temperature: 0.7,
+        });
+
+        output = response.choices[0]?.message?.content || "";
+        inputTokens = response.usage?.prompt_tokens || 0;
+        outputTokens = response.usage?.completion_tokens || 0;
       }
 
-      // Make the API call
-      const response = await client.chat.completions.create({
-        model: modelName,
-        messages: [
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-        max_tokens: 1000,
-        temperature: 0.7,
-      });
-
       const latency = (Date.now() - startTime) / 1000;
-      const inputTokens = response.usage?.prompt_tokens || 0;
-      const outputTokens = response.usage?.completion_tokens || 0;
       const totalCost =
         inputTokens * modelConfig.costPerInputToken +
         outputTokens * modelConfig.costPerOutputToken;
 
       const result = {
         model: modelConfig,
-        output: response.choices[0]?.message?.content || "",
+        output,
         inputTokens,
         outputTokens,
         latency,

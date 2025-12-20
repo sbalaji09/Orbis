@@ -66,7 +66,7 @@ export function InputPanel({
           <label className="text-xs text-black/60 uppercase tracking-wide block mb-2">
             Select Models to Compare (max 4)
           </label>
-          <div className="grid grid-cols-5 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             {availableModels.map((model) => {
               const isSelected = selectedModels.some((m) => m.id === model.id);
               const isDisabled = !isSelected && selectedModels.length >= 4;
@@ -76,7 +76,7 @@ export function InputPanel({
                   key={model.id}
                   onClick={() => !isDisabled && toggleModel(model)}
                   disabled={isDisabled && !isSelected}
-                  className={`p-3 border-2 transition-all text-left ${
+                  className={`p-3 border-2 transition-all ${
                     isSelected
                       ? "border-babyblue bg-babyblue/10 shadow-[3px_3px_0_rgba(91,95,255,0.3)]"
                       : isDisabled
@@ -84,37 +84,33 @@ export function InputPanel({
                       : "border-black/30 bg-white hover:border-black hover:shadow-[3px_3px_0_rgba(0,0,0,0.15)]"
                   }`}
                 >
-                  <div className="flex items-start justify-between mb-2">
-                    <ModelLogo provider={model.provider} size={24} />
-                    {isSelected && (
-                      <div className="w-4 h-4 bg-babyblue border border-black flex items-center justify-center">
-                        <svg
-                          className="w-3 h-3 text-white"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={3}
-                            d="M5 13l4 4L19 7"
-                          />
-                        </svg>
+                  <div className="flex items-center gap-3">
+                    <ModelLogo provider={model.provider} size={32} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-semibold truncate">{model.name}</span>
+                        {isSelected && (
+                          <div className="w-4 h-4 bg-babyblue border border-black flex items-center justify-center flex-shrink-0">
+                            <svg
+                              className="w-3 h-3 text-white"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={3}
+                                d="M5 13l4 4L19 7"
+                              />
+                            </svg>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                  <span className="text-xs font-semibold block mb-1">{model.name}</span>
-                  <p className="text-[9px] text-black/40 mb-2 font-mono">
-                    {model.provider}
-                  </p>
-                  <div className="space-y-0.5">
-                    <p className="text-[9px] text-black/50">
-                      In: ${(model.costPerInputToken * 1000000).toFixed(2)}/1M
-                    </p>
-                    <p className="text-[9px] text-black/50">
-                      Out: ${(model.costPerOutputToken * 1000000).toFixed(2)}/1M
-                    </p>
+                      <p className="text-[10px] text-black/50 font-mono">
+                        ${(model.costPerInputToken * 1000000).toFixed(2)}/${(model.costPerOutputToken * 1000000).toFixed(2)} per 1M
+                      </p>
+                    </div>
                   </div>
                 </button>
               );
