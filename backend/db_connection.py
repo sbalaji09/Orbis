@@ -1385,12 +1385,14 @@ class SupabaseDB:
                 )
                 SELECT
                     d.day::date AS day,
-                    COALESCE(SUM(p.cost), 0)::numeric(18,6) AS total_cost,
-                    COALESCE(COUNT(p.*), 0) AS call_count
+                    COALESCE(SUM(s.cost), 0)::numeric(18,6) AS total_cost,
+                    COALESCE(COUNT(s.*), 0) AS call_count
                 FROM days d
-                LEFT JOIN prompts p
-                ON p.user_id = %s
-                AND (p.created_at AT TIME ZONE 'UTC')::date = d.day::date
+                LEFT JOIN traces t
+                ON t.user_id = %s
+                AND (t.created_at AT TIME ZONE 'UTC')::date = d.day::date
+                LEFT JOIN spans s
+                ON s.trace_id = t.id
                 GROUP BY d.day
                 ORDER BY d.day ASC
             """
@@ -1406,7 +1408,7 @@ class SupabaseDB:
                 for row in rows:
                     row_dict = dict(zip(columns, row))
                     day_val = row_dict.get("day")
-                    # day_val should be a date object; convert to ISO string YYYY-MM-DD
+
                     try:
                         day_str = day_val.isoformat()
                     except Exception:
@@ -1422,10 +1424,12 @@ class SupabaseDB:
                     })
 
             return results
+
         except Exception as e:
-            raise Exception(f"Failed to get cost by model: {e}")
+            raise Exception(f"Failed to get cost trends: {e}")
         finally:
             self.return_connection(conn)
+
     
     def get_token_breakdown(self, user_id: str, days: int) -> List[Dict[str, Any]]:
         since = datetime.utcnow() - timedelta(days=days)
