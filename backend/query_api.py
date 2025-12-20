@@ -514,7 +514,7 @@ async def get_token_breakdown(days: int, user_id: str = Depends(get_user_id_from
 
         token_breakdown = await loop.run_in_executor(
             None,
-            lambda: db.get
+            lambda: db.get_token_breakdown(user_id, days)
         )
 
         return token_breakdown
