@@ -24,15 +24,16 @@ export interface ModelOutput {
   totalCost: number;
   timestamp: number;
   error?: string;
+  cached?: boolean;
 }
 
 export const AVAILABLE_MODELS: ModelConfig[] = [
   {
     id: "grok-4-1",
-    name: "Grok 4.1",
+    name: "Grok 4.1 Fast",
     provider: "xAI",
-    costPerInputToken: 0.000002,
-    costPerOutputToken: 0.000008,
+    costPerInputToken: 0.0000002,
+    costPerOutputToken: 0.0000005,
     color: "#e91e8c",
   },
   {
@@ -45,26 +46,26 @@ export const AVAILABLE_MODELS: ModelConfig[] = [
   },
   {
     id: "groq-llama",
-    name: "Llama 3.1",
+    name: "Llama 3.3 70B",
     provider: "Groq",
-    costPerInputToken: 0.0000005,
-    costPerOutputToken: 0.0000008,
+    costPerInputToken: 0.00000059,
+    costPerOutputToken: 0.00000079,
     color: "#e8c302",
   },
   {
     id: "mistral-large",
     name: "Mistral Large",
     provider: "Mistral AI",
-    costPerInputToken: 0.000003,
-    costPerOutputToken: 0.000009,
+    costPerInputToken: 0.0000005,
+    costPerOutputToken: 0.0000015,
     color: "#ff7b54",
   },
   {
     id: "deepseek-v3",
     name: "DeepSeek V3",
     provider: "DeepSeek",
-    costPerInputToken: 0.0000003,
-    costPerOutputToken: 0.0000006,
+    costPerInputToken: 0.00000028,
+    costPerOutputToken: 0.00000042,
     color: "#14b8a6",
   },
 ];

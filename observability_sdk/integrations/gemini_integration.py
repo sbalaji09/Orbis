@@ -11,18 +11,28 @@ from ..collector.collector import get_collector
 from ..core.context import get_current_span, set_current_span
 from ..collector.config import get_config
 
-# Gemini pricing per 1M tokens (updated 11.19.25)
+# Gemini pricing per 1M tokens (updated 12.19.25)
+# Note: Using paid tier pricing. Free tier has usage limits but $0 cost.
 GEMINI_PRICING = {
-    # Gemini 2.5 family (FREE)
-    "gemini-2.5-pro": {"input": 0.0, "output": 0.0},
-    "gemini-2.5-flash": {"input": 0.0, "output": 0.0},
-    "gemini-2.5-flash-preview-09-2025": {"input": 0.0, "output": 0.0},
-    "gemini-2.5-flash-lite": {"input": 0.0, "output": 0.0},
-    
-    # Gemini 2.0 family (FREE)
-    "gemini-2.0-flash": {"input": 0.0, "output": 0.0},
-    "gemini-2.0-flash-lite": {"input": 0.0, "output": 0.0},
-    "gemini-2.0-flash-exp": {"input": 0.0, "output": 0.0},
+    # Gemini 3 family
+    "gemini-3-pro-preview": {"input": 2.0, "output": 12.0},  # text input; prompts <= 200k
+    "gemini-3-flash-preview": {"input": 0.5, "output": 3.0},  # text input
+    "gemini-3-pro-image-preview": {"input": 2.0, "output": 12.0},  # text portion
+
+    # Gemini 2.5 family
+    "gemini-2.5-pro": {"input": 1.25, "output": 10.0},  # prompts <= 200k
+    "gemini-2.5-flash": {"input": 0.3, "output": 2.5},  # text input
+    "gemini-2.5-flash-preview-09-2025": {"input": 0.3, "output": 2.5},
+    "gemini-2.5-flash-lite": {"input": 0.1, "output": 0.4},  # text input
+    "gemini-2.5-flash-lite-preview-09-2025": {"input": 0.1, "output": 0.4},
+    "gemini-2.5-flash-native-audio-preview-12-2025": {"input": 0.5, "output": 2.0},  # text input
+    "gemini-2.5-flash-image": {"input": 0.3, "output": 0.039},  # per image output
+    "gemini-2.5-flash-preview-tts": {"input": 0.5, "output": 10.0},  # audio output
+    "gemini-2.5-pro-preview-tts": {"input": 1.0, "output": 20.0},  # audio output
+
+    # Gemini 2.0 family
+    "gemini-2.0-flash": {"input": 0.1, "output": 0.4},  # text input
+    "gemini-2.0-flash-lite": {"input": 0.075, "output": 0.3},
 }
 
 def calculate_gemini_cost(model: str, input_tokens: int, output_tokens: int) -> float:
@@ -119,7 +129,7 @@ class GeminiInstrumentor:
         # Create span
         span = Span(
             name=f"gemini.{model_name}",
-            user_id=config.user_id or "11111111-1111-1111-1111-111111111111",
+            user_id=config.user_id,
             agent_id=config.project_id,
             model=model_name,
             prompt=prompt,

@@ -22,8 +22,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Fetch recent traces
-    const response = await fetch(`${API_BASE_URL}/traces?limit=20`, {
+    // Fetch recent traces (increased limit to get more traces)
+    const response = await fetch(`${API_BASE_URL}/traces?limit=50`, {
       headers: {
         "Content-Type": "application/json",
         ...authHeaders,
@@ -57,24 +57,41 @@ export async function GET(request: NextRequest) {
             const spansData = await spansResponse.json();
             const spans = spansData.spans || [];
 
-            // Find the first span with input data
+            // Find the first LLM span with input data
             const spanWithInput = spans.find(
-              (span: any) => span.input_preview || span.input_blob_url
+              (span: any) => span.span_type === "llm" && (span.prompt || span.input_preview || span.input_blob_url)
             );
 
-            if (spanWithInput) {
-              let prompt = spanWithInput.input_preview || "";
+            console.log(`[Trace ${trace.trace_id}] Searching for LLM spans:`, {
+              total_spans: spans.length,
+              llm_spans: spans.filter((s: any) => s.span_type === "llm").length,
+              found_span: !!spanWithInput
+            });
 
-              // If there's a blob URL, fetch the full input
+            if (spanWithInput) {
+              // Try to get prompt from LLM span first, then fall back to input_preview
+              let prompt = spanWithInput.prompt || spanWithInput.input_preview || "";
+              console.log(`[Trace ${trace.trace_id}] Found span with input:`, {
+                has_prompt: !!spanWithInput.prompt,
+                has_input_preview: !!spanWithInput.input_preview,
+                prompt_length: prompt.length,
+                prompt_sample: prompt.substring(0, 50)
+              });
+
+              // If there's a blob URL, fetch the full input (only if it's an HTTP URL)
               if (spanWithInput.input_blob_url && !prompt) {
-                try {
-                  const blobResponse = await fetch(spanWithInput.input_blob_url);
-                  if (blobResponse.ok) {
-                    const blobData = await blobResponse.text();
-                    prompt = blobData;
+                const blobUrl = spanWithInput.input_blob_url;
+                // Only fetch if it's a valid HTTP/HTTPS URL
+                if (blobUrl.startsWith('http://') || blobUrl.startsWith('https://')) {
+                  try {
+                    const blobResponse = await fetch(blobUrl);
+                    if (blobResponse.ok) {
+                      const blobData = await blobResponse.text();
+                      prompt = blobData;
+                    }
+                  } catch (e) {
+                    console.error("Error fetching blob data:", e);
                   }
-                } catch (e) {
-                  console.error("Error fetching blob data:", e);
                 }
               }
 
@@ -82,6 +99,11 @@ export async function GET(request: NextRequest) {
               let extractedPrompt = prompt;
               try {
                 const parsedInput = JSON.parse(prompt);
+                console.log(`[Trace ${trace.trace_id}] Parsed input as JSON:`, {
+                  has_messages: !!parsedInput.messages,
+                  has_prompt: !!parsedInput.prompt,
+                  type: typeof parsedInput
+                });
                 if (parsedInput.messages && Array.isArray(parsedInput.messages)) {
                   // Extract content from messages array
                   const userMessage = parsedInput.messages.find(
@@ -97,36 +119,49 @@ export async function GET(request: NextRequest) {
                 }
               } catch (e) {
                 // If not JSON, use the raw prompt
+                console.log(`[Trace ${trace.trace_id}] Input is not JSON, using raw prompt`);
               }
 
-              return {
+              console.log(`[Trace ${trace.trace_id}] Final extracted prompt:`, {
+                length: extractedPrompt?.length || 0,
+                isEmpty: !extractedPrompt || extractedPrompt.trim() === "",
+                sample: extractedPrompt?.substring(0, 100)
+              });
+
+              // If we still don't have a good prompt, skip this trace
+              if (!extractedPrompt || extractedPrompt.trim() === "") {
+                console.log(`[Trace ${trace.trace_id}] Skipping - no valid prompt`);
+                return null;
+              }
+
+              const result = {
                 id: trace.trace_id,
                 timestamp: trace.start_time,
                 prompt: extractedPrompt.substring(0, 500), // Limit to 500 chars for display
-                model: spanWithInput.llm_model || "unknown",
+                model: spanWithInput.model || spanWithInput.llm_model || "unknown",
                 status: trace.status,
               };
+
+              console.log(`[Trace ${trace.trace_id}] Returning trace:`, {
+                timestamp: trace.start_time,
+                timestamp_type: typeof trace.start_time,
+                parsed_date: new Date(trace.start_time).toISOString(),
+              });
+
+              return result;
             }
           }
         } catch (error) {
           console.error(`Error fetching spans for trace ${trace.trace_id}:`, error);
         }
 
-        // Fallback if we can't get the prompt
-        return {
-          id: trace.trace_id,
-          timestamp: trace.start_time,
-          prompt: "No prompt available",
-          model: "unknown",
-          status: trace.status,
-        };
+        // Skip this trace if we can't get the prompt
+        return null;
       })
     );
 
-    // Filter out traces without valid prompts
-    const validTraces = tracesWithPrompts.filter(
-      (t) => t.prompt && t.prompt !== "No prompt available"
-    );
+    // Filter out null traces (ones without valid prompts)
+    const validTraces = tracesWithPrompts.filter((t) => t !== null);
 
     return NextResponse.json({
       traces: validTraces,

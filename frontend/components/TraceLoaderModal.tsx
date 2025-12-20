@@ -43,6 +43,17 @@ export function TraceLoaderModal({ isOpen, onClose, onLoad }: TraceLoaderModalPr
         throw new Error('Failed to fetch traces');
       }
       const data = await response.json();
+      console.log('🔍 Fetched traces:', data.traces?.length || 0);
+      if (data.traces && data.traces.length > 0) {
+        console.log('🕐 Sample trace timestamp:', {
+          raw: data.traces[0].timestamp,
+          type: typeof data.traces[0].timestamp,
+          parsed: new Date(data.traces[0].timestamp),
+          now: new Date(),
+          diff_ms: new Date().getTime() - new Date(data.traces[0].timestamp).getTime(),
+          diff_mins: Math.floor((new Date().getTime() - new Date(data.traces[0].timestamp).getTime()) / 60000)
+        });
+      }
       setTraces(data.traces || []);
     } catch (err) {
       console.error('Error fetching traces:', err);
@@ -61,13 +72,16 @@ export function TraceLoaderModal({ isOpen, onClose, onLoad }: TraceLoaderModalPr
   };
 
   const formatTimestamp = (timestamp: string) => {
-    const date = new Date(timestamp);
+    // If timestamp doesn't have timezone info, assume it's UTC
+    const timestampWithZ = timestamp.endsWith('Z') ? timestamp : timestamp + 'Z';
+    const date = new Date(timestampWithZ);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMins / 60);
     const diffDays = Math.floor(diffHours / 24);
 
+    if (diffMins < 1) return 'just now';
     if (diffMins < 60) return `${diffMins}m ago`;
     if (diffHours < 24) return `${diffHours}h ago`;
     return `${diffDays}d ago`;

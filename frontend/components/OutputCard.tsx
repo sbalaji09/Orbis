@@ -1,5 +1,6 @@
 import { ModelOutput } from "@/app/dashboard/playground/PlaygroundClient";
 import { ModelLogo } from "./ModelLogo";
+import ReactMarkdown from "react-markdown";
 
 interface OutputCardProps {
   output: ModelOutput;
@@ -15,6 +16,7 @@ export function OutputCard({
   isMostEfficient,
 }: OutputCardProps) {
   const badges = [];
+  if (output.cached) badges.push({ label: "Cached", color: "bg-accent-teal" });
   if (isCheapest) badges.push({ label: "Cheapest", color: "bg-green" });
   if (isFastest) badges.push({ label: "Fastest", color: "bg-babyblue" });
   if (isMostEfficient) badges.push({ label: "Efficient", color: "bg-mustard" });
@@ -99,9 +101,9 @@ export function OutputCard({
             </div>
           </div>
         ) : (
-          <pre className="text-xs font-mono whitespace-pre-wrap leading-relaxed text-black">
-            {output.output}
-          </pre>
+          <div className="text-xs prose prose-sm max-w-none prose-headings:font-semibold prose-p:leading-relaxed prose-pre:bg-black/5 prose-pre:border-2 prose-pre:border-black/10 prose-code:text-xs prose-ul:my-2 prose-ol:my-2">
+            <ReactMarkdown>{output.output}</ReactMarkdown>
+          </div>
         )}
       </div>
 

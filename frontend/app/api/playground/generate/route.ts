@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
+import {
+  getCachedResponse,
+  setCachedResponse,
+} from "@/lib/playground-cache";
 
 interface ModelConfig {
   id: string;
@@ -23,16 +27,17 @@ interface ModelOutput {
   totalCost: number;
   timestamp: number;
   error?: string;
+  cached?: boolean;
 }
 
 // Model configuration mapping
 const MODEL_CONFIGS: Record<string, ModelConfig> = {
   "grok-4-1": {
     id: "grok-4-1",
-    name: "Grok 4.1",
+    name: "Grok 4.1 Fast",
     provider: "xAI",
-    costPerInputToken: 0.000002,
-    costPerOutputToken: 0.000008,
+    costPerInputToken: 0.0000002,
+    costPerOutputToken: 0.0000005,
   },
   "gpt-5": {
     id: "gpt-5",
@@ -43,24 +48,24 @@ const MODEL_CONFIGS: Record<string, ModelConfig> = {
   },
   "groq-llama": {
     id: "groq-llama",
-    name: "Llama 3.1",
+    name: "Llama 3.3 70B",
     provider: "Groq",
-    costPerInputToken: 0.0000005,
-    costPerOutputToken: 0.0000008,
+    costPerInputToken: 0.00000059,
+    costPerOutputToken: 0.00000079,
   },
   "mistral-large": {
     id: "mistral-large",
     name: "Mistral Large",
     provider: "Mistral AI",
-    costPerInputToken: 0.000003,
-    costPerOutputToken: 0.000009,
+    costPerInputToken: 0.0000005,
+    costPerOutputToken: 0.0000015,
   },
   "deepseek-v3": {
     id: "deepseek-v3",
     name: "DeepSeek V3",
     provider: "DeepSeek",
-    costPerInputToken: 0.0000003,
-    costPerOutputToken: 0.0000006,
+    costPerInputToken: 0.00000028,
+    costPerOutputToken: 0.00000042,
   },
 };
 
@@ -112,7 +117,6 @@ async function callModel(
   prompt: string,
   retries = 2
 ): Promise<ModelOutput> {
-  const startTime = Date.now();
   const modelConfig = MODEL_CONFIGS[modelId];
 
   if (!modelConfig) {
@@ -128,6 +132,20 @@ async function callModel(
     };
   }
 
+  // Check cache first
+  const cachedResult = getCachedResponse(prompt, modelId);
+  if (cachedResult) {
+    console.log(`[Cache HIT] ${modelId} - Using cached response`);
+    return {
+      model: modelConfig,
+      ...cachedResult,
+      cached: true,
+    };
+  }
+
+  console.log(`[Cache MISS] ${modelId} - Calling API`);
+  const startTime = Date.now();
+
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       let client: OpenAI;
@@ -141,11 +159,11 @@ async function callModel(
           break;
         case "grok-4-1":
           client = getXAIClient();
-          modelName = "grok-beta";
+          modelName = "grok-4-1-fast-reasoning";
           break;
         case "groq-llama":
           client = getGroqClient();
-          modelName = "llama-3.1-70b-versatile";
+          modelName = "llama-3.3-70b-versatile";
           break;
         case "mistral-large":
           client = getMistralClient();
@@ -179,7 +197,7 @@ async function callModel(
         inputTokens * modelConfig.costPerInputToken +
         outputTokens * modelConfig.costPerOutputToken;
 
-      return {
+      const result = {
         model: modelConfig,
         output: response.choices[0]?.message?.content || "",
         inputTokens,
@@ -187,7 +205,20 @@ async function callModel(
         latency,
         totalCost,
         timestamp: Date.now(),
+        cached: false,
       };
+
+      // Store successful response in cache
+      setCachedResponse(prompt, modelId, {
+        output: result.output,
+        inputTokens: result.inputTokens,
+        outputTokens: result.outputTokens,
+        latency: result.latency,
+        totalCost: result.totalCost,
+        timestamp: result.timestamp,
+      });
+
+      return result;
     } catch (error: any) {
       // If this is the last retry, return the error
       if (attempt === retries) {

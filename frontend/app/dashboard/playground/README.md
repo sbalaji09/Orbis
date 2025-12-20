@@ -7,6 +7,7 @@ A powerful comparison tool for testing and evaluating multiple AI models side-by
 - **Multi-Model Comparison**: Compare up to 4 models simultaneously
 - **Cost Analysis**: Real-time token usage and cost tracking per model
 - **Performance Metrics**: Latency, tokens/second, and efficiency comparisons
+- **Smart Caching**: In-memory LRU cache (1-hour TTL) prevents duplicate API calls and saves credits
 - **Trace Integration**: Load prompts from your observability traces
 - **Code Export**: Export prompts as code in Python, TypeScript, or cURL
 - **Error Handling**: Graceful error display with retry logic
@@ -171,6 +172,13 @@ The playground includes comprehensive error handling:
 ## Performance
 
 - **Parallel Execution**: All model calls run simultaneously for faster results
+- **Smart Caching**:
+  - Caches responses by prompt + model combination (SHA-256 hash)
+  - 1-hour TTL (time-to-live) with sliding window
+  - Max 100 cached entries (LRU eviction)
+  - Instant results for repeated prompts (no API calls)
+  - Displays "Cached" badge on cached responses
+  - Saves API credits and reduces latency to ~0s
 - **Retry Logic**: Automatic retry with exponential backoff (1s, 2s delays)
 - **Token Limits**: Capped at 1000 output tokens per request for cost control
 
