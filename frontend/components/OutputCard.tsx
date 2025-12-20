@@ -4,13 +4,67 @@ import ReactMarkdown from "react-markdown";
 
 interface OutputCardProps {
   output: ModelOutput;
+  compareTo?: ModelOutput | null;
+  showDiff?: boolean;
   isCheapest: boolean;
   isFastest: boolean;
   isMostEfficient: boolean;
 }
 
+type DiffLine = { type: "equal" | "add" | "remove"; value: string };
+
+function buildLineDiff(before: string, after: string): DiffLine[] | null {
+  const beforeLines = before.split("\n");
+  const afterLines = after.split("\n");
+
+  const maxLines = 400;
+  if (beforeLines.length > maxLines || afterLines.length > maxLines) return null;
+
+  const n = beforeLines.length;
+  const m = afterLines.length;
+  const dp: number[][] = Array.from({ length: n + 1 }, () =>
+    Array(m + 1).fill(0)
+  );
+
+  for (let i = 1; i <= n; i++) {
+    for (let j = 1; j <= m; j++) {
+      if (beforeLines[i - 1] === afterLines[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1] + 1;
+      } else {
+        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+      }
+    }
+  }
+
+  const diff: DiffLine[] = [];
+  let i = n;
+  let j = m;
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && beforeLines[i - 1] === afterLines[j - 1]) {
+      diff.push({ type: "equal", value: beforeLines[i - 1] });
+      i--;
+      j--;
+      continue;
+    }
+    if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+      diff.push({ type: "add", value: afterLines[j - 1] });
+      j--;
+      continue;
+    }
+    if (i > 0) {
+      diff.push({ type: "remove", value: beforeLines[i - 1] });
+      i--;
+    }
+  }
+
+  diff.reverse();
+  return diff;
+}
+
 export function OutputCard({
   output,
+  compareTo = null,
+  showDiff = false,
   isCheapest,
   isFastest,
   isMostEfficient,
@@ -101,9 +155,94 @@ export function OutputCard({
             </div>
           </div>
         ) : (
-          <div className="text-xs prose prose-sm max-w-none prose-headings:font-semibold prose-p:leading-relaxed prose-pre:bg-black/5 prose-pre:border-2 prose-pre:border-black/10 prose-code:text-xs prose-ul:my-2 prose-ol:my-2">
-            <ReactMarkdown>{output.output}</ReactMarkdown>
-          </div>
+          <>
+            {showDiff ? (
+              compareTo ? (
+                compareTo.error ? (
+                  <div className="border-2 border-black/10 bg-black/2 p-3">
+                    <p className="text-xs text-black/60 font-mono">
+                      Previous run for this model had an error.
+                    </p>
+                  </div>
+                ) : (
+                (() => {
+                  const diff = buildLineDiff(compareTo.output, output.output);
+                  if (!diff) {
+                    return (
+                      <div className="border-2 border-black/10 bg-black/2 p-3">
+                        <p className="text-xs text-black/60 font-mono">
+                          Diff view is disabled for large outputs (over 400 lines).
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="border-2 border-black/10 bg-white">
+                      <div className="px-3 py-2 border-b border-black/10 bg-black/2 flex items-center justify-between">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-black/60">
+                          Diff vs Previous Run
+                        </p>
+                        <div className="flex items-center gap-2 text-[10px] font-mono text-black/40">
+                          <span className="inline-flex items-center gap-1">
+                            <span className="w-2 h-2 bg-green/20 border border-black/10" />
+                            added
+                          </span>
+                          <span className="inline-flex items-center gap-1">
+                            <span className="w-2 h-2 bg-red-500/10 border border-black/10" />
+                            removed
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="p-3 font-mono text-[11px] leading-relaxed whitespace-pre-wrap break-words">
+                        {diff.map((line, idx) => (
+                          <div
+                            key={idx}
+                            className={`flex gap-2 px-2 py-0.5 ${
+                              line.type === "add"
+                                ? "bg-green/10"
+                                : line.type === "remove"
+                                ? "bg-red-500/10"
+                                : ""
+                            }`}
+                          >
+                            <span
+                              className={`w-3 flex-shrink-0 ${
+                                line.type === "add"
+                                  ? "text-green"
+                                  : line.type === "remove"
+                                  ? "text-error"
+                                  : "text-black/20"
+                              }`}
+                            >
+                              {line.type === "add"
+                                ? "+"
+                                : line.type === "remove"
+                                ? "-"
+                                : " "}
+                            </span>
+                            <span>{line.value || " "}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()
+                )
+              ) : (
+                <div className="border-2 border-black/10 bg-black/2 p-3">
+                  <p className="text-xs text-black/60 font-mono">
+                    No previous output available for this model.
+                  </p>
+                </div>
+              )
+            ) : (
+              <div className="text-xs prose prose-sm max-w-none prose-headings:font-semibold prose-p:leading-relaxed prose-pre:bg-black/5 prose-pre:border-2 prose-pre:border-black/10 prose-code:text-xs prose-ul:my-2 prose-ol:my-2">
+                <ReactMarkdown>{output.output}</ReactMarkdown>
+              </div>
+            )}
+          </>
         )}
       </div>
 

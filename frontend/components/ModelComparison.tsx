@@ -1,12 +1,25 @@
 import { ModelOutput } from "@/app/dashboard/playground/PlaygroundClient";
 import { OutputCard } from "@/components/OutputCard";
+import { useMemo, useState } from "react";
 
 interface ModelComparisonProps {
   outputs: ModelOutput[];
   inputPrompt: string;
+  previousOutputs?: ModelOutput[];
 }
 
-export function ModelComparison({ outputs, inputPrompt }: ModelComparisonProps) {
+export function ModelComparison({
+  outputs,
+  inputPrompt,
+  previousOutputs,
+}: ModelComparisonProps) {
+  const [diffMode, setDiffMode] = useState(false);
+
+  const previousByModelId = useMemo(() => {
+    if (!previousOutputs || previousOutputs.length === 0) return null;
+    return new Map(previousOutputs.map((o) => [o.model.id, o]));
+  }, [previousOutputs]);
+
   // Calculate cheapest
   const cheapestOutput = outputs.reduce((prev, current) =>
     current.totalCost < prev.totalCost ? current : prev
@@ -105,12 +118,53 @@ export function ModelComparison({ outputs, inputPrompt }: ModelComparisonProps) 
       {/* Side-by-Side Outputs */}
       <div className="border-2 border-black bg-card shadow-[4px_4px_0_rgba(0,0,0,0.15)]">
         <div className="px-6 py-4 bg-babyblue/10 border-b-2 border-black">
-          <h2 className="text-base font-semibold tracking-tight">
-            Model Outputs
-          </h2>
-          <p className="text-xs text-black/60 mt-1 font-mono">
-            {`// Side-by-side comparison of responses`}
-          </p>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-base font-semibold tracking-tight">
+                Model Outputs
+              </h2>
+              <p className="text-xs text-black/60 mt-1 font-mono">
+                {`// Side-by-side comparison of responses`}
+              </p>
+            </div>
+
+            <label
+              className={`flex items-center gap-2 select-none ${
+                previousByModelId
+                  ? "cursor-pointer"
+                  : "opacity-40 cursor-not-allowed"
+              }`}
+              title={
+                previousByModelId
+                  ? "Compare to previous run"
+                  : "Run the playground twice to enable diff mode"
+              }
+            >
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-black/70">
+                Diff Mode
+              </span>
+              <button
+                type="button"
+                onClick={() => previousByModelId && setDiffMode((v) => !v)}
+                aria-pressed={diffMode}
+                disabled={!previousByModelId}
+                className={`w-10 h-5 border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.1)] transition-colors ${
+                  diffMode ? "bg-black" : "bg-white"
+                }`}
+              >
+                <div
+                  className={`w-4 h-4 bg-mustard border border-black transition-transform ${
+                    diffMode ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </button>
+              {!previousByModelId && (
+                <span className="text-[10px] text-black/50 font-mono">
+                  Run again to enable
+                </span>
+              )}
+            </label>
+          </div>
         </div>
 
         <div className={`grid gap-4 p-6 ${outputs.length === 1 ? 'grid-cols-1' : outputs.length === 2 ? 'grid-cols-2' : outputs.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
@@ -118,6 +172,8 @@ export function ModelComparison({ outputs, inputPrompt }: ModelComparisonProps) 
             <OutputCard
               key={output.model.id}
               output={output}
+              compareTo={previousByModelId?.get(output.model.id) ?? null}
+              showDiff={diffMode}
               isCheapest={output.model.id === cheapestOutput.model.id}
               isFastest={output.model.id === fastestOutput.model.id}
               isMostEfficient={output.model.id === mostEfficientOutput.model.id}

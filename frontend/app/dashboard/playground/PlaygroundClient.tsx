@@ -82,6 +82,12 @@ export const AVAILABLE_MODELS: ModelConfig[] = [
 export default function App() {
   const [inputPrompt, setInputPrompt] = useState("");
   const [outputs, setOutputs] = useState<ModelOutput[]>([]);
+  const [previousOutputs, setPreviousOutputs] = useState<ModelOutput[] | null>(
+    null
+  );
+  const [lastSelectedModels, setLastSelectedModels] = useState<ModelConfig[]>(
+    []
+  );
   const [isGenerating, setIsGenerating] = useState(false);
   const [showCodeExport, setShowCodeExport] = useState(false);
   const [showTraceLoader, setShowTraceLoader] = useState(false);
@@ -90,6 +96,8 @@ export default function App() {
     if (!inputPrompt.trim() || selectedModels.length === 0) return;
 
     setIsGenerating(true);
+    if (outputs.length > 0) setPreviousOutputs(outputs);
+    setLastSelectedModels(selectedModels);
 
     try {
       // Call the API with selected models
@@ -201,7 +209,11 @@ export default function App() {
 
         {/* Model Comparison */}
         {outputs.length > 0 && (
-          <ModelComparison outputs={outputs} inputPrompt={inputPrompt} />
+          <ModelComparison
+            outputs={outputs}
+            inputPrompt={inputPrompt}
+            previousOutputs={previousOutputs ?? undefined}
+          />
         )}
 
         {/* Empty State */}
@@ -219,6 +231,12 @@ export default function App() {
         isOpen={showCodeExport}
         onClose={() => setShowCodeExport(false)}
         prompt={inputPrompt}
+        availableModels={AVAILABLE_MODELS}
+        defaultModelId={
+          outputs[0]?.model?.id ??
+          lastSelectedModels[0]?.id ??
+          AVAILABLE_MODELS[0]?.id
+        }
       />
 
       <TraceLoaderModal
