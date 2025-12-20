@@ -36,6 +36,12 @@ type ExportTarget =
       provider: string;
       envVar: string;
       modelName: string;
+    }
+  | {
+      kind: "anthropic";
+      provider: string;
+      envVar: string;
+      modelName: string;
     };
 
 function getExportTarget(modelId: string): ExportTarget | null {
@@ -71,13 +77,12 @@ function getExportTarget(modelId: string): ExportTarget | null {
         baseURL: "https://api.mistral.ai/v1",
         modelName: "mistral-large-latest",
       };
-    case "deepseek-chat":
+    case "claude-sonnet":
       return {
-        kind: "openai_compat",
-        provider: "DeepSeek",
-        envVar: "DEEPSEEK_API_KEY",
-        baseURL: "https://api.deepseek.com/v1",
-        modelName: "deepseek-chat",
+        kind: "anthropic",
+        provider: "Anthropic",
+        envVar: "ANTHROPIC_API_KEY",
+        modelName: "claude-3-5-sonnet-20241022",
       };
     case "gemini-2.5-flash-lite":
       return {
@@ -142,6 +147,24 @@ def run():
 
 run()`;
       }
+      if (exportTarget.kind === "anthropic") {
+        return `import os
+from anthropic import Anthropic
+
+client = Anthropic(api_key=os.environ.get("${exportTarget.envVar}", "YOUR_API_KEY_HERE"))
+
+prompt = """${prompt}"""
+
+msg = client.messages.create(
+    model="${exportTarget.modelName}",
+    max_tokens=1000,
+    temperature=0.7,
+    messages=[{"role": "user", "content": prompt}],
+)
+
+print(msg.content[0].text)
+`;
+      }
 
       return `import os
 from observability_sdk import configure, instrument_all, observe
@@ -186,6 +209,25 @@ def run():
 run()`;
 
     case "typescript":
+      if (exportTarget.kind === "anthropic") {
+        return `// npm i @anthropic-ai/sdk
+import { Anthropic } from "@anthropic-ai/sdk";
+
+const client = new Anthropic({ apiKey: process.env.${exportTarget.envVar} });
+const prompt = \`${promptEscaped}\`;
+
+async function main() {
+  const msg = await client.messages.create({
+    model: "${exportTarget.modelName}",
+    max_tokens: 1000,
+    temperature: 0.7,
+    messages: [{ role: "user", content: prompt }],
+  });
+  console.log(msg.content?.[0]?.type === "text" ? msg.content[0].text : "");
+}
+
+main();`;
+      }
       if (exportTarget.kind === "gemini") {
         return `// Gemini TypeScript example (no Orbis JS SDK shown here)
 // npm i @google/genai
@@ -241,6 +283,23 @@ async function generateCompletion() {
 generateCompletion();`;
 
     case "curl":
+      if (exportTarget.kind === "anthropic") {
+        return `curl https://api.anthropic.com/v1/messages \\
+  -H "Content-Type: application/json" \\
+  -H "anthropic-version: 2023-06-01" \\
+  -H "x-api-key: YOUR_API_KEY_HERE" \\
+  -d '{
+    "model": "${exportTarget.modelName}",
+    "max_tokens": 1000,
+    "temperature": 0.7,
+    "messages": [
+      {
+        "role": "user",
+        "content": "${promptForJson}"
+      }
+    ]
+  }'`;
+      }
       if (exportTarget.kind === "gemini") {
         return `curl "https://generativelanguage.googleapis.com/v1beta/models/${exportTarget.modelName}:generateContent?key=YOUR_API_KEY_HERE" \\
   -H "Content-Type: application/json" \\
@@ -488,6 +547,8 @@ export function CodeExportModal({
                     <p className="text-[10px] text-black/50 font-mono">
                       {exportTarget?.kind === "gemini"
                         ? "// Gemini example uses google-genai style client"
+                        : exportTarget?.kind === "anthropic"
+                        ? "// Claude example uses Anthropic Messages API"
                         : "// OpenAI-compatible endpoint"}
                     </p>
                   </div>

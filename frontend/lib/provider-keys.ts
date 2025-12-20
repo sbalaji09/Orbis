@@ -3,7 +3,7 @@ export type ProviderKeyProvider =
   | "xai"
   | "groq"
   | "mistral"
-  | "deepseek"
+  | "anthropic"
   | "gemini";
 
 export const PROVIDERS: Array<{ id: ProviderKeyProvider; label: string }> = [
@@ -11,6 +11,6 @@ export const PROVIDERS: Array<{ id: ProviderKeyProvider; label: string }> = [
   { id: "xai", label: "xAI" },
   { id: "groq", label: "Groq" },
   { id: "mistral", label: "Mistral AI" },
-  { id: "deepseek", label: "DeepSeek" },
+  { id: "anthropic", label: "Anthropic (Claude)" },
   { id: "gemini", label: "Google (Gemini)" },
 ];

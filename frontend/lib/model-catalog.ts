@@ -4,7 +4,7 @@ export type CatalogProvider =
   | "xAI"
   | "Groq"
   | "Mistral AI"
-  | "DeepSeek";
+  | "Anthropic";
 
 export type ProviderModelPricing = { input: number; output: number }; // USD per 1M tokens
 
@@ -123,11 +123,20 @@ export const MODEL_CATALOG: Record<
     "voxtral-mini-transcribe": { input: 0.002, output: 0.0 },
     "voxtral-small-latest": { input: 0.1, output: 0.3 },
   },
-  DeepSeek: {
-    "deepseek-chat": { input: 0.28, output: 0.42 },
-    "deepseek-reasoner": { input: 0.28, output: 0.42 },
-    "deepseek-v3": { input: 0.28, output: 0.42 },
-    "deepseek-v3.2": { input: 0.28, output: 0.42 },
+  Anthropic: {
+    // Pricing per 1M tokens (mirrors observability_sdk/integrations/anthropic_integration.py)
+    "claude-3-5-sonnet-20241022": { input: 3.0, output: 15.0 },
+    "claude-3-5-sonnet-20240620": { input: 3.0, output: 15.0 },
+    "claude-3-haiku-20240307": { input: 0.25, output: 1.25 },
+    "claude-3-sonnet-20240229": { input: 3.0, output: 15.0 },
+    "claude-sonnet-4": { input: 3.0, output: 15.0 },
+    "claude-sonnet-4-20250514": { input: 3.0, output: 15.0 },
+    "claude-opus-4": { input: 15.0, output: 75.0 },
+    "claude-opus-4-20250514": { input: 15.0, output: 75.0 },
+    "claude-opus-4.5": { input: 5.0, output: 25.0 },
+    "claude-sonnet-4.5": { input: 3.0, output: 15.0 },
+    "claude-haiku-3.5": { input: 0.8, output: 4.0 },
+    "claude-haiku-4.5": { input: 1.0, output: 5.0 },
   },
   xAI: {
     "grok-2-image-1212": { input: 0.0, output: 0.07 },
@@ -142,4 +151,3 @@ export const MODEL_CATALOG: Record<
     "grok-code-fast-1": { input: 0.2, output: 1.5 },
   },
 };
-

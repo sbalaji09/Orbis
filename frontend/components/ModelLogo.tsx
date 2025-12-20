@@ -18,8 +18,9 @@ export function ModelLogo({ provider, size = 24 }: ModelLogoProps) {
         return "/logos/gemini.svg";
       case "Mistral AI":
         return "/logos/mistral.svg";
-      case "DeepSeek":
-        return "/logos/deepseek.svg";
+      case "Anthropic":
+      case "Anthropic (Claude)":
+        return "/logos/claude.svg";
       default:
         return null;
     }

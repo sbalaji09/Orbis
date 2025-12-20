@@ -134,12 +134,12 @@ export const AVAILABLE_MODELS: ModelConfig[] = [
     color: "#ff7b54",
   },
   {
-    id: "deepseek-chat",
-    name: "DeepSeek Chat",
-    provider: "DeepSeek",
-    costPerInputToken: 0.00000028,
-    costPerOutputToken: 0.00000042,
-    color: "#14b8a6",
+    id: "claude-sonnet",
+    name: "Claude 3.5 Sonnet",
+    provider: "Anthropic",
+    costPerInputToken: 0.000003, // $3.00/M
+    costPerOutputToken: 0.000015, // $15.00/M
+    color: "#ff6b00",
   },
 ];
 
@@ -572,10 +572,10 @@ export default function App() {
                       ? "xai"
                       : m.provider === "Groq"
                       ? "groq"
-                      : m.provider === "Mistral AI"
+                  : m.provider === "Mistral AI"
                       ? "mistral"
-                      : m.provider === "DeepSeek"
-                      ? "deepseek"
+                      : m.provider === "Anthropic"
+                      ? "anthropic"
                       : "openai",
                   modelName: m.name,
                   costPerInputToken: m.costPerInputToken,
@@ -657,6 +657,12 @@ export default function App() {
       if (p.label.startsWith("Google") && typeof p.available === "boolean") {
         next["Google"] = p.available;
       }
+      if (
+        p.label.startsWith("Anthropic") &&
+        typeof p.available === "boolean"
+      ) {
+        next["Anthropic"] = p.available;
+      }
     }
     setProviderAvailability(next);
   };
@@ -672,9 +678,9 @@ export default function App() {
     if (m.includes("grok")) return "grok-4-1";
     if (m.includes("llama-3.3-70b")) return "groq-llama";
     if (m.includes("mistral-large")) return "mistral-large";
-    if (m.includes("deepseek")) return "deepseek-chat";
     if (m.includes("gpt")) return "gpt-4o";
     if (m.includes("gemini")) return "gemini-2.5-flash-lite";
+    if (m.includes("claude")) return "claude-sonnet";
     return null;
   };
 

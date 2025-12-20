@@ -79,12 +79,12 @@ const MODEL_CONFIGS: Record<string, ModelConfig> = {
     costPerInputToken: 0.0000005,
     costPerOutputToken: 0.0000015,
   },
-  "deepseek-chat": {
-    id: "deepseek-chat",
-    name: "DeepSeek Chat",
-    provider: "DeepSeek",
-    costPerInputToken: 0.00000028,
-    costPerOutputToken: 0.00000042,
+  "claude-sonnet": {
+    id: "claude-sonnet",
+    name: "Claude 3.5 Sonnet",
+    provider: "Anthropic",
+    costPerInputToken: 0.000003,
+    costPerOutputToken: 0.000015,
   },
 };
 
@@ -143,6 +143,49 @@ async function resolveProviderKey(
   throw new Error(
     `${envVar} not configured and no saved key found for provider '${provider}' (connect a key in the UI or set ORBIS_DEMO_${envVar})`
   );
+}
+
+async function callAnthropic(
+  prompt: string,
+  modelName: string
+): Promise<{ content: string; inputTokens: number; outputTokens: number }> {
+  const apiKey = await resolveProviderKey("ANTHROPIC_API_KEY", "anthropic");
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "anthropic-version": "2023-06-01",
+      "x-api-key": apiKey,
+    },
+    body: JSON.stringify({
+      model: modelName,
+      max_tokens: 1000,
+      temperature: 0.7,
+      messages: [
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Anthropic API error: ${error}`);
+  }
+
+  const data: any = await response.json();
+  const content = Array.isArray(data.content)
+    ? data.content
+        .map((c: any) => (c && c.type === "text" ? c.text : ""))
+        .join("")
+    : "";
+  const inputTokens = data.usage?.input_tokens ?? 0;
+  const outputTokens = data.usage?.output_tokens ?? 0;
+
+  return { content, inputTokens, outputTokens };
 }
 
 async function callGemini(
@@ -213,8 +256,8 @@ async function callModel(
             ? "Groq"
             : custom.provider === "mistral"
             ? "Mistral AI"
-            : custom.provider === "deepseek"
-            ? "DeepSeek"
+            : custom.provider === "anthropic"
+            ? "Anthropic"
             : "OpenAI",
         costPerInputToken: custom.costPerInputToken ?? 0,
         costPerOutputToken: custom.costPerOutputToken ?? 0,
@@ -264,6 +307,15 @@ async function callModel(
         output = geminiResponse.content;
         inputTokens = geminiResponse.inputTokens;
         outputTokens = geminiResponse.outputTokens;
+      } else if (modelId === "claude-sonnet" || custom?.provider === "anthropic") {
+        const anthropicModel =
+          custom?.provider === "anthropic"
+            ? custom.modelName
+            : "claude-3-5-sonnet-20241022";
+        const anthropicResponse = await callAnthropic(prompt, anthropicModel);
+        output = anthropicResponse.content;
+        inputTokens = anthropicResponse.inputTokens;
+        outputTokens = anthropicResponse.outputTokens;
       } else {
         let client: OpenAI;
         let modelName: string;
@@ -289,10 +341,6 @@ async function callModel(
             case "mistral":
               apiKey = await resolveProviderKey("MISTRAL_API_KEY", "mistral");
               baseURL = "https://api.mistral.ai/v1";
-              break;
-            case "deepseek":
-              apiKey = await resolveProviderKey("DEEPSEEK_API_KEY", "deepseek");
-              baseURL = "https://api.deepseek.com/v1";
               break;
             default:
               throw new Error(`Unsupported provider: ${custom.provider}`);
@@ -323,12 +371,6 @@ async function callModel(
               baseURL = "https://api.mistral.ai/v1";
               client = openAICompatClient(apiKey, baseURL);
               modelName = "mistral-large-latest";
-              break;
-            case "deepseek-chat":
-              apiKey = await resolveProviderKey("DEEPSEEK_API_KEY", "deepseek");
-              baseURL = "https://api.deepseek.com/v1";
-              client = openAICompatClient(apiKey, baseURL);
-              modelName = "deepseek-chat";
               break;
             default:
               throw new Error(`Unsupported model: ${modelId}`);

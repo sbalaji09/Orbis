@@ -26,7 +26,7 @@ A powerful comparison tool for testing and evaluating multiple AI models side-by
 | Llama 3.3 70B | Groq | $0.59/M tokens | $0.79/M tokens |
 | Gemini 2.5 Flash Lite | Google | $0.10/M tokens | $0.40/M tokens |
 | Mistral Large | Mistral AI | $0.50/M tokens | $1.50/M tokens |
-| DeepSeek Chat | DeepSeek | $0.28/M tokens | $0.42/M tokens |
+| Claude 3.5 Sonnet | Anthropic | $3.00/M tokens | $15.00/M tokens |
 
 ## Setup
 
@@ -49,7 +49,7 @@ OPENAI_API_KEY=sk-...
 XAI_API_KEY=xai-...
 GROQ_API_KEY=gsk_...
 MISTRAL_API_KEY=...
-DEEPSEEK_API_KEY=...
+ANTHROPIC_API_KEY=...
 GEMINI_API_KEY=...
 ```
 
@@ -65,7 +65,7 @@ ORBIS_DEMO_GROQ_API_KEY=gsk_...
 ORBIS_DEMO_OPENAI_API_KEY=sk-...
 ORBIS_DEMO_XAI_API_KEY=xai-...
 ORBIS_DEMO_MISTRAL_API_KEY=...
-ORBIS_DEMO_DEEPSEEK_API_KEY=...
+ORBIS_DEMO_ANTHROPIC_API_KEY=...
 ORBIS_DEMO_GEMINI_API_KEY=...
 ```
 
@@ -91,7 +91,7 @@ When configured, the playground will use keys in this order:
 - **xAI (Grok)**: https://console.x.ai/
 - **Groq**: https://console.groq.com/keys
 - **Mistral AI**: https://console.mistral.ai/api-keys/
-- **DeepSeek**: https://platform.deepseek.com/api_keys
+- **Anthropic (Claude)**: https://console.anthropic.com/
 - **Gemini**: https://aistudio.google.com/app/apikey
 
 ### 3. Start the Development Server
@@ -123,7 +123,7 @@ Generates responses from selected models in parallel.
 ```json
 {
   "prompt": "Explain quantum computing",
-  "models": ["gpt-4o", "grok-4-1", "deepseek-chat"]
+  "models": ["gpt-4o", "grok-4-1", "claude-sonnet"]
 }
 ```
 
@@ -234,7 +234,7 @@ Click “Run Report” to generate outputs and show a compact table:
 3. Select language (Python/TypeScript/cURL)
 4. Copy the generated code
 
-Exports are provider-aware (OpenAI-compatible base URLs for Groq/Mistral/xAI/DeepSeek, and Gemini separately).
+Exports are provider-aware (OpenAI-compatible base URLs for Groq/Mistral/xAI, Gemini separately, and native Anthropic for Claude).
 
 ## Error Handling
 
@@ -280,7 +280,7 @@ The playground includes comprehensive error handling:
 
 ### Slow Response Times
 - Some models (OpenAI / Mistral) can be slower than others
-- Groq and DeepSeek typically respond fastest
+- Groq typically responds fastest
 - Network latency affects all models equally
 
 ### Traces Not Loading
