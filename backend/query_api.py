@@ -433,7 +433,7 @@ async def get_traces_by_agent(
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/cost/summary")
-async def get_cost_summary(user_id: str, period: str):
+async def get_cost_summary(period: str, user_id: str = Depends(get_user_id_from_token)):
     try:
         validate_user_id(user_id)
 
@@ -452,7 +452,7 @@ async def get_cost_summary(user_id: str, period: str):
         raise HTTPException(status_code=500, detail=str(e))
     
 @app.get("/cost/by-agent")
-async def get_cost_by_agent(user_id: str, start_date: str, end_date: str):
+async def get_cost_by_agent(start_date: str, end_date: str, user_id: str = Depends(get_user_id_from_token)):
     try:
         validate_user_id(user_id)
 
@@ -470,7 +470,7 @@ async def get_cost_by_agent(user_id: str, start_date: str, end_date: str):
         raise HTTPException(status_code=500, detail=str(e))
     
 @app.get("/cost/by-model")
-async def get_cost_by_model(user_id: str, start_date: str, end_date: str):
+async def get_cost_by_model(start_date: str, end_date: str, user_id: str = Depends(get_user_id_from_token)):
     try:
         validate_user_id(user_id)
 
@@ -488,7 +488,7 @@ async def get_cost_by_model(user_id: str, start_date: str, end_date: str):
         raise HTTPException(status_code=500, detail=str(e))
     
 @app.get("/cost/trends")
-async def get_cost_trends(user_id: str, days: int):
+async def get_cost_trends(days: int, user_id: str = Depends(get_user_id_from_token)):
     try:
         validate_user_id(user_id)
 
@@ -506,7 +506,7 @@ async def get_cost_trends(user_id: str, days: int):
         raise HTTPException(status_code=500, detail=str(e))
     
 @app.get("/cost/token-breakdown")
-async def get_token_breakdown(user_id: str, days: int):
+async def get_token_breakdown(days: int, user_id: str = Depends(get_user_id_from_token)):
     try:
         validate_user_id(user_id)
 
