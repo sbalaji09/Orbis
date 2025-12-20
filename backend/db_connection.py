@@ -1432,52 +1432,74 @@ class SupabaseDB:
 
     
     def get_token_breakdown(self, user_id: str, days: int) -> List[Dict[str, Any]]:
-        since = datetime.utcnow() - timedelta(days=days)
+        if days is None or not isinstance(days, int) or days < 1:
+            raise ValueError("`days` must be an integer >= 1")
 
-        query = """
-        SELECT
-            DATE(timestamp) as day,
-            model,
-            SUM(input_tokens) as input_tokens,
-            SUM(output_tokens) as output_tokens,
-            SUM(COALESCE(cached_input_tokens, 0)) as cached_input_tokens
-        FROM token_usage
-        WHERE user_id = ?
-        AND timestamp >= ?
-        GROUP BY day, model
-        ORDER BY day ASC
+        since = datetime.now(timezone.utc) - timedelta(days=days)
+
+        cached_expr = "0"
+
+        query = f"""
+            SELECT
+                date_trunc('day', t.created_at AT TIME ZONE 'UTC')::date AS day,
+                COALESCE(s.model, 'unknown') AS model,
+                COALESCE(SUM(s.prompt_tokens), 0) AS input_tokens,
+                COALESCE(SUM(s.completion_tokens), 0) AS output_tokens,
+                COALESCE(SUM({cached_expr}), 0) AS cached_input_tokens
+            FROM traces t
+            JOIN spans s
+            ON s.trace_id = t.id
+            WHERE t.user_id = %s
+            AND t.created_at >= %s
+            GROUP BY day, model
+            ORDER BY day ASC, model ASC
         """
 
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        cursor.execute(query, (user_id, since))
-        rows = cursor.fetchall()
-        conn.close()
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(query, (user_id, since))
+                rows = cur.fetchall()
 
-        breakdown: Dict[str, Dict[str, Any]] = {}
+            breakdown: Dict[str, Dict[str, Any]] = {}
 
-        for day, model, in_tok, out_tok, cached_tok in rows:
-            if day not in breakdown:
-                breakdown[day] = {
-                    "date": day,
-                    "input_tokens": 0,
-                    "output_tokens": 0,
-                    "cached_input_tokens": 0,
-                    "total_tokens": 0,
-                    "by_model": {}
-                }
+            for day, model, in_tok, out_tok, cached_tok in rows:
+                try:
+                    day_str = day.isoformat()
+                except Exception:
+                    day_str = str(day)
 
-            breakdown[day]["input_tokens"] += in_tok
-            breakdown[day]["output_tokens"] += out_tok
-            breakdown[day]["cached_input_tokens"] += cached_tok
-            breakdown[day]["total_tokens"] += in_tok + out_tok
+                if day_str not in breakdown:
+                    breakdown[day_str] = {
+                        "date": day_str,
+                        "input_tokens": 0,
+                        "output_tokens": 0,
+                        "cached_input_tokens": 0,
+                        "total_tokens": 0,
+                        "by_model": {}
+                    }
 
-            breakdown[day]["by_model"][model] = {
-                "input": in_tok,
-                "output": out_tok
-            }
+                in_tok = int(in_tok or 0)
+                out_tok = int(out_tok or 0)
+                cached_tok = int(cached_tok or 0)
 
-        return list(breakdown.values())
+                breakdown[day_str]["input_tokens"] += in_tok
+                breakdown[day_str]["output_tokens"] += out_tok
+                breakdown[day_str]["cached_input_tokens"] += cached_tok
+                breakdown[day_str]["total_tokens"] += in_tok + out_tok
+
+                if model not in breakdown[day_str]["by_model"]:
+                    breakdown[day_str]["by_model"][model] = {"input": 0, "output": 0}
+
+                breakdown[day_str]["by_model"][model]["input"] += in_tok
+                breakdown[day_str]["by_model"][model]["output"] += out_tok
+                
+            return [breakdown[k] for k in sorted(breakdown.keys())]
+
+        except Exception as e:
+            raise Exception(f"Failed to get token breakdown: {e}")
+        finally:
+            self.return_connection(conn)
     
     # closes all the connections in the pool
     def close(self):
