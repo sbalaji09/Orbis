@@ -305,3 +305,29 @@ export async function getCostByModel() {
     return [];
   }
 }
+
+export async function getCostTrends(days: number) {
+  try {
+    const authHeaders = await getAuthHeaders();
+    const response = await fetch(
+      `${API_BASE_URL}/cost/trends/${encodeURIComponent(days)}`,
+      {
+        headers: {
+          ...authHeaders,
+        },
+        cache: "no-store",
+      }
+    );
+
+    if (!response.ok) {
+      console.error(`Failed to fetch prompt analytics: ${response.statusText}`);
+      return [];
+    }
+
+    const data = await response.json();
+    return data.versions || [];
+  } catch(error) {
+    console.error("Error getting cost summary:", error);
+    return [];
+  }
+}
