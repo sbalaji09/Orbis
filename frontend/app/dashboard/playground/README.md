@@ -5,32 +5,38 @@ A powerful comparison tool for testing and evaluating multiple AI models side-by
 ## Features
 
 - **Multi-Model Comparison**: Compare up to 4 models simultaneously
-- **Cost Analysis**: Real-time token usage and cost tracking per model
-- **Performance Metrics**: Latency, tokens/second, and efficiency comparisons
+- **Provider Logos**: Quickly identify provider/model at a glance
+- **Cost + Performance Metrics**: Tokens, latency, and estimated USD cost per model
+- **Diff Mode**: Line-by-line output diffs and metric deltas (tokens/cost/time) vs a baseline/previous run
+- **Guardrails**: Lightweight checks (JSON validity, must-contain keywords, max latency, max cost)
+- **Replay From Trace**: Load a real production trace as a baseline to re-run and compare
+- **Baseline Library**: Save approved runs and reload them later (stored in browser localStorage)
+- **Run History + A/B Compare**: Keep the last 10 runs and diff any two runs (A vs B)
+- **Regression Report**: One-click report table (pass/fail + deltas) across selected models
 - **Smart Caching**: In-memory LRU cache (1-hour TTL) prevents duplicate API calls and saves credits
-- **Trace Integration**: Load prompts from your observability traces
-- **Code Export**: Export prompts as code in Python, TypeScript, or cURL
+- **Code Export**: Provider-aware exports (Python/TypeScript/cURL) + VS Code Dark+ syntax highlighting
 - **Error Handling**: Graceful error display with retry logic
 
 ## Supported Models
 
 | Model | Provider | Input Cost | Output Cost |
 |-------|----------|------------|-------------|
-| Grok 4.1 | xAI | $0.002/M tokens | $0.008/M tokens |
-| GPT-5 (GPT-4o) | OpenAI | $0.005/M tokens | $0.015/M tokens |
-| Llama 3.1 70B | Groq | $0.0005/M tokens | $0.0008/M tokens |
-| Mistral Large | Mistral AI | $0.003/M tokens | $0.009/M tokens |
-| DeepSeek V3 | DeepSeek | $0.0003/M tokens | $0.0006/M tokens |
+| Grok 4.1 Fast | xAI | $0.20/M tokens | $0.50/M tokens |
+| GPT-5 (placeholder uses GPT‑4o) | OpenAI | $5.00/M tokens | $15.00/M tokens |
+| Llama 3.3 70B | Groq | $0.59/M tokens | $0.79/M tokens |
+| Gemini 2.5 Pro | Google | $1.25/M tokens | $10.00/M tokens |
+| Mistral Large | Mistral AI | $0.50/M tokens | $1.50/M tokens |
+| DeepSeek V3 | DeepSeek | $0.28/M tokens | $0.42/M tokens |
 
 ## Setup
 
 ### 1. Install Dependencies
 
-The OpenAI SDK has already been installed:
+Dependencies are installed in `frontend` (including `openai`, `react-markdown`, and `shiki` for code highlighting).
 
 ```bash
 cd frontend
-npm install openai
+npm install
 ```
 
 ### 2. Configure API Keys
@@ -44,6 +50,7 @@ XAI_API_KEY=xai-...
 GROQ_API_KEY=gsk_...
 MISTRAL_API_KEY=...
 DEEPSEEK_API_KEY=...
+GEMINI_API_KEY=...
 ```
 
 #### Where to Get API Keys:
@@ -53,6 +60,7 @@ DEEPSEEK_API_KEY=...
 - **Groq**: https://console.groq.com/keys
 - **Mistral AI**: https://console.mistral.ai/api-keys/
 - **DeepSeek**: https://platform.deepseek.com/api_keys
+- **Gemini**: https://aistudio.google.com/app/apikey
 
 ### 3. Start the Development Server
 
@@ -70,6 +78,7 @@ Navigate to: http://localhost:3000/dashboard/playground
 - **`InputPanel.tsx`**: Prompt input and model selection UI
 - **`ModelComparison.tsx`**: Side-by-side output comparison view
 - **`OutputCard.tsx`**: Individual model output display with metrics
+- **`RegressionReport.tsx`**: Compact pass/fail table + metric deltas
 - **`CodeExportModal.tsx`**: Export prompts as code
 - **`TraceLoaderModal.tsx`**: Load prompts from trace history
 
@@ -121,6 +130,17 @@ Fetches recent traces with their prompts for quick loading.
 }
 ```
 
+#### `GET /api/playground/replay/:traceId`
+Fetches a trace’s prompt and baseline output (used by “Replay & Set Baseline”).
+
+Returns:
+- `prompt` (extracted user prompt)
+- `output` (extracted model output)
+- `model/provider` + token/cost/latency (when available)
+
+#### `POST /api/playground/highlight`
+Server-side code highlighting for the Export modal (Shiki Dark+).
+
 ## Usage
 
 ### Basic Comparison
@@ -130,12 +150,50 @@ Fetches recent traces with their prompts for quick loading.
 3. Click "Generate & Compare"
 4. View side-by-side results with metrics
 
-### Loading from Traces
+### Diff Mode
+
+Diff Mode compares model outputs against a “compare-to” reference:
+- **Baseline** (saved or replayed from a trace), if set
+- Otherwise, the **previous run**, if available
+- Or an **A/B compare** selection (Run B vs Run A)
+
+Turn on “Diff Mode” in the Model Outputs section to see line diffs. Tokens/cost/time deltas appear under the quick metrics.
+
+### Guardrails
+
+Guardrails are lightweight checks that only affect pass/fail badges and the Regression Report (they do not change model generation):
+- **Require JSON output**: passes if `JSON.parse(output)` succeeds
+- **Must contain**: comma-separated substrings that must appear in the output
+- **Max latency (s)**: fails if latency exceeds the threshold
+- **Max cost ($)**: fails if cost exceeds the threshold
+
+### Replay From Trace (Baseline)
 
 1. Click "Load from Trace"
-2. Select a recent trace from the list
-3. The prompt will be loaded into the playground
-4. Modify and test with different models
+2. Select a recent trace
+3. Click "Replay & Set Baseline"
+4. Click Generate to rerun the same prompt and compare vs the baseline output
+
+### Baseline Library
+
+- Click "Save Current Run" to store an approved run as a baseline
+- Click "Load" to set the baseline + restore the prompt/outputs
+
+Baselines are stored in the browser via localStorage (not in Supabase yet).
+
+### Run History + A/B Compare
+
+- The last 10 runs are stored (localStorage)
+- Rename runs for clarity
+- Pick any two runs as **A** and **B**, then click “Compare A/B”
+  - A becomes the “compare-to”
+  - B becomes the current outputs
+
+### Regression Report
+
+Click “Run Report” to generate outputs and show a compact table:
+- Guardrail pass/fail per model
+- Metric deltas vs baseline/compare-to (when available)
 
 ### Exporting Code
 
@@ -144,21 +202,7 @@ Fetches recent traces with their prompts for quick loading.
 3. Select language (Python/TypeScript/cURL)
 4. Copy the generated code
 
-Example Python export:
-```python
-from openai import OpenAI
-
-client = OpenAI(api_key="your-api-key")
-
-response = client.chat.completions.create(
-    model="gpt-4o",
-    messages=[
-        {"role": "user", "content": "Your prompt here"}
-    ]
-)
-
-print(response.choices[0].message.content)
-```
+Exports are provider-aware (OpenAI-compatible base URLs for Groq/Mistral/xAI/DeepSeek, and Gemini separately).
 
 ## Error Handling
 
@@ -212,6 +256,10 @@ The playground includes comprehensive error handling:
 - Verify the backend API is running on port 8000
 - Check that traces exist in your database
 
+### Baselines / Runs Reset When Navigating
+- The playground stores state in localStorage
+- If you are in private browsing mode, storage may be cleared between navigations
+
 ## Development
 
 ### Adding a New Model
@@ -255,14 +303,12 @@ curl -X POST http://localhost:3000/api/playground/generate \
 - API keys are server-side only (not exposed to browser)
 - API routes use Next.js middleware for authentication
 - Trace data access is user-scoped via Supabase auth
-- No sensitive data stored in frontend state
+- Baselines / run history are stored in localStorage (do not store secrets in prompts)
 
 ## Future Enhancements
 
-- [ ] User-specific cost tracking and limits
-- [ ] Playground run history in database
-- [ ] Model response quality ratings
-- [ ] Batch testing multiple prompts
-- [ ] A/B testing framework
-- [ ] Custom model configurations
-- [ ] Response caching for identical prompts
+- [ ] Persist baselines/runs to Supabase for cross-device + team sharing
+- [ ] Batch/dataset mode (CSV inputs, aggregates, pass rate)
+- [ ] More robust JSON guardrail (extract fenced JSON blocks)
+- [ ] “Approve/promote” baseline flow with notes and audit trail
+- [ ] Saved/shareable regression reports
