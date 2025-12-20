@@ -228,18 +228,27 @@ export async function getPromptAnalytics(promptName: string) {
   }
 }
 
-export async function getCostSummary(period: string) {
+function unwrapList(data: any) {
+  if (Array.isArray(data)) return data;
+  // common wrappers
+  if (Array.isArray(data?.results)) return data.results;
+  if (Array.isArray(data?.data)) return data.data;
+  if (Array.isArray(data?.items)) return data.items;
+  if (Array.isArray(data?.versions)) return data.versions; // keep as fallback if some endpoints still do this
+  return [];
+}
+
+export async function getCostSummary(userId: string, period: string) {
   try {
     const authHeaders = await getAuthHeaders();
-    const response = await fetch(
-      `${API_BASE_URL}/cost/summary/${encodeURIComponent(period)}`,
-      {
-        headers: {
-          ...authHeaders,
-        },
-        cache: "no-store",
-      }
-    );
+    const url = new URL(`${API_BASE_URL}/cost/summary`);
+    url.searchParams.set("user_id", userId);
+    url.searchParams.set("period", period);
+
+    const response = await fetch(url.toString(), {
+      headers: { ...authHeaders },
+      cache: "no-store",
+    });
 
     if (!response.ok) {
       console.error(`Failed to fetch prompt analytics: ${response.statusText}`);
@@ -247,87 +256,104 @@ export async function getCostSummary(period: string) {
     }
 
     const data = await response.json();
-    return data.versions || [];
+    return unwrapList(data);
   } catch(error) {
     console.error("Error getting cost summary:", error);
     return [];
   }
 }
 
-export async function getCostByAgent() {
+function isoDateOnly(d: Date) {
+  // YYYY-MM-DD
+  return d.toISOString().slice(0, 10);
+}
+
+export async function getCostByAgent(userId: string, startDate?: string, endDate?: string) {
   try {
     const authHeaders = await getAuthHeaders();
-    const response = await fetch(
-      `${API_BASE_URL}/cost/by-agent`,
-      {
-        headers: {
-          ...authHeaders,
-        },
-        cache: "no-store",
-      }
-    );
+
+    const end = endDate ?? isoDateOnly(new Date());
+    const start =
+      startDate ??
+      isoDateOnly(new Date(Date.now() - 29 * 24 * 60 * 60 * 1000));
+
+    const url = new URL(`${API_BASE_URL}/cost/by-agent`);
+    url.searchParams.set("user_id", userId);
+    url.searchParams.set("start_date", start);
+    url.searchParams.set("end_date", end);
+
+    const response = await fetch(url.toString(), {
+      headers: { ...authHeaders },
+      cache: "no-store",
+    });
 
     if (!response.ok) {
-      console.error(`Failed to fetch prompt analytics: ${response.statusText}`);
+      console.error(`Failed to fetch cost by agent: ${response.status} ${response.statusText}`);
       return [];
     }
 
     const data = await response.json();
-    return data.versions || [];
-  } catch(error) {
-    console.error("Error getting cost summary:", error);
+    return unwrapList(data);
+  } catch (error) {
+    console.error("Error getting cost by agent:", error);
     return [];
   }
 }
 
-export async function getCostByModel() {
+export async function getCostByModel(userId: string, startDate?: string, endDate?: string) {
   try {
     const authHeaders = await getAuthHeaders();
-    const response = await fetch(
-      `${API_BASE_URL}/cost/by-model`,
-      {
-        headers: {
-          ...authHeaders,
-        },
-        cache: "no-store",
-      }
-    );
+
+    const end = endDate ?? isoDateOnly(new Date());
+    const start =
+      startDate ??
+      isoDateOnly(new Date(Date.now() - 29 * 24 * 60 * 60 * 1000));
+
+    const url = new URL(`${API_BASE_URL}/cost/by-model`);
+    url.searchParams.set("user_id", userId);
+    url.searchParams.set("start_date", start);
+    url.searchParams.set("end_date", end);
+
+    const response = await fetch(url.toString(), {
+      headers: { ...authHeaders },
+      cache: "no-store",
+    });
 
     if (!response.ok) {
-      console.error(`Failed to fetch prompt analytics: ${response.statusText}`);
+      console.error(`Failed to fetch cost by model: ${response.status} ${response.statusText}`);
       return [];
     }
 
     const data = await response.json();
-    return data.versions || [];
-  } catch(error) {
-    console.error("Error getting cost summary:", error);
+    return unwrapList(data);
+  } catch (error) {
+    console.error("Error getting cost by model:", error);
     return [];
   }
 }
 
-export async function getCostTrends(days: number) {
+export async function getCostTrends(userId: string, days: number) {
   try {
     const authHeaders = await getAuthHeaders();
-    const response = await fetch(
-      `${API_BASE_URL}/cost/trends/${encodeURIComponent(days)}`,
-      {
-        headers: {
-          ...authHeaders,
-        },
-        cache: "no-store",
-      }
-    );
+
+    const url = new URL(`${API_BASE_URL}/cost/trends`);
+    url.searchParams.set("user_id", userId);
+    url.searchParams.set("days", String(days));
+
+    const response = await fetch(url.toString(), {
+      headers: { ...authHeaders },
+      cache: "no-store",
+    });
 
     if (!response.ok) {
-      console.error(`Failed to fetch prompt analytics: ${response.statusText}`);
+      console.error(`Failed to fetch cost trends: ${response.status} ${response.statusText}`);
       return [];
     }
 
     const data = await response.json();
-    return data.versions || [];
-  } catch(error) {
-    console.error("Error getting cost summary:", error);
+    return unwrapList(data);
+  } catch (error) {
+    console.error("Error getting cost trends:", error);
     return [];
   }
 }
