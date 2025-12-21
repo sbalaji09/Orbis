@@ -67,7 +67,7 @@ export default function CostByModelChart({
           cx="50%"
           cy="50%"
           outerRadius={80}
-          label={(entry) => entry.model}
+          label={(entry) => entry.payload.model}
           labelLine={{ stroke: "#000", strokeWidth: 1 }}
         >
           {data.map((_, index) => (

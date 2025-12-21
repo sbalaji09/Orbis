@@ -77,9 +77,19 @@ const navItems: NavItem[] = [
         strokeLinecap="round"
         strokeLinejoin="round"
       >
-        <path d="M12 4.5 15.5 10H8.5L12 4.5z" vectorEffect="non-scaling-stroke" />
+        <path
+          d="M12 4.5 15.5 10H8.5L12 4.5z"
+          vectorEffect="non-scaling-stroke"
+        />
         <circle cx="8" cy="17" r="2.25" vectorEffect="non-scaling-stroke" />
-        <rect x="14" y="14.75" width="4.5" height="4.5" rx="0.5" vectorEffect="non-scaling-stroke" />
+        <rect
+          x="14"
+          y="14.75"
+          width="4.5"
+          height="4.5"
+          rx="0.5"
+          vectorEffect="non-scaling-stroke"
+        />
       </svg>
     ),
     name: "Playground",
@@ -89,7 +99,7 @@ const navItems: NavItem[] = [
 
 export default function NavMenu() {
   const pathname = usePathname();
-  const { user, signOut } = useAuth();
+  const { user, signOut, loading: authLoading } = useAuth();
 
   const isActive = (link: string) => {
     if (link === "/dashboard") {
@@ -128,7 +138,13 @@ export default function NavMenu() {
                       : "bg-transparent text-black/60 border-transparent hover:text-foreground hover:bg-black/5"
                   }`}
                 >
-                  <span className={item.name === "Playground" ? "w-6 h-6" : "w-4 h-4"}>{item.icon}</span>
+                  <span
+                    className={
+                      item.name === "Playground" ? "w-6 h-6" : "w-4 h-4"
+                    }
+                  >
+                    {item.icon}
+                  </span>
                   <span>{item.name}</span>
                   {item.badge && (
                     <span className="px-1.5 py-0.5 text-[9px] font-semibold bg-babyblue/10 text-babyblue border border-babyblue uppercase tracking-wide">
@@ -141,15 +157,24 @@ export default function NavMenu() {
           })}
         </ul>
 
-        {/* User Info & Logout */}
+        {/* User Info & Logout - Show skeleton while auth is loading */}
         <div className="flex items-center gap-3 pl-3 border-l-2 border-black/10">
-          <span className="text-xs text-black/50">{user?.email}</span>
-          <button
-            onClick={signOut}
-            className="px-3 py-1.5 text-xs font-medium border-2 border-black/20 hover:border-black hover:bg-black hover:text-white transition-all"
-          >
-            Logout
-          </button>
+          {authLoading ? (
+            <>
+              <div className="h-4 w-32 bg-gray-200 animate-pulse rounded" />
+              <div className="h-7 w-16 bg-gray-200 animate-pulse rounded" />
+            </>
+          ) : (
+            <>
+              <span className="text-xs text-black/50">{user?.email}</span>
+              <button
+                onClick={signOut}
+                className="px-3 py-1.5 text-xs font-medium border-2 border-black/20 hover:border-black hover:bg-black hover:text-white transition-all"
+              >
+                Logout
+              </button>
+            </>
+          )}
         </div>
       </div>
     </nav>

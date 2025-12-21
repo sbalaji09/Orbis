@@ -84,7 +84,7 @@ export default function CostDashboardClient({
   initialByAgent,
   initialByModel,
 }: CostDashboardClientProps) {
-  const { session } = useAuth();
+  const { session, loading: authLoading } = useAuth();
   const token = session?.access_token ?? null;
 
   const [selectedPeriod, setSelectedPeriod] = useState(30);
@@ -127,6 +127,9 @@ export default function CostDashboardClient({
 
   // Fetch data when period changes (only overview tab data)
   useEffect(() => {
+    // Wait for auth to complete
+    if (authLoading) return;
+
     // Skip if this is the initial render with 30 days (already have server data)
     if (selectedPeriod === 30 && !hasFetchedRef.current) {
       return;
@@ -157,7 +160,7 @@ export default function CostDashboardClient({
 
     hasFetchedRef.current = true;
     fetchData();
-  }, [selectedPeriod, token, getDateRange]);
+  }, [selectedPeriod, token, getDateRange, authLoading]);
 
   // Handle period selection
   const handlePeriodSelect = (value: number) => {
@@ -202,6 +205,69 @@ export default function CostDashboardClient({
     const date = new Date(dateStr);
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
+
+  // Show skeleton while auth is loading to prevent layout shift
+  if (authLoading) {
+    return (
+      <div className="h-full overflow-y-auto bg-background">
+        <div className="max-w-7xl mx-auto p-6">
+          {/* Header */}
+          <div className="mb-6">
+            <div className="h-8 w-64 bg-gray-200 animate-pulse mb-2" />
+            <div className="h-4 w-96 bg-gray-100 animate-pulse" />
+          </div>
+
+          {/* Period Selector Skeleton */}
+          <div className="flex items-center gap-4 mb-6">
+            <div className="h-10 w-40 bg-gray-200 animate-pulse" />
+          </div>
+
+          {/* Tab Navigation Skeleton */}
+          <div className="flex gap-2 mb-6 border-b-2 border-black">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="h-10 w-32 bg-gray-200 animate-pulse -mb-[2px]"
+              />
+            ))}
+          </div>
+
+          {/* Overview Cards Skeleton */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            {[1, 2, 3, 4].map((i) => (
+              <div
+                key={i}
+                className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-5"
+              >
+                <div className="h-4 w-24 bg-gray-200 animate-pulse mb-3" />
+                <div className="h-8 w-32 bg-gray-200 animate-pulse mb-2" />
+                <div className="h-3 w-20 bg-gray-100 animate-pulse" />
+              </div>
+            ))}
+          </div>
+
+          {/* Chart Skeleton */}
+          <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6 mb-6">
+            <div className="h-6 w-48 bg-gray-200 animate-pulse mb-4" />
+            <div className="h-72 bg-gray-100 animate-pulse" />
+          </div>
+
+          {/* Two Charts Skeleton */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {[1, 2].map((i) => (
+              <div
+                key={i}
+                className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6"
+              >
+                <div className="h-6 w-40 bg-gray-200 animate-pulse mb-4" />
+                <div className="h-64 bg-gray-100 animate-pulse" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full overflow-y-auto bg-background">

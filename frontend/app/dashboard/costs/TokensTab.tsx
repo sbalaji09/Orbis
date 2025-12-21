@@ -53,7 +53,7 @@ export default function TokensTab({
   selectedPeriod,
   formatDate,
 }: TokensTabProps) {
-  const { session } = useAuth();
+  const { session, loading: authLoading } = useAuth();
   const token = session?.access_token ?? null;
 
   const [tokenBreakdown, setTokenBreakdown] = useState<TokenBreakdown[]>([]);
@@ -61,7 +61,11 @@ export default function TokensTab({
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!token) return;
+    if (authLoading) return;
+    if (!token) {
+      setIsLoading(false);
+      return;
+    }
 
     const fetchData = async () => {
       setIsLoading(true);
@@ -80,7 +84,29 @@ export default function TokensTab({
     };
 
     fetchData();
-  }, [selectedPeriod, token]);
+  }, [selectedPeriod, token, authLoading]);
+
+  // Show skeleton while auth is loading
+  if (authLoading) {
+    return (
+      <div className="space-y-6">
+        {/* Chart Skeleton */}
+        <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6">
+          <div className="h-6 w-64 bg-gray-200 animate-pulse mb-4" />
+          <div className="h-72 bg-gray-100 animate-pulse" />
+        </div>
+        {/* Table Skeleton */}
+        <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6">
+          <div className="h-6 w-48 bg-gray-200 animate-pulse mb-4" />
+          <div className="space-y-3">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="h-12 bg-gray-100 animate-pulse" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

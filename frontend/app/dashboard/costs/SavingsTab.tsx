@@ -12,7 +12,7 @@ interface SavingsTabProps {
 }
 
 export default function SavingsTab({ selectedPeriod }: SavingsTabProps) {
-  const { session } = useAuth();
+  const { session, loading: authLoading } = useAuth();
   const token = session?.access_token ?? null;
 
   const [savingsData, setSavingsData] = useState<SavingsOpportunities | null>(
@@ -21,7 +21,11 @@ export default function SavingsTab({ selectedPeriod }: SavingsTabProps) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!token) return;
+    if (authLoading) return;
+    if (!token) {
+      setIsLoading(false);
+      return;
+    }
 
     const fetchData = async () => {
       setIsLoading(true);
@@ -36,7 +40,39 @@ export default function SavingsTab({ selectedPeriod }: SavingsTabProps) {
     };
 
     fetchData();
-  }, [selectedPeriod, token]);
+  }, [selectedPeriod, token, authLoading]);
+
+  // Show skeleton while auth is loading
+  if (authLoading) {
+    return (
+      <div className="space-y-6">
+        {/* Summary Card Skeleton */}
+        <div className="bg-green-50 border-2 border-green-600 p-6">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-green-200 animate-pulse rounded" />
+            <div>
+              <div className="h-5 w-32 bg-green-200 animate-pulse mb-2" />
+              <div className="h-8 w-24 bg-green-200 animate-pulse" />
+            </div>
+          </div>
+        </div>
+        {/* Table Skeletons */}
+        {[...Array(3)].map((_, i) => (
+          <div
+            key={i}
+            className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6"
+          >
+            <div className="h-6 w-64 bg-gray-200 animate-pulse mb-4" />
+            <div className="space-y-3">
+              {[...Array(3)].map((_, j) => (
+                <div key={j} className="h-12 bg-gray-100 animate-pulse" />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
