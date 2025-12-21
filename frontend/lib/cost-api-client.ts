@@ -240,3 +240,28 @@ export async function fetchTokensPerTrace(days: number, token: string | null, li
     return [];
   }
 }
+
+export async function fetchSavingsOpportunities(
+  days: number,
+  token: string | null
+): Promise<SavingsOpportunities | null> {
+  try {
+    const url = new URL(`${API_BASE_URL}/cost/savings-opportunities`);
+    url.searchParams.set("days", String(days));
+
+    const response = await fetch(url.toString(), {
+      headers: getHeaders(token),
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      console.error(`Failed to fetch savings opportunities: ${response.statusText}`);
+      return null;
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching savings opportunities:", error);
+    return null;
+  }
+}
