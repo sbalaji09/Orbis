@@ -565,7 +565,19 @@ async def get_cost_by_tag(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
+@app.get("/cost/tags")
+async def get_user_tags(
+    limit: int = Query(default=20, ge=1, le=100),
+    user_id: str = Depends(get_user_id_from_token)
+):
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: db.get_top_tags(user_id, limit)
+        )
+        return {"tags": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
 @app.exception_handler(ValidationError)
 async def validation_error_handler(request, exc: ValidationError):
     return JSONResponse(
