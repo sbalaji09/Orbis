@@ -15,7 +15,6 @@
     "@supabase/auth-ui-shared": "^0.1.8",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.88.0",
-    "@tailwindcss/typography": "^0.5.19",
     "lru-cache": "^11.2.4",
     "lucide-react": "^0.554.0",
     "motion": "^12.23.24",
@@ -31,6 +30,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@tailwindcss/typography": "^0.5.19",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
