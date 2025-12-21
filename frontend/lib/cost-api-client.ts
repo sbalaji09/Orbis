@@ -35,6 +35,60 @@ export interface TokenBreakdown {
   by_model: Record<string, { input: number; output: number }>;
 }
 
+export interface LLMSpan {
+  span_id: string;
+  name: string;
+  llm_model: string;
+  prompt_tokens: number;
+  completion_tokens: number;
+  cost: number;
+}
+
+export interface TokensPerTrace {
+  trace_id: string;
+  trace_hash_id: string;
+  agent_name: string;
+  start_time: string;
+  total_tokens: number;
+  total_cost: number;
+  status: string;
+  span_count: number;
+  input_tokens: number;
+  output_tokens: number;
+  llm_spans: LLMSpan[];
+}
+
+export interface ModelAnalysis {
+  model: string;
+  call_count: number;
+  total_cost: number;
+  avg_tokens: number;
+  avg_cost_per_call: number;
+}
+
+export interface VerboseTrace {
+  trace_hash_id: string;
+  agent_name: string;
+  input_tokens: number;
+  output_tokens: number;
+  output_input_ratio: number;
+  total_cost: number;
+}
+
+export interface RepeatedPrompt {
+  model: string;
+  preview: string;
+  repetition_count: number;
+  potential_savings: number;
+}
+
+export interface SavingsOpportunities {
+  model_analysis: ModelAnalysis[];
+  verbose_traces: VerboseTrace[];
+  repeated_prompts: RepeatedPrompt[];
+  total_potential_savings: number;
+}
+
 function getHeaders(token: string | null): HeadersInit {
   const headers: HeadersInit = {
     "Content-Type": "application/json",
