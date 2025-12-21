@@ -94,6 +94,28 @@ export default function CostDashboardClient({
     };
   }, []);
 
+  // Fetch token/savings data on initial mount (not provided by server)
+  useEffect(() => {
+    if (!token) return;
+
+    const fetchInitialTokenData = async () => {
+      try {
+        const [tokenData, traceTokens, savings] = await Promise.all([
+          fetchTokenBreakdown(30, token),
+          fetchTokensPerTrace(30, token),
+          fetchSavingsOpportunities(30, token),
+        ]);
+        setTokenBreakdown(tokenData);
+        setTokensPerTrace(traceTokens);
+        setSavingsData(savings);
+      } catch (error) {
+        console.error("Failed to fetch initial token data:", error);
+      }
+    };
+
+    fetchInitialTokenData();
+  }, [token]);
+
   // Fetch data when period changes
   useEffect(() => {
     // Skip if this is the initial render with 30 days (already have server data)
@@ -116,7 +138,7 @@ export default function CostDashboardClient({
           fetchTokensPerTrace(selectedPeriod, token),
           fetchSavingsOpportunities(selectedPeriod, token),
         ]);
-        
+
         setTrends(trendsData);
         setByAgent(agentData);
         setByModel(modelData);
