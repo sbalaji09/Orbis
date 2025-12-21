@@ -303,3 +303,25 @@ export async function fetchCostByTag(
     return [];
   }
 }
+
+// fetches the user tags
+export async function fetchUserTags(token: string | null): Promise<string[]> {
+  try {
+    const url = new URL(`${API_BASE_URL}/cost/tags`);
+
+    const response = await fetch(url.toString(), {
+      headers: getHeaders(token),
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      return [];
+    }
+
+    const data = await response.json();
+    return data.tags || [];
+  } catch (error) {
+    console.error("Error fetching user tags:", error);
+    return [];
+  }
+}
