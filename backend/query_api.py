@@ -536,6 +536,19 @@ async def get_tokens_per_trace(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/cost/savings-opportunities")
+async def get_savings_opportunities(
+    days: int = Query(default=30, ge=1, le=365),
+    user_id: str = Depends(get_user_id_from_token)
+):
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, db.get_savings_opportunities, user_id, days
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.exception_handler(ValidationError)
 async def validation_error_handler(request, exc: ValidationError):
     return JSONResponse(
