@@ -59,13 +59,14 @@ class SupabaseDB:
         try:
             with conn.cursor() as cur:
                 # Build dynamic SQL based on whether agent_id is provided
+                tags = trace_data.get('tags', [])
                 if trace_data.get('agent_id') is not None:
                     sql = """
                         INSERT INTO traces (
                             trace_id, trace_hash_id, user_id, agent_id, start_time, status,
-                            total_cost, total_tokens
+                            total_cost, total_tokens, tags
                         ) VALUES (
-                            %s, %s, %s, %s, %s, %s, %s, %s
+                            %s, %s, %s, %s, %s, %s, %s, %s, %s
                         )
                         ON CONFLICT (trace_id) DO NOTHING
                         RETURNING trace_id
@@ -78,15 +79,16 @@ class SupabaseDB:
                         trace_data.get('start_time'),
                         trace_data.get('status', 'running'),
                         trace_data.get('total_cost', 0),
-                        trace_data.get('total_tokens', 0)
+                        trace_data.get('total_tokens', 0),
+                        tags
                     ))
                 else:
                     sql = """
                         INSERT INTO traces (
                             trace_id, trace_hash_id, user_id, start_time, status,
-                            total_cost, total_tokens
+                            total_cost, total_tokens, tags
                         ) VALUES (
-                            %s, %s, %s, %s, %s, %s, %s
+                            %s, %s, %s, %s, %s, %s, %s, %s
                         )
                         ON CONFLICT (trace_id) DO NOTHING
                         RETURNING trace_id
@@ -98,7 +100,8 @@ class SupabaseDB:
                         trace_data.get('start_time'),
                         trace_data.get('status', 'running'),
                         trace_data.get('total_cost', 0),
-                        trace_data.get('total_tokens', 0)
+                        trace_data.get('total_tokens', 0),
+                        tags
                     ))
                 result = cur.fetchone()
                 conn.commit()
