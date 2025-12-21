@@ -1501,6 +1501,60 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
     
+    def get_tokens_per_trace(self, user_id: str, days: int, limit: int = 50) -> List[Dict[str, Any]]:
+        since = datetime.now(timezone.utc) - timedelta(days=days)
+
+        query = """
+            SELECT
+                t.trace_id,
+                t.trace_hash_id,
+                a.agent_name,
+                t.start_time,
+                t.total_tokens,
+                t.total_cost,
+                t.status,
+                COUNT(s.span_id) as span_count,
+                COALESCE(SUM(s.prompt_tokens), 0) as input_tokens,
+                COALESCE(SUM(s.completion_tokens), 0) as output_tokens,
+                json_agg(json_build_object(
+                    'span_id', s.span_id,
+                    'name', s.name,
+                    'llm_model', s.llm_model,
+                    'prompt_tokens', s.prompt_tokens,
+                    'completion_tokens', s.completion_tokens,
+                    'cost', s.cost
+                ) ORDER BY s.start_time) FILTER (WHERE s.llm_model is NOT NULL) as llm_spans
+            FROM traces t
+            LEFT JOIN agents a ON t.agent_id = a.agent_id
+            LEFT JOIN spans s ON s.trace_id = t.trace_id
+            WHERE t.user_id = %s
+                AND t.starT_time >= %s
+            GROUP BY t.trace_id, t.trace_hash_id, a.agent_name, t.start_time, t.total_tokens, t.total_cost, t.status,
+            ORDER BY t.start_time DESC
+            LIMIT %s
+        """
+
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(query, (user_id, since, limit))
+                rows =  cur.fetchall()
+            return [{
+                "trace_id": str(row[0]),
+                "trace_hash_id": row[1],
+                "agent_name": row[2] or "Unknown",
+                "start_time": row[3].isoformat() if row[3] else None,
+                "total_tokens": int(row[4] or 0),
+                "total_cost": float(row[5] or 0),
+                "status": row[6],
+                "span_count": int(row[7]),
+                "input_tokens": int(row[8]),
+                "output_tokens": int(row[9]),
+                "llm_spans": row[10] or []
+            } for row in rows]
+        finally:
+            self.return_connection(conn)
+
     # closes all the connections in the pool
     def close(self):
         self.pool.closeall()
