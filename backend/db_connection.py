@@ -1703,6 +1703,26 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
 
+    def get_top_tags(self, user_id: str, limit: int = 20) -> List[str]:
+        query = """
+            SELECT unnest(tags) as tag, COUNT(*) as usage_count
+            FROM traces
+            WHERE user_id = %s
+            AND tags IS NOT NULL
+            GROUP BY tag
+            ORDER BY usage_count DESC
+            LIMIT %s
+        """
+
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(query, (user_id, limit))
+                rows = cur.fetchall()
+            return [row[0] for row in rows]
+        finally:
+            self.return_connection(conn)
+        
     # closes all the connections in the pool
     def close(self):
         self.pool.closeall()
