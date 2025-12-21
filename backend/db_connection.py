@@ -1555,6 +1555,117 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
 
+    def get_savings_opportunities(self, user_id, days: int) -> Dict[str, Any]:
+        since = datetime.now(timezone.utc) - timedelta(days=days)
+
+        # this query finds high-cost models that could use cheaper alternatives
+        model_query = """
+            SELECT 
+                s.llm_model,
+                COUNT(*) as call_count,
+                SUM(s.cost) as total_cost,
+                AVG(s.prompt_tokens + s.completion_tokens) as avg_tokens,
+                AVG(s.cost) as avg_cost_per_call
+            FROM traces t
+            JOIN spans s ON s.trace_id = t.trace_id
+            WHERE t.user_id = %s
+            AND t.start_time >= %s
+            AND s.llm_model IS NOT NULL
+            GROUP BY s.llm_model
+            ORDER BY total_cost DESC
+        """
+        
+        # this query finds traces with a high output / input ratio which could mean that the input is too verbose
+        verbosity_query = """
+            SELECT 
+                t.trace_hash_id,
+                a.agent_name,
+                SUM(s.prompt_tokens) as input_tokens,
+                SUM(s.completion_tokens) as output_tokens,
+                CASE WHEN SUM(s.prompt_tokens) > 0 
+                    THEN SUM(s.completion_tokens)::float / SUM(s.prompt_tokens) 
+                    ELSE 0 
+                END as output_input_ratio,
+                SUM(s.cost) as total_cost
+            FROM traces t
+            LEFT JOIN agents a ON t.agent_id = a.agent_id
+            JOIN spans s ON s.trace_id = t.trace_id
+            WHERE t.user_id = %s
+            AND t.start_time >= %s
+            GROUP BY t.trace_id, t.trace_hash_id, a.agent_name
+            HAVING SUM(s.prompt_tokens) > 100
+            ORDER BY output_input_ratio DESC
+            LIMIT 10
+        """
+
+        # this query finds repeated similar prompts for potential caching opportunities
+        repetition_query = """
+            SELECT 
+                s.llm_model,
+                s.input_preview,
+                COUNT(*) as repetition_count,
+                SUM(s.cost) as wasted_cost
+            FROM traces t
+            JOIN spans s ON s.trace_id = t.trace_id
+            WHERE t.user_id = %s
+            AND t.start_time >= %s
+            AND s.input_preview IS NOT NULL
+            GROUP BY s.llm_model, s.input_preview
+            HAVING COUNT(*) > 2
+            ORDER BY wasted_cost DESC
+            LIMIT 10
+        """
+
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(model_query, (user_id, since))
+                model_rows = cur.fetchall()
+                
+                cur.execute(verbosity_query, (user_id, since))
+                verbosity_rows = cur.fetchall()
+                
+                cur.execute(repetition_query, (user_id, since))
+                repetition_rows = cur.fetchall()
+            
+            # calculate potential savings by using the results from all three queries
+            model_analysis = []
+            for row in model_rows:
+                model_analysis.append({
+                    "model": row[0],
+                    "call_count": int(row[1]),
+                    "total_cost": float(row[2] or 0),
+                    "avg_tokens": float(row[3] or 0),
+                    "avg_cost_per_call": float(row[4] or 0)
+                })
+
+            verbose_traces = [{
+                "trace_hash_id": row[0],
+                "agent_name": row[1] or "Unknown",
+                "input_tokens": int(row[2] or 0),
+                "output_tokens": int(row[3] or 0),
+                "output_input_ratio": round(float(row[4] or 0), 2),
+                "total_cost": float(row[5] or 0)
+            } for row in verbosity_rows]
+            
+            repeated_prompts = [{
+                "model": row[0],
+                "preview": row[1][:100] if row[1] else "",
+                "repetition_count": int(row[2]),
+                "potential_savings": float(row[3] or 0) * 0.9  # 90% could be cached
+            } for row in repetition_rows]
+
+            total_potential_savings = sum(r["potential_savings"] for r in repeated_prompts)
+
+            return {
+                "model_analysis": model_analysis,
+                "verbose_traces": verbose_traces,
+                "repeated_prompts": repeated_prompts,
+                "total_potential_savings": total_potential_savings
+            }
+        finally:
+            self.return_connection(conn)
+
     # closes all the connections in the pool
     def close(self):
         self.pool.closeall()
