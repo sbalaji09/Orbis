@@ -24,12 +24,14 @@ import {
   fetchTokenBreakdown,
   fetchTokensPerTrace,
   fetchSavingsOpportunities,
+  fetchCostByTag,
   type CostTrend,
   type CostByAgent,
   type CostByModel,
   type TokenBreakdown,
   type TokensPerTrace,
   type SavingsOpportunities,
+  type CostByTag,
 } from "@/lib/cost-api-client";
 
 
@@ -72,6 +74,7 @@ export default function CostDashboardClient({
   const [tokensPerTrace, setTokensPerTrace] = useState<TokensPerTrace[]>([]);
   const [savingsData, setSavingsData] = useState<SavingsOpportunities | null>(null);
   const [activeTab, setActiveTab] = useState<"overview" | "tokens" | "savings">("overview");
+  const [costByTag, setCostByTag] = useState<CostByTag[]>([]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -100,21 +103,24 @@ export default function CostDashboardClient({
 
     const fetchInitialTokenData = async () => {
       try {
-        const [tokenData, traceTokens, savings] = await Promise.all([
+        const { startDate, endDate } = getDateRange(30);
+        const [tokenData, traceTokens, savings, tagData] = await Promise.all([
           fetchTokenBreakdown(30, token),
           fetchTokensPerTrace(30, token),
           fetchSavingsOpportunities(30, token),
+          fetchCostByTag(startDate, endDate, token),
         ]);
         setTokenBreakdown(tokenData);
         setTokensPerTrace(traceTokens);
         setSavingsData(savings);
+        setCostByTag(tagData);
       } catch (error) {
         console.error("Failed to fetch initial token data:", error);
       }
     };
 
     fetchInitialTokenData();
-  }, [token]);
+  }, [token, getDateRange]);
 
   // Fetch data when period changes
   useEffect(() => {
