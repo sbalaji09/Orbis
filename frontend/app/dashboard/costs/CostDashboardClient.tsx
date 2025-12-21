@@ -587,7 +587,127 @@ export default function CostDashboardClient({
             </div>
           </div>          
           </>
-        )}           
+        )}  
+
+        {activeTab === "features" && (
+          <div className="space-y-6">
+            {/* Features Summary */}
+            <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-lg font-semibold">Cost by Feature / Endpoint</h2>
+                  <p className="text-sm text-muted mt-1">
+                    Track costs by tagging your traces with features like &quot;chat&quot;, &quot;summarization&quot;, or endpoints like &quot;/api/generate&quot;
+                  </p>
+                </div>
+              </div>
+              
+              {costByTag.length > 0 ? (
+                <>
+                  {/* Bar Chart */}
+                  <div className="h-64 mb-6">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={costByTag.slice(0, 10)} layout="vertical" margin={{ top: 5, right: 30, left: 100, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
+                        <XAxis
+                          type="number"
+                          tickFormatter={(v) => `$${v.toFixed(2)}`}
+                          tick={{ fontSize: 12 }}
+                          stroke="#666"
+                        />
+                        <YAxis
+                          type="category"
+                          dataKey="tag"
+                          tick={{ fontSize: 12 }}
+                          stroke="#666"
+                          width={90}
+                        />
+                        <Tooltip
+                          formatter={(value) => [formatCost(Number(value)), "Cost"]}
+                          contentStyle={{ border: "2px solid black", borderRadius: 0 }}
+                        />
+                        <Bar dataKey="total_cost" fill="#5b5fff" radius={[0, 4, 4, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Detailed Table */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b-2 border-black">
+                          <th className="text-left py-3 px-4 font-semibold">Tag / Feature</th>
+                          <th className="text-right py-3 px-4 font-semibold">Traces</th>
+                          <th className="text-right py-3 px-4 font-semibold">LLM Calls</th>
+                          <th className="text-right py-3 px-4 font-semibold">Input Tokens</th>
+                          <th className="text-right py-3 px-4 font-semibold">Output Tokens</th>
+                          <th className="text-right py-3 px-4 font-semibold">Total Cost</th>
+                          <th className="text-right py-3 px-4 font-semibold">% of Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(() => {
+                          const totalTagCost = costByTag.reduce((sum, t) => sum + t.total_cost, 0);
+                          return costByTag.map((tag, i) => {
+                            const pct = totalTagCost > 0 ? (tag.total_cost / totalTagCost) * 100 : 0;
+                            return (
+                              <tr key={tag.tag} className="border-b border-gray-200 hover:bg-gray-50">
+                                <td className="py-3 px-4">
+                                  <div className="flex items-center gap-2">
+                                    <div
+                                      className="w-3 h-3 rounded-sm"
+                                      style={{ backgroundColor: COLORS[i % COLORS.length] }}
+                                    />
+                                    <span className="font-mono text-sm">{tag.tag}</span>
+                                  </div>
+                                </td>
+                                <td className="text-right py-3 px-4 font-mono">{tag.trace_count.toLocaleString()}</td>
+                                <td className="text-right py-3 px-4 font-mono">{tag.call_count.toLocaleString()}</td>
+                                <td className="text-right py-3 px-4 font-mono text-blue-600">{tag.input_tokens.toLocaleString()}</td>
+                                <td className="text-right py-3 px-4 font-mono text-green-600">{tag.output_tokens.toLocaleString()}</td>
+                                <td className="text-right py-3 px-4 font-mono font-semibold">{formatCost(tag.total_cost)}</td>
+                                <td className="text-right py-3 px-4">
+                                  <div className="flex items-center justify-end gap-2">
+                                    <div className="w-16 bg-gray-200 h-2 rounded-full overflow-hidden">
+                                      <div
+                                        className="h-full rounded-full"
+                                        style={{
+                                          width: `${pct}%`,
+                                          backgroundColor: COLORS[i % COLORS.length]
+                                        }}
+                                      />
+                                    </div>
+                                    <span className="font-mono w-12 text-right">{pct.toFixed(1)}%</span>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          });
+                        })()}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-12 text-muted">
+                  <svg className="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                  </svg>
+                  <p className="font-medium mb-2">No tagged traces found</p>
+                  <p className="text-sm max-w-md mx-auto">
+                    Add tags to your traces to track costs by feature. In your SDK, set tags when creating a trace:
+                  </p>
+                  <pre className="mt-4 bg-gray-100 border-2 border-black p-4 text-left text-xs font-mono max-w-lg mx-auto overflow-x-auto">
+        {`orbis.start_trace(
+            name="my_trace",
+            tags=["feature:chat", "env:prod"]
+        )`}
+                  </pre>
+                </div>
+              )}
+            </div>
+          </div>
+        )}         
         {/* Token Breakdown Over Time */}
         {activeTab === "tokens" && (
           <div className="space-y-6">
