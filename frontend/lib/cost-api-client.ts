@@ -216,3 +216,27 @@ export async function fetchTokenBreakdown(
     return [];
   }
 }
+
+export async function fetchTokensPerTrace(days: number, token: string | null, limit: number=50): Promise<TokensPerTrace[]> {
+  try {
+    const url = new URL(`${API_BASE_URL}/cost/tokens-per-trace`);
+    url.searchParams.set("days", String(days));
+    url.searchParams.set("limit", String(limit));
+
+    const response = await fetch(url.toString(), {
+      headers: getHeaders(token),
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      console.error(`Failed to fetch tokens per trace: ${response.statusText}`);
+      return [];
+    }
+
+    const data = await response.json();
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error("Error fetching tokens per trace:", error);
+    return [];
+  }
+}
