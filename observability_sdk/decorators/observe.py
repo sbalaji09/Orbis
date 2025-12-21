@@ -1,5 +1,5 @@
 from functools import wraps
-from typing import Optional, Callable, Dict, Any
+from typing import List, Optional, Callable, Dict, Any
 import time
 from ..core.span import Span
 from ..collector.collector import get_collector
@@ -15,7 +15,8 @@ def observe(
         prompt_id: Optional[str] = None,
         prompt_version: Optional[str] = None,
         prompt_template: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None):
+        metadata: Optional[Dict[str, Any]] = None,
+        tags: Optional[List[str]] = None,):
     """
     Decorator to automatically track function execution as a span.
     """
@@ -38,7 +39,8 @@ def observe(
                 agent_id=config.project_id,
                 user_id=user_id or config.user_id,
                 trace_id=trace_id or (parent_span.trace_id if parent_span else Span.__dataclass_fields__['trace_id'].default_factory()),
-                prompt=input_str
+                prompt=input_str,
+                tags=tags,
             )
 
             # ✅ FIX: Set span_type to "function" for @observe decorator
