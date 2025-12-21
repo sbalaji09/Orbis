@@ -9,13 +9,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from observability_sdk import configure, instrument_all, observe
 import openai
-import time
 
 # Configure observability
 configure(
-    api_key="test-tool-tracking-key-123",
-    project_id="616d8f4e-8b03-4112-a40c-a61164977cb5",
-    user_id="00000000-0000-0000-0000-000000000000",
+    api_key="VGVzdCBBZ2VudAyqF8dhGI1mMuqLtMFmouY=",
+    project_id="61d12c7c-e745-4a14-a039-60b7a5d1df62",
+    user_id="fbd31533-fe77-427f-9d2d-a1c4c69e9a6d",
     api_url="http://localhost:8080",
 )
 
@@ -145,8 +144,7 @@ def creative_writing_agent():
     # Generate initial story with v1.0
     print("\n📝 Step 1: Generate with v1.0...")
     story_v1 = test_streaming_v1()
-    time.sleep(1)
-    
+
     # Improve with v2.0
     print("\n✨ Step 2: Improve with v2.0...")
     story_v2 = test_streaming_v2()
@@ -165,19 +163,15 @@ if __name__ == "__main__":
     
     # Test 1: Streaming v1.0
     result1 = test_streaming_v1()
-    time.sleep(2)
     
     # Test 2: Streaming v2.0
     result2 = test_streaming_v2()
-    time.sleep(2)
     
     # Test 3: Non-streaming different prompt
     result3 = test_nonstreaming()
-    time.sleep(2)
     
     # Test 4: Agent with nested calls
     result4 = creative_writing_agent()
-    time.sleep(6)
     
     print("\n" + "=" * 70)
     print("📊 EXPECTED IN DASHBOARD")

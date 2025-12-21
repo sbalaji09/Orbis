@@ -91,15 +91,28 @@ class SpanCollector:
                 if get_config().debug:
                     print(f"worker error: {e}")
     
+    # Drain the queue into the batch (process all pending items)
+    def _drain_queue(self) -> None:
+        while not self.queue.empty():
+            try:
+                span_data = self.queue.get_nowait()
+                with self.lock:
+                    self.batch.append(span_data)
+            except Empty:
+                break
+
     # Send all batched spans to the backend
     def flush(self) -> None:
+        # First, drain any remaining items from the queue into the batch
+        self._drain_queue()
+
         with self.lock:
             if not self.batch:
                 return
-            
+
             spans_to_send = self.batch.copy()
             self.batch.clear()
-        
+
         self._send_batch(spans_to_send)
     
     # Send a batch of spans to the backend API

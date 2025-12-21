@@ -7,6 +7,7 @@ from auth.secure_cache import hash_api_key_for_cache
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 from backend.db_connection import db
+from backend.auth_utils import verify_jwt_token
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 API_KEY_CACHE_TTL = int(os.getenv("API_KEY_CACHE_TTL", 3600))
@@ -28,11 +29,23 @@ def verify_api_key_against_hash(api_key: str, hashed_key: str) -> bool:
     except Exception:
         return False
 
-# validate an API key and return the associated user_id and returns None if invalid
+# validate an API key or JWT token and return the associated user_id and returns None if invalid
 async def validate_api_key(api_key: str) -> Optional[str]:
     if not api_key:
         return None
-    
+
+    # Check if it's a JWT token (starts with "eyJ")
+    if api_key.startswith("eyJ"):
+        try:
+            payload = verify_jwt_token(api_key)
+            user_id = payload.get("sub")
+            if user_id:
+                return user_id
+        except Exception as e:
+            print(f"[WS_AUTH] JWT validation failed: {e}")
+            return None
+
+    # Otherwise, validate as API key
     redis = await get_redis()
 
     cache_key = f"api_key_cache:{hash_api_key_for_cache(api_key)}"
@@ -41,7 +54,7 @@ async def validate_api_key(api_key: str) -> Optional[str]:
 
     if user_id:
         return user_id
-    
+
     agents = db.get_all_agents_for_auth()
     for agent in agents:
         if verify_api_key_against_hash(api_key, agent['api_key']):
@@ -49,7 +62,7 @@ async def validate_api_key(api_key: str) -> Optional[str]:
 
             await redis.setex(cache_key, API_KEY_CACHE_TTL, user_id)
             return user_id
-    
+
     return None
 
 # check if a trace belongs to the given user

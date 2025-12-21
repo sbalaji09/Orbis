@@ -24,6 +24,12 @@ class SDKConfig:
     enabled: bool = True
     debug: bool = False
 
+    # auto-flush when root span completes (no parent span)
+    auto_flush_on_root_span: bool = True
+
+    # time to wait after auto-flush to ensure HTTP requests complete (in seconds)
+    auto_flush_wait_time: float = 2.0
+
     # load configuration from env variables
     @classmethod
     def from_env(cls) -> "SDKConfig":
@@ -36,6 +42,8 @@ class SDKConfig:
             flush_interval=float(os.getenv("OBSERVABILITY_FLUSH_INTERVAL", "5.0")),
             enabled=os.getenv("OBSERVABILITY_ENABLED", "true").lower() == "true",
             debug=os.getenv("OBSERVABILITY_DEBUG", "false").lower() == "true",
+            auto_flush_on_root_span=os.getenv("OBSERVABILITY_AUTO_FLUSH_ROOT", "true").lower() == "true",
+            auto_flush_wait_time=float(os.getenv("OBSERVABILITY_AUTO_FLUSH_WAIT", "2.0")),
         )
 
 _config = SDKConfig.from_env()
@@ -53,15 +61,17 @@ def configure(
     flush_interval: Optional[float] = None,
     enabled: Optional[bool] = None,
     debug: Optional[bool] = None,
+    auto_flush_on_root_span: Optional[bool] = None,
+    auto_flush_wait_time: Optional[float] = None,
 ) -> None:
     # update SDK config
     global _config
-    
+
     if api_url is not None:
         _config.api_url = api_url
     if api_key is not None:
         _config.api_key = api_key
-    if project_id is not None:  
+    if project_id is not None:
         _config.project_id = project_id
     if user_id is not None:
         _config.user_id = user_id
@@ -73,3 +83,7 @@ def configure(
         _config.enabled = enabled
     if debug is not None:
         _config.debug = debug
+    if auto_flush_on_root_span is not None:
+        _config.auto_flush_on_root_span = auto_flush_on_root_span
+    if auto_flush_wait_time is not None:
+        _config.auto_flush_wait_time = auto_flush_wait_time
