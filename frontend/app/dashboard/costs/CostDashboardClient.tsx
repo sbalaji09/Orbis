@@ -319,241 +319,244 @@ export default function CostDashboardClient({
             </button>
           ))}
         </div>
-
-        {/* Overview Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          {/* Total Cost */}
-          <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-5">
-            <div className="flex items-center gap-2 mb-2">
-              <svg className="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span className="text-xs font-medium text-muted uppercase tracking-wide">Total Cost</span>
-            </div>
-            <div className="text-2xl font-bold font-mono">{formatCostShort(metrics.totalCost)}</div>
-            <div className="text-xs text-muted mt-1">Last {selectedPeriod} days</div>
-          </div>
-
-          {/* Total Calls */}
-          <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-5">
-            <div className="flex items-center gap-2 mb-2">
-              <svg className="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              <span className="text-xs font-medium text-muted uppercase tracking-wide">LLM Calls</span>
-            </div>
-            <div className="text-2xl font-bold font-mono">{metrics.totalCalls.toLocaleString()}</div>
-            <div className="text-xs text-muted mt-1">Last {selectedPeriod} days</div>
-          </div>
-
-          {/* Avg Cost/Day */}
-          <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-5">
-            <div className="flex items-center gap-2 mb-2">
-              <svg className="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-              <span className="text-xs font-medium text-muted uppercase tracking-wide">Avg/Day</span>
-            </div>
-            <div className="text-2xl font-bold font-mono">{formatCostShort(metrics.avgCostPerDay)}</div>
-            <div className="text-xs text-muted mt-1">Daily average</div>
-          </div>
-
-          {/* Trend */}
-          <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-5">
-            <div className="flex items-center gap-2 mb-2">
-              <svg className="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-              </svg>
-              <span className="text-xs font-medium text-muted uppercase tracking-wide">Trend</span>
-            </div>
-            <div className={`text-2xl font-bold font-mono ${metrics.trendPct >= 0 ? "text-error" : "text-success"}`}>
-              {metrics.trendPct >= 0 ? "+" : ""}{metrics.trendPct.toFixed(1)}%
-            </div>
-            <div className="text-xs text-muted mt-1">vs previous {metrics.comparisonDays}D</div>
-          </div>
-        </div>
-
-        {/* Charts Row 1: Cost Trend */}
-        <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6 mb-6">
-          <h2 className="text-lg font-semibold mb-4">Cost Over Time</h2>
-          <div className="h-72">
-            {trends.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={trends} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
-                  <XAxis
-                    dataKey="date"
-                    tickFormatter={formatDate}
-                    tick={{ fontSize: 12 }}
-                    stroke="#666"
-                  />
-                  <YAxis
-                    tickFormatter={(v) => `$${v.toFixed(2)}`}
-                    tick={{ fontSize: 12 }}
-                    stroke="#666"
-                  />
-                  <Tooltip
-                    formatter={(value) => [formatCost(Number(value)), "Cost"]}
-                    labelFormatter={(label) => formatDate(String(label))}
-                    contentStyle={{ border: "2px solid black", borderRadius: 0 }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="total_cost"
-                    stroke="#5b5fff"
-                    strokeWidth={2}
-                    dot={{ fill: "#5b5fff", strokeWidth: 0, r: 3 }}
-                    activeDot={{ r: 5, fill: "#5b5fff" }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-full flex items-center justify-center text-muted">
-                {isLoading ? "Loading..." : "No cost data available"}
+        
+        {activeTab === "overview" && (
+          <>
+          {/* Overview Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            {/* Total Cost */}
+            <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-5">
+              <div className="flex items-center gap-2 mb-2">
+                <svg className="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-xs font-medium text-muted uppercase tracking-wide">Total Cost</span>
               </div>
-            )}
-          </div>
-        </div>
+              <div className="text-2xl font-bold font-mono">{formatCostShort(metrics.totalCost)}</div>
+              <div className="text-xs text-muted mt-1">Last {selectedPeriod} days</div>
+            </div>
 
-        {/* Charts Row 2: By Agent and By Model */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Cost by Agent */}
-          <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6">
-            <h2 className="text-lg font-semibold mb-4">Cost by Agent</h2>
-            <div className="h-64">
-              {byAgent.length > 0 ? (
+            {/* Total Calls */}
+            <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-5">
+              <div className="flex items-center gap-2 mb-2">
+                <svg className="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                <span className="text-xs font-medium text-muted uppercase tracking-wide">LLM Calls</span>
+              </div>
+              <div className="text-2xl font-bold font-mono">{metrics.totalCalls.toLocaleString()}</div>
+              <div className="text-xs text-muted mt-1">Last {selectedPeriod} days</div>
+            </div>
+
+            {/* Avg Cost/Day */}
+            <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-5">
+              <div className="flex items-center gap-2 mb-2">
+                <svg className="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                <span className="text-xs font-medium text-muted uppercase tracking-wide">Avg/Day</span>
+              </div>
+              <div className="text-2xl font-bold font-mono">{formatCostShort(metrics.avgCostPerDay)}</div>
+              <div className="text-xs text-muted mt-1">Daily average</div>
+            </div>
+
+            {/* Trend */}
+            <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-5">
+              <div className="flex items-center gap-2 mb-2">
+                <svg className="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
+                <span className="text-xs font-medium text-muted uppercase tracking-wide">Trend</span>
+              </div>
+              <div className={`text-2xl font-bold font-mono ${metrics.trendPct >= 0 ? "text-error" : "text-success"}`}>
+                {metrics.trendPct >= 0 ? "+" : ""}{metrics.trendPct.toFixed(1)}%
+              </div>
+              <div className="text-xs text-muted mt-1">vs previous {metrics.comparisonDays}D</div>
+            </div>
+          </div>
+
+          {/* Charts Row 1: Cost Trend */}
+          <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6 mb-6">
+            <h2 className="text-lg font-semibold mb-4">Cost Over Time</h2>
+            <div className="h-72">
+              {trends.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={byAgent} layout="vertical" margin={{ top: 5, right: 30, left: 80, bottom: 5 }}>
+                  <LineChart data={trends} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
                     <XAxis
-                      type="number"
-                      tickFormatter={(v) => `$${v.toFixed(2)}`}
+                      dataKey="date"
+                      tickFormatter={formatDate}
                       tick={{ fontSize: 12 }}
                       stroke="#666"
                     />
                     <YAxis
-                      type="category"
-                      dataKey="agent"
+                      tickFormatter={(v) => `$${v.toFixed(2)}`}
                       tick={{ fontSize: 12 }}
                       stroke="#666"
-                      width={70}
                     />
                     <Tooltip
                       formatter={(value) => [formatCost(Number(value)), "Cost"]}
+                      labelFormatter={(label) => formatDate(String(label))}
                       contentStyle={{ border: "2px solid black", borderRadius: 0 }}
                     />
-                    <Bar dataKey="total_cost" fill="#5b5fff" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-full flex items-center justify-center text-muted">
-                  {isLoading ? "Loading..." : "No agent data available"}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Cost by Model */}
-          <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6">
-            <h2 className="text-lg font-semibold mb-4">Cost by Model</h2>
-            <div className="h-64">
-              {byModel.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={byModel}
+                    <Line
+                      type="monotone"
                       dataKey="total_cost"
-                      nameKey="model"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={80}
-                      label={({ name, percent }) => `${name} (${((percent ?? 0) * 100).toFixed(0)}%)`}
-                      labelLine={true}
-                    >
-                      {byModel.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      formatter={(value) => [formatCost(Number(value)), "Cost"]}
-                      contentStyle={{ border: "2px solid black", borderRadius: 0 }}
+                      stroke="#5b5fff"
+                      strokeWidth={2}
+                      dot={{ fill: "#5b5fff", strokeWidth: 0, r: 3 }}
+                      activeDot={{ r: 5, fill: "#5b5fff" }}
                     />
-                    <Legend />
-                  </PieChart>
+                  </LineChart>
                 </ResponsiveContainer>
               ) : (
                 <div className="h-full flex items-center justify-center text-muted">
-                  {isLoading ? "Loading..." : "No model data available"}
+                  {isLoading ? "Loading..." : "No cost data available"}
                 </div>
               )}
             </div>
           </div>
-        </div>
 
-        {/* Cost Breakdown Table */}
-        <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6 mt-6">
-          <h2 className="text-lg font-semibold mb-4">Cost Breakdown by Model</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b-2 border-black">
-                  <th className="text-left py-3 px-4 font-semibold">Model</th>
-                  <th className="text-right py-3 px-4 font-semibold">Total Cost</th>
-                  <th className="text-right py-3 px-4 font-semibold">Calls</th>
-                  <th className="text-right py-3 px-4 font-semibold">Avg/Call</th>
-                  <th className="text-right py-3 px-4 font-semibold">% of Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {byModel.length > 0 ? (
-                  byModel.map((row, i) => {
-                    const totalCost = byModel.reduce((sum, r) => sum + r.total_cost, 0);
-                    const pct = totalCost > 0 ? (row.total_cost / totalCost) * 100 : 0;
-                    const avgPerCall = row.call_count > 0 ? row.total_cost / row.call_count : 0;
-
-                    return (
-                      <tr key={row.model} className="border-b border-gray-200 hover:bg-gray-50">
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="w-3 h-3 rounded-sm"
-                              style={{ backgroundColor: COLORS[i % COLORS.length] }}
-                            />
-                            <span className="font-mono">{row.model}</span>
-                          </div>
-                        </td>
-                        <td className="text-right py-3 px-4 font-mono">{formatCost(row.total_cost)}</td>
-                        <td className="text-right py-3 px-4 font-mono">{row.call_count.toLocaleString()}</td>
-                        <td className="text-right py-3 px-4 font-mono">{formatCost(avgPerCall)}</td>
-                        <td className="text-right py-3 px-4">
-                          <div className="flex items-center justify-end gap-2">
-                            <div className="w-16 bg-gray-200 h-2 rounded-full overflow-hidden">
-                              <div
-                                className="h-full rounded-full"
-                                style={{
-                                  width: `${pct}%`,
-                                  backgroundColor: COLORS[i % COLORS.length]
-                                }}
-                              />
-                            </div>
-                            <span className="font-mono w-12 text-right">{pct.toFixed(1)}%</span>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
+          {/* Charts Row 2: By Agent and By Model */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Cost by Agent */}
+            <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6">
+              <h2 className="text-lg font-semibold mb-4">Cost by Agent</h2>
+              <div className="h-64">
+                {byAgent.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={byAgent} layout="vertical" margin={{ top: 5, right: 30, left: 80, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
+                      <XAxis
+                        type="number"
+                        tickFormatter={(v) => `$${v.toFixed(2)}`}
+                        tick={{ fontSize: 12 }}
+                        stroke="#666"
+                      />
+                      <YAxis
+                        type="category"
+                        dataKey="agent"
+                        tick={{ fontSize: 12 }}
+                        stroke="#666"
+                        width={70}
+                      />
+                      <Tooltip
+                        formatter={(value) => [formatCost(Number(value)), "Cost"]}
+                        contentStyle={{ border: "2px solid black", borderRadius: 0 }}
+                      />
+                      <Bar dataKey="total_cost" fill="#5b5fff" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
                 ) : (
-                  <tr>
-                    <td colSpan={5} className="py-8 text-center text-muted">
-                      {isLoading ? "Loading..." : "No model data available"}
-                    </td>
-                  </tr>
+                  <div className="h-full flex items-center justify-center text-muted">
+                    {isLoading ? "Loading..." : "No agent data available"}
+                  </div>
                 )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+              </div>
+            </div>
 
+            {/* Cost by Model */}
+            <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6">
+              <h2 className="text-lg font-semibold mb-4">Cost by Model</h2>
+              <div className="h-64">
+                {byModel.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={byModel}
+                        dataKey="total_cost"
+                        nameKey="model"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        label={({ name, percent }) => `${name} (${((percent ?? 0) * 100).toFixed(0)}%)`}
+                        labelLine={true}
+                      >
+                        {byModel.map((_, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(value) => [formatCost(Number(value)), "Cost"]}
+                        contentStyle={{ border: "2px solid black", borderRadius: 0 }}
+                      />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-muted">
+                    {isLoading ? "Loading..." : "No model data available"}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Cost Breakdown Table */}
+          <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6 mt-6">
+            <h2 className="text-lg font-semibold mb-4">Cost Breakdown by Model</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b-2 border-black">
+                    <th className="text-left py-3 px-4 font-semibold">Model</th>
+                    <th className="text-right py-3 px-4 font-semibold">Total Cost</th>
+                    <th className="text-right py-3 px-4 font-semibold">Calls</th>
+                    <th className="text-right py-3 px-4 font-semibold">Avg/Call</th>
+                    <th className="text-right py-3 px-4 font-semibold">% of Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {byModel.length > 0 ? (
+                    byModel.map((row, i) => {
+                      const totalCost = byModel.reduce((sum, r) => sum + r.total_cost, 0);
+                      const pct = totalCost > 0 ? (row.total_cost / totalCost) * 100 : 0;
+                      const avgPerCall = row.call_count > 0 ? row.total_cost / row.call_count : 0;
+
+                      return (
+                        <tr key={row.model} className="border-b border-gray-200 hover:bg-gray-50">
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="w-3 h-3 rounded-sm"
+                                style={{ backgroundColor: COLORS[i % COLORS.length] }}
+                              />
+                              <span className="font-mono">{row.model}</span>
+                            </div>
+                          </td>
+                          <td className="text-right py-3 px-4 font-mono">{formatCost(row.total_cost)}</td>
+                          <td className="text-right py-3 px-4 font-mono">{row.call_count.toLocaleString()}</td>
+                          <td className="text-right py-3 px-4 font-mono">{formatCost(avgPerCall)}</td>
+                          <td className="text-right py-3 px-4">
+                            <div className="flex items-center justify-end gap-2">
+                              <div className="w-16 bg-gray-200 h-2 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full rounded-full"
+                                  style={{
+                                    width: `${pct}%`,
+                                    backgroundColor: COLORS[i % COLORS.length]
+                                  }}
+                                />
+                              </div>
+                              <span className="font-mono w-12 text-right">{pct.toFixed(1)}%</span>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-muted">
+                        {isLoading ? "Loading..." : "No model data available"}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>          
+          </>
+        )}           
         {/* Token Breakdown Over Time */}
         {activeTab === "tokens" && (
           <div className="space-y-6">
