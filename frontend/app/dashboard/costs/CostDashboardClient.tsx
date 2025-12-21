@@ -773,59 +773,136 @@ export default function CostDashboardClient({
 
         {activeTab === "savings" && savingsData && (
           <div className="space-y-6">
-            {/* Potential Savings Summary Card */}
-            <div className="bg-green-50 border-2 border-green-600 p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <div>
-                    <h2 className="text-lg font-semibold text-green-800">Estimated Savings Available</h2>
-                    <p className="text-2xl font-bold text-green-600">${savingsData.total_potential_savings.toFixed(2)}</p>
-                  </div>
-                </div>
-                <div className="text-right text-sm text-green-700 max-w-xs">
-                  <p>Based on caching repeated prompts. See recommendations below.</p>
-                </div>
-              </div>
-            </div>
+            {/* Personalized Recommendations Based on User Data */}
+            {(() => {
+              // Calculate personalized insights from user data
+              const expensiveModels = savingsData.model_analysis.filter(m =>
+                (m.model.includes('gpt-4') && !m.model.includes('mini')) ||
+                m.model.includes('claude-3-5-sonnet') ||
+                m.model.includes('claude-3-opus')
+              );
+              const expensiveModelCost = expensiveModels.reduce((sum, m) => sum + m.total_cost, 0);
+              const expensiveModelCalls = expensiveModels.reduce((sum, m) => sum + m.call_count, 0);
+              const potentialModelSavings = expensiveModelCost * 0.9; // ~90% savings switching to mini
 
-            {/* Quick Wins Summary */}
-            <div className="bg-amber-50 border-2 border-amber-500 p-5">
-              <h3 className="font-semibold text-amber-800 mb-3 flex items-center gap-2">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-                3 Ways to Reduce Your LLM Costs
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                <div className="bg-white/60 p-3 rounded">
-                  <p className="font-medium text-amber-900">1. Use cheaper models</p>
-                  <p className="text-amber-700 mt-1">Switch GPT-4 to GPT-4o-mini for simple tasks. Most requests don&apos;t need the most expensive model.</p>
-                </div>
-                <div className="bg-white/60 p-3 rounded">
-                  <p className="font-medium text-amber-900">2. Cache repeated prompts</p>
-                  <p className="text-amber-700 mt-1">Enable prompt caching for system prompts that don&apos;t change. Saves up to 90% on cached portions.</p>
-                </div>
-                <div className="bg-white/60 p-3 rounded">
-                  <p className="font-medium text-amber-900">3. Shorten outputs</p>
-                  <p className="text-amber-700 mt-1">Add &quot;Be concise&quot; to prompts. Output tokens cost 3-4x more than input tokens.</p>
-                </div>
-              </div>
-            </div>
+              const verboseCost = savingsData.verbose_traces.reduce((sum, t) => sum + t.total_cost, 0);
+              const avgVerboseRatio = savingsData.verbose_traces.length > 0
+                ? savingsData.verbose_traces.reduce((sum, t) => sum + t.output_input_ratio, 0) / savingsData.verbose_traces.length
+                : 0;
+
+              const cacheSavings = savingsData.total_potential_savings;
+              const totalRepetitions = savingsData.repeated_prompts.reduce((sum, p) => sum + p.repetition_count, 0);
+
+              const totalPotentialSavings = potentialModelSavings + cacheSavings + (verboseCost * 0.3);
+
+              const recommendations = [];
+
+              // Only show recommendations that apply to this user
+              if (expensiveModelCalls > 0) {
+                recommendations.push({
+                  priority: expensiveModelCost,
+                  title: `Switch ${expensiveModelCalls.toLocaleString()} expensive model calls`,
+                  description: `You spent $${expensiveModelCost.toFixed(2)} on ${expensiveModels.map(m => m.model).join(', ')}. Using GPT-4o-mini or Claude Haiku for simple tasks could save ~$${potentialModelSavings.toFixed(2)}.`,
+                  savings: potentialModelSavings,
+                  color: 'green'
+                });
+              }
+
+              if (savingsData.repeated_prompts.length > 0) {
+                recommendations.push({
+                  priority: cacheSavings,
+                  title: `Cache ${totalRepetitions} repeated prompts`,
+                  description: `You're sending the same prompts multiple times. Enable prompt caching to save $${cacheSavings.toFixed(2)}.`,
+                  savings: cacheSavings,
+                  color: 'blue'
+                });
+              }
+
+              if (savingsData.verbose_traces.length > 0 && avgVerboseRatio > 2) {
+                const verboseSavings = verboseCost * 0.3;
+                recommendations.push({
+                  priority: verboseSavings,
+                  title: `Reduce verbose outputs (${avgVerboseRatio.toFixed(1)}x avg ratio)`,
+                  description: `${savingsData.verbose_traces.length} traces have outputs ${avgVerboseRatio.toFixed(1)}x longer than inputs. Add "Be concise" to save ~$${verboseSavings.toFixed(2)}.`,
+                  savings: verboseSavings,
+                  color: 'amber'
+                });
+              }
+
+              // Sort by potential savings
+              recommendations.sort((a, b) => b.priority - a.priority);
+
+              return (
+                <>
+                  {/* Total Savings Header */}
+                  <div className="bg-green-50 border-2 border-green-600 p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div>
+                          <h2 className="text-lg font-semibold text-green-800">You Could Save Up To</h2>
+                          <p className="text-2xl font-bold text-green-600">${totalPotentialSavings.toFixed(2)}</p>
+                        </div>
+                      </div>
+                      <div className="text-right text-sm text-green-700">
+                        <p>Based on your actual usage over the last {selectedPeriod} days</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Personalized Recommendations */}
+                  {recommendations.length > 0 ? (
+                    <div className="space-y-3">
+                      <h3 className="font-semibold text-lg">Your Top Opportunities</h3>
+                      {recommendations.map((rec, i) => (
+                        <div key={i} className={`border-2 p-4 ${
+                          rec.color === 'green' ? 'border-green-500 bg-green-50' :
+                          rec.color === 'blue' ? 'border-blue-500 bg-blue-50' :
+                          'border-amber-500 bg-amber-50'
+                        }`}>
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className={`text-xs font-bold px-2 py-0.5 rounded ${
+                                  rec.color === 'green' ? 'bg-green-600 text-white' :
+                                  rec.color === 'blue' ? 'bg-blue-600 text-white' :
+                                  'bg-amber-600 text-white'
+                                }`}>
+                                  #{i + 1}
+                                </span>
+                                <h4 className="font-semibold">{rec.title}</h4>
+                              </div>
+                              <p className="text-sm mt-1 text-gray-700">{rec.description}</p>
+                            </div>
+                            <div className="text-right ml-4">
+                              <p className="text-xs text-gray-500">Potential savings</p>
+                              <p className={`text-lg font-bold ${
+                                rec.color === 'green' ? 'text-green-600' :
+                                rec.color === 'blue' ? 'text-blue-600' :
+                                'text-amber-600'
+                              }`}>
+                                ${rec.savings.toFixed(2)}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="bg-gray-50 border-2 border-gray-300 p-6 text-center">
+                      <p className="text-gray-600">No specific optimization opportunities detected. Your usage looks efficient!</p>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
 
             {/* Model Cost Analysis */}
+            {savingsData.model_analysis.length > 0 && (
             <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h2 className="text-lg font-semibold">Your Model Usage</h2>
-                  <p className="text-sm text-muted mt-1">Consider using cheaper models for simpler tasks</p>
-                </div>
-                <div className="bg-blue-50 border border-blue-200 px-3 py-2 text-xs text-blue-700 max-w-xs">
-                  <strong>Tip:</strong> GPT-4o-mini costs 97% less than GPT-4 and works great for classification, extraction, and simple Q&A.
-                </div>
-              </div>
+              <h2 className="text-lg font-semibold mb-4">Model Usage Breakdown</h2>
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b-2 border-black">
@@ -833,80 +910,55 @@ export default function CostDashboardClient({
                     <th className="text-right py-3 px-4 font-semibold">Calls</th>
                     <th className="text-right py-3 px-4 font-semibold">Total Cost</th>
                     <th className="text-right py-3 px-4 font-semibold">Avg Tokens</th>
-                    <th className="text-right py-3 px-4 font-semibold">Avg Cost/Call</th>
-                    <th className="text-left py-3 px-4 font-semibold">Suggestion</th>
+                    <th className="text-right py-3 px-4 font-semibold">Cost/Call</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {savingsData.model_analysis.map((m) => {
-                    // Simple heuristic for suggestions
-                    const isExpensive = m.model.includes('gpt-4') && !m.model.includes('mini');
-                    const isHighVolume = m.call_count > 100;
-                    const suggestion = isExpensive && isHighVolume
-                      ? 'Try GPT-4o-mini'
-                      : isExpensive
-                      ? 'Consider mini for simple tasks'
-                      : m.model.includes('claude-3-5-sonnet')
-                      ? 'Try Haiku for simple tasks'
-                      : '';
-
-                    return (
-                      <tr key={m.model} className="border-b border-gray-200">
-                        <td className="py-3 px-4 font-mono">{m.model}</td>
-                        <td className="text-right py-3 px-4 font-mono">{m.call_count.toLocaleString()}</td>
-                        <td className="text-right py-3 px-4 font-mono">${m.total_cost.toFixed(4)}</td>
-                        <td className="text-right py-3 px-4 font-mono">{m.avg_tokens.toFixed(0)}</td>
-                        <td className="text-right py-3 px-4 font-mono">${m.avg_cost_per_call.toFixed(6)}</td>
-                        <td className="py-3 px-4">
-                          {suggestion && (
-                            <span className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded">
-                              {suggestion}
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Verbose Traces */}
-            <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h2 className="text-lg font-semibold">Verbose Responses</h2>
-                  <p className="text-sm text-muted mt-1">These traces generate way more output than input. Output tokens are 3-4x more expensive!</p>
-                </div>
-                <div className="bg-blue-50 border border-blue-200 px-3 py-2 text-xs text-blue-700 max-w-xs">
-                  <strong>Fix:</strong> Add instructions like &quot;Respond in under 100 words&quot; or &quot;Be concise&quot; to your prompts.
-                </div>
-              </div>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b-2 border-black">
-                    <th className="text-left py-3 px-4 font-semibold">Trace</th>
-                    <th className="text-left py-3 px-4 font-semibold">Agent</th>
-                    <th className="text-right py-3 px-4 font-semibold">Input</th>
-                    <th className="text-right py-3 px-4 font-semibold">Output</th>
-                    <th className="text-right py-3 px-4 font-semibold">Ratio</th>
-                    <th className="text-right py-3 px-4 font-semibold">Cost</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {savingsData.verbose_traces.slice(0, 5).map((t) => (
-                    <tr key={t.trace_hash_id} className="border-b border-gray-200">
-                      <td className="py-3 px-4 font-mono text-xs">{t.trace_hash_id?.slice(0, 8)}</td>
-                      <td className="py-3 px-4">{t.agent_name}</td>
-                      <td className="text-right py-3 px-4 font-mono">{t.input_tokens.toLocaleString()}</td>
-                      <td className="text-right py-3 px-4 font-mono">{t.output_tokens.toLocaleString()}</td>
-                      <td className="text-right py-3 px-4 font-mono text-orange-600">{t.output_input_ratio}x</td>
-                      <td className="text-right py-3 px-4 font-mono">${t.total_cost.toFixed(4)}</td>
+                  {savingsData.model_analysis.map((m) => (
+                    <tr key={m.model} className="border-b border-gray-200">
+                      <td className="py-3 px-4 font-mono">{m.model}</td>
+                      <td className="text-right py-3 px-4 font-mono">{m.call_count.toLocaleString()}</td>
+                      <td className="text-right py-3 px-4 font-mono">${m.total_cost.toFixed(4)}</td>
+                      <td className="text-right py-3 px-4 font-mono">{m.avg_tokens.toFixed(0)}</td>
+                      <td className="text-right py-3 px-4 font-mono">${m.avg_cost_per_call.toFixed(6)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+            )}
+
+            {/* Verbose Traces - Only show if there are verbose traces */}
+            {savingsData.verbose_traces.length > 0 && (
+              <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6">
+                <h2 className="text-lg font-semibold mb-2">Verbose Responses Detected</h2>
+                <p className="text-sm text-muted mb-4">These {savingsData.verbose_traces.length} traces have unusually high output/input ratios.</p>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b-2 border-black">
+                      <th className="text-left py-3 px-4 font-semibold">Trace</th>
+                      <th className="text-left py-3 px-4 font-semibold">Agent</th>
+                      <th className="text-right py-3 px-4 font-semibold">Input</th>
+                      <th className="text-right py-3 px-4 font-semibold">Output</th>
+                      <th className="text-right py-3 px-4 font-semibold">Ratio</th>
+                      <th className="text-right py-3 px-4 font-semibold">Cost</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {savingsData.verbose_traces.slice(0, 5).map((t) => (
+                      <tr key={t.trace_hash_id} className="border-b border-gray-200">
+                        <td className="py-3 px-4 font-mono text-xs">{t.trace_hash_id?.slice(0, 8)}</td>
+                        <td className="py-3 px-4">{t.agent_name}</td>
+                        <td className="text-right py-3 px-4 font-mono">{t.input_tokens.toLocaleString()}</td>
+                        <td className="text-right py-3 px-4 font-mono">{t.output_tokens.toLocaleString()}</td>
+                        <td className="text-right py-3 px-4 font-mono text-orange-600">{t.output_input_ratio}x</td>
+                        <td className="text-right py-3 px-4 font-mono">${t.total_cost.toFixed(4)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
 
             {/* Repeated Prompts (Caching Opportunities) */}
             {savingsData.repeated_prompts.length > 0 && (
