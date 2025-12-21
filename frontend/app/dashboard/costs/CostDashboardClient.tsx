@@ -775,20 +775,57 @@ export default function CostDashboardClient({
           <div className="space-y-6">
             {/* Potential Savings Summary Card */}
             <div className="bg-green-50 border-2 border-green-600 p-6">
-              <div className="flex items-center gap-3">
-                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div>
+                    <h2 className="text-lg font-semibold text-green-800">Estimated Savings Available</h2>
+                    <p className="text-2xl font-bold text-green-600">${savingsData.total_potential_savings.toFixed(2)}</p>
+                  </div>
+                </div>
+                <div className="text-right text-sm text-green-700 max-w-xs">
+                  <p>Based on caching repeated prompts. See recommendations below.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Wins Summary */}
+            <div className="bg-amber-50 border-2 border-amber-500 p-5">
+              <h3 className="font-semibold text-amber-800 mb-3 flex items-center gap-2">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
-                <div>
-                  <h2 className="text-lg font-semibold text-green-800">Potential Savings</h2>
-                  <p className="text-2xl font-bold text-green-600">${savingsData.total_potential_savings.toFixed(2)}</p>
+                3 Ways to Reduce Your LLM Costs
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div className="bg-white/60 p-3 rounded">
+                  <p className="font-medium text-amber-900">1. Use cheaper models</p>
+                  <p className="text-amber-700 mt-1">Switch GPT-4 to GPT-4o-mini for simple tasks. Most requests don&apos;t need the most expensive model.</p>
+                </div>
+                <div className="bg-white/60 p-3 rounded">
+                  <p className="font-medium text-amber-900">2. Cache repeated prompts</p>
+                  <p className="text-amber-700 mt-1">Enable prompt caching for system prompts that don&apos;t change. Saves up to 90% on cached portions.</p>
+                </div>
+                <div className="bg-white/60 p-3 rounded">
+                  <p className="font-medium text-amber-900">3. Shorten outputs</p>
+                  <p className="text-amber-700 mt-1">Add &quot;Be concise&quot; to prompts. Output tokens cost 3-4x more than input tokens.</p>
                 </div>
               </div>
             </div>
 
             {/* Model Cost Analysis */}
             <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6">
-              <h2 className="text-lg font-semibold mb-4">Cost by Model (Consider Cheaper Alternatives)</h2>
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h2 className="text-lg font-semibold">Your Model Usage</h2>
+                  <p className="text-sm text-muted mt-1">Consider using cheaper models for simpler tasks</p>
+                </div>
+                <div className="bg-blue-50 border border-blue-200 px-3 py-2 text-xs text-blue-700 max-w-xs">
+                  <strong>Tip:</strong> GPT-4o-mini costs 97% less than GPT-4 and works great for classification, extraction, and simple Q&A.
+                </div>
+              </div>
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b-2 border-black">
@@ -797,26 +834,54 @@ export default function CostDashboardClient({
                     <th className="text-right py-3 px-4 font-semibold">Total Cost</th>
                     <th className="text-right py-3 px-4 font-semibold">Avg Tokens</th>
                     <th className="text-right py-3 px-4 font-semibold">Avg Cost/Call</th>
+                    <th className="text-left py-3 px-4 font-semibold">Suggestion</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {savingsData.model_analysis.map((m) => (
-                    <tr key={m.model} className="border-b border-gray-200">
-                      <td className="py-3 px-4 font-mono">{m.model}</td>
-                      <td className="text-right py-3 px-4 font-mono">{m.call_count.toLocaleString()}</td>
-                      <td className="text-right py-3 px-4 font-mono">${m.total_cost.toFixed(4)}</td>
-                      <td className="text-right py-3 px-4 font-mono">{m.avg_tokens.toFixed(0)}</td>
-                      <td className="text-right py-3 px-4 font-mono">${m.avg_cost_per_call.toFixed(6)}</td>
-                    </tr>
-                  ))}
+                  {savingsData.model_analysis.map((m) => {
+                    // Simple heuristic for suggestions
+                    const isExpensive = m.model.includes('gpt-4') && !m.model.includes('mini');
+                    const isHighVolume = m.call_count > 100;
+                    const suggestion = isExpensive && isHighVolume
+                      ? 'Try GPT-4o-mini'
+                      : isExpensive
+                      ? 'Consider mini for simple tasks'
+                      : m.model.includes('claude-3-5-sonnet')
+                      ? 'Try Haiku for simple tasks'
+                      : '';
+
+                    return (
+                      <tr key={m.model} className="border-b border-gray-200">
+                        <td className="py-3 px-4 font-mono">{m.model}</td>
+                        <td className="text-right py-3 px-4 font-mono">{m.call_count.toLocaleString()}</td>
+                        <td className="text-right py-3 px-4 font-mono">${m.total_cost.toFixed(4)}</td>
+                        <td className="text-right py-3 px-4 font-mono">{m.avg_tokens.toFixed(0)}</td>
+                        <td className="text-right py-3 px-4 font-mono">${m.avg_cost_per_call.toFixed(6)}</td>
+                        <td className="py-3 px-4">
+                          {suggestion && (
+                            <span className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded">
+                              {suggestion}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
 
             {/* Verbose Traces */}
             <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6">
-              <h2 className="text-lg font-semibold mb-2">Verbose Responses (High Output/Input Ratio)</h2>
-              <p className="text-sm text-muted mb-4">Traces where output tokens significantly exceed input - consider prompting for concise responses.</p>
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h2 className="text-lg font-semibold">Verbose Responses</h2>
+                  <p className="text-sm text-muted mt-1">These traces generate way more output than input. Output tokens are 3-4x more expensive!</p>
+                </div>
+                <div className="bg-blue-50 border border-blue-200 px-3 py-2 text-xs text-blue-700 max-w-xs">
+                  <strong>Fix:</strong> Add instructions like &quot;Respond in under 100 words&quot; or &quot;Be concise&quot; to your prompts.
+                </div>
+              </div>
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b-2 border-black">
