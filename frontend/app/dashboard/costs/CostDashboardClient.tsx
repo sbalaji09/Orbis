@@ -73,7 +73,7 @@ export default function CostDashboardClient({
   const [tokenBreakdown, setTokenBreakdown] = useState<TokenBreakdown[]>([]);
   const [tokensPerTrace, setTokensPerTrace] = useState<TokensPerTrace[]>([]);
   const [savingsData, setSavingsData] = useState<SavingsOpportunities | null>(null);
-  const [activeTab, setActiveTab] = useState<"overview" | "tokens" | "savings">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "features" | "tokens" | "savings">("overview");
   const [costByTag, setCostByTag] = useState<CostByTag[]>([]);
 
   // Close dropdown when clicking outside
@@ -136,13 +136,14 @@ export default function CostDashboardClient({
       try {
         const { startDate, endDate } = getDateRange(selectedPeriod);
 
-        const [trendsData, agentData, modelData, tokenData, traceTokens, savings] = await Promise.all([
+        const [trendsData, agentData, modelData, tokenData, traceTokens, savings, tagData] = await Promise.all([
           fetchCostTrends(selectedPeriod, token),
           fetchCostByAgent(startDate, endDate, token),
           fetchCostByModel(startDate, endDate, token),
           fetchTokenBreakdown(selectedPeriod, token),
           fetchTokensPerTrace(selectedPeriod, token),
           fetchSavingsOpportunities(selectedPeriod, token),
+          fetchCostByTag(startDate, endDate, token),
         ]);
 
         setTrends(trendsData);
@@ -151,6 +152,7 @@ export default function CostDashboardClient({
         setTokenBreakdown(tokenData);
         setTokensPerTrace(traceTokens);
         setSavingsData(savings);
+        setCostByTag(tagData);
       } catch (error) {
         console.error("Failed to fetch cost data:", error);
       } finally {
@@ -331,6 +333,7 @@ export default function CostDashboardClient({
         <div className="flex gap-2 mb-6 border-b-2 border-black">
           {[
             { id: "overview", label: "Overview" },
+            { id: "features", label: "Features"},
             { id: "tokens", label: "Token Analytics" },
             { id: "savings", label: "Savings Opportunities" },
           ].map((tab) => (
