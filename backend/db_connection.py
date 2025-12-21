@@ -385,7 +385,7 @@ class SupabaseDB:
                     # Convert ALL datetime objects to ISO strings
                     # Use list() to avoid dict size change during iteration
                     for key, value in list(trace.items()):
-                        if isinstance(value, datetime.datetime):
+                        if isinstance(value, datetime):
                             trace[key] = value.isoformat()
 
                     traces.append(trace)
