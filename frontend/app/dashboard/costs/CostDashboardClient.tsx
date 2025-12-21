@@ -21,10 +21,17 @@ import {
   fetchCostTrends,
   fetchCostByAgent,
   fetchCostByModel,
+  fetchTokenBreakdown,
+  fetchTokensPerTrace,
+  fetchSavingsOpportunities,
   type CostTrend,
   type CostByAgent,
   type CostByModel,
+  type TokenBreakdown,
+  type TokensPerTrace,
+  type SavingsOpportunities,
 } from "@/lib/cost-api-client";
+
 
 interface CostDashboardClientProps {
   initialTrends: CostTrend[];
