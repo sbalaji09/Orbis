@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ReactElement } from "react";
-import { Logo } from "./Logo";
+import { OrbisLogo } from "./OrbisLogo";
 import { useAuth } from "@/hooks/useAuth";
 
 interface NavItem {
@@ -73,6 +73,25 @@ const navItems: NavItem[] = [
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M12 4.5 15.5 10H8.5L12 4.5z" vectorEffect="non-scaling-stroke" />
+        <circle cx="8" cy="17" r="2.25" vectorEffect="non-scaling-stroke" />
+        <rect x="14" y="14.75" width="4.5" height="4.5" rx="0.5" vectorEffect="non-scaling-stroke" />
+      </svg>
+    ),
+    name: "Playground",
+    link: "/dashboard/playground",
+  },
+  {
+    icon: (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
         strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -105,13 +124,10 @@ export default function NavMenu() {
         {/* <div className="w-8 h-8 bg-mustard border-2 border-black flex items-center justify-center group-hover:shadow-[2px_2px_0_rgba(0,0,0,0.2)] transition-all">
           <span className="text-white font-bold text-lg">O</span>
         </div> */}
-        <Logo className="w-12 h-12" />
+        <OrbisLogo className="w-12 h-12" />
         <div className="flex flex-col gap-0">
           <span className="text-base font-semibold tracking-tight leading-none">
-            $ orbis.ai
-          </span>
-          <span className="text-[9px] text-black/40 font-medium uppercase tracking-wider">
-            {`// observability`}
+            orbis
           </span>
         </div>
       </Link>
@@ -131,7 +147,7 @@ export default function NavMenu() {
                       : "bg-transparent text-black/60 border-transparent hover:text-foreground hover:bg-black/5"
                   }`}
                 >
-                  <span className="w-4 h-4">{item.icon}</span>
+                  <span className={item.name === "Playground" ? "w-6 h-6" : "w-4 h-4"}>{item.icon}</span>
                   <span>{item.name}</span>
                   {item.badge && (
                     <span className="px-1.5 py-0.5 text-[9px] font-semibold bg-babyblue/10 text-babyblue border border-babyblue uppercase tracking-wide">

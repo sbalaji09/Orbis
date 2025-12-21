@@ -1,5 +1,6 @@
 @import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 :root {
   --background: #f5f3f0;
@@ -17,6 +18,13 @@
   --accent-purple: #8b5cf6;
   --accent-teal: #14b8a6;
   --green: #10b981;
+  --sage: #8a9a7b;
+  --pink: #e91e8c;
+  --model-grok: #e91e8c;
+  --model-openai: #5b5fff;
+  --model-groq: #e8c302;
+  --model-mistral: #ff7b54;
+  --model-anthropic: #ff6b00;
 }
 
 @theme inline {
@@ -36,6 +44,13 @@
   --color-accent-teal: var(--accent-teal);
   --color-green: var(--green);
   --color-black: var(--foreground);
+  --color-sage: var(--sage);
+  --color-pink: var(--pink);
+  --color-model-grok: var(--model-grok);
+  --color-model-openai: var(--model-openai);
+  --color-model-groq: var(--model-groq);
+  --color-model-mistral: var(--model-mistral);
+  --color-model-anthropic: var(--model-anthropic);
   --font-mono: "JetBrains Mono", "Fira Code", "Consolas", "Monaco",
     "Courier New", monospace;
   --font-sans: "Zalando Sans", -apple-system, BlinkMacSystemFont, "Segoe UI",

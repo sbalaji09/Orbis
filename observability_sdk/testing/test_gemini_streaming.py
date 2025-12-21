@@ -11,11 +11,10 @@ import time
 
 # Configure
 configure(
-    api_key="sk_live_Vy41Kdajw0Nigty3A3HrJlCx0ZXGXSqovDHCre6zU3Y",
+    api_key="VGVzdCBBZ2VudAyqF8dhGI1mMuqLtMFmouY=",
+    project_id="61d12c7c-e745-4a14-a039-60b7a5d1df62",
+    user_id="fbd31533-fe77-427f-9d2d-a1c4c69e9a6d",
     api_url="http://localhost:8080",
-    project_id="11111111-1111-1111-1111-111111111111",
-    user_id="00000000-0000-0000-0000-000000000000",
-    debug=True
 )
 
 instrument_all()

@@ -11,21 +11,55 @@ from ..core.context import get_current_span, set_current_span
 from ..collector.config import get_config
 import time
 
-# anthropic pricing per 1M tokens (updated 11.16.25)
+# anthropic pricing per 1M tokens (updated 12.19.25)
+# Note: Cache pricing not included - using base input tokens for simplicity
 ANTHROPIC_PRICING = {
-    # Claude 4 family
+    # Claude Opus 4.5
+    "claude-opus-4.5": {"input": 5.0, "output": 25.0},
+    "claude-opus-4-5": {"input": 5.0, "output": 25.0},
+
+    # Claude Opus 4.1
+    "claude-opus-4.1": {"input": 15.0, "output": 75.0},
+    "claude-opus-4-1": {"input": 15.0, "output": 75.0},
+
+    # Claude Opus 4
+    "claude-opus-4": {"input": 15.0, "output": 75.0},
     "claude-opus-4-20250514": {"input": 15.0, "output": 75.0},
+
+    # Claude Sonnet 4.5
+    "claude-sonnet-4.5": {"input": 3.0, "output": 15.0},
+    "claude-sonnet-4-5": {"input": 3.0, "output": 15.0},
+
+    # Claude Sonnet 4
+    "claude-sonnet-4": {"input": 3.0, "output": 15.0},
     "claude-sonnet-4-20250514": {"input": 3.0, "output": 15.0},
-    
-    # Claude 3.5 family
+
+    # Claude Sonnet 3.7 (deprecated)
+    "claude-sonnet-3.7": {"input": 3.0, "output": 15.0},
+    "claude-sonnet-3-7": {"input": 3.0, "output": 15.0},
+
+    # Claude Haiku 4.5
+    "claude-haiku-4.5": {"input": 1.0, "output": 5.0},
+    "claude-haiku-4-5": {"input": 1.0, "output": 5.0},
+
+    # Claude Haiku 3.5
+    "claude-haiku-3.5": {"input": 0.80, "output": 4.0},
+    "claude-3-5-haiku-20241022": {"input": 0.80, "output": 4.0},
+
+    # Claude 3.5 Sonnet (still widely used)
     "claude-3-5-sonnet-20241022": {"input": 3.0, "output": 15.0},
     "claude-3-5-sonnet-20240620": {"input": 3.0, "output": 15.0},
-    "claude-3-5-haiku-20241022": {"input": 0.80, "output": 4.0},
-    
-    # Claude 3 family
+
+    # Claude Opus 3 (deprecated)
+    "claude-opus-3": {"input": 15.0, "output": 75.0},
     "claude-3-opus-20240229": {"input": 15.0, "output": 75.0},
-    "claude-3-sonnet-20240229": {"input": 3.0, "output": 15.0},
+
+    # Claude Haiku 3
+    "claude-haiku-3": {"input": 0.25, "output": 1.25},
     "claude-3-haiku-20240307": {"input": 0.25, "output": 1.25},
+
+    # Claude Sonnet 3
+    "claude-3-sonnet-20240229": {"input": 3.0, "output": 15.0},
 }
 
 # calculate cost for anthropic api call

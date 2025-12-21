@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Logo } from "@/components/Logo";
+import { OrbisLogo } from "@/components/OrbisLogo";
 import { AnimatedDAG } from "@/components/AnimatedDAG";
 import { ArrowUpRight, Copy, Zap, Shield, Database } from "lucide-react";
 import { Tab, TabGroup, TabList, TabPanel, TabPanels } from "@headlessui/react";
@@ -23,8 +23,8 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-12">
             <div className="flex items-center">
-              <Logo className="w-12 h-12" />
-              <span className="tracking-tight font-semibold">$ orbis.ai</span>
+              <OrbisLogo className="w-12 h-12" />
+              <span className="tracking-tight font-semibold">orbis</span>
             </div>
             <div className="hidden md:flex items-center gap-8">
               <a
@@ -525,13 +525,11 @@ def my_agent(query: str):
           <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
             <div>
               <div className="flex items-center gap-3 mb-4">
-                <Logo className="w-10 h-10" />
-                <span className="tracking-tight">$ orbis.ai</span>
+                <OrbisLogo className="w-10 h-10" />
+                <span className="tracking-tight font-semibold">orbis</span>
               </div>
               <p className="text-sm text-black/60 leading-relaxed">
-                {`// Observability for AI agents.`}
-                <br />
-                {`// Every call traced, every dollar tracked.`}
+                LLM observability for small teams.
               </p>
             </div>
 
