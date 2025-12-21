@@ -14,7 +14,7 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
+  Legend
 } from "recharts";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -68,6 +68,10 @@ export default function CostDashboardClient({
   const [isLoading, setIsLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const hasFetchedRef = useRef(false);
+  const [tokenBreakdown, setTokenBreakdown] = useState<TokenBreakdown[]>([]);
+  const [tokensPerTrace, setTokensPerTrace] = useState<TokensPerTrace[]>([]);
+  const [savingsData, setSavingsData] = useState<SavingsOpportunities | null>(null);
+  const [activeTab, setActiveTab] = useState<"overview" | "tokens" | "savings">("overview");
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -104,15 +108,21 @@ export default function CostDashboardClient({
       try {
         const { startDate, endDate } = getDateRange(selectedPeriod);
 
-        const [trendsData, agentData, modelData] = await Promise.all([
+        const [trendsData, agentData, modelData, tokenData, traceTokens, savings] = await Promise.all([
           fetchCostTrends(selectedPeriod, token),
           fetchCostByAgent(startDate, endDate, token),
           fetchCostByModel(startDate, endDate, token),
+          fetchTokenBreakdown(selectedPeriod, token),
+          fetchTokensPerTrace(selectedPeriod, token),
+          fetchSavingsOpportunities(selectedPeriod, token),
         ]);
-
+        
         setTrends(trendsData);
         setByAgent(agentData);
         setByModel(modelData);
+        setTokenBreakdown(tokenData);
+        setTokensPerTrace(traceTokens);
+        setSavingsData(savings);
       } catch (error) {
         console.error("Failed to fetch cost data:", error);
       } finally {
@@ -287,6 +297,27 @@ export default function CostDashboardClient({
               <span>Loading...</span>
             </div>
           )}
+        </div>
+
+        {/* Tab Navigation */}
+        <div className="flex gap-2 mb-6 border-b-2 border-black">
+          {[
+            { id: "overview", label: "Overview" },
+            { id: "tokens", label: "Token Analytics" },
+            { id: "savings", label: "Savings Opportunities" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as typeof activeTab)}
+              className={`px-4 py-2 text-sm font-medium -mb-[2px] border-2 border-b-0 transition-colors ${
+                activeTab === tab.id
+                  ? "border-black bg-white"
+                  : "border-transparent hover:bg-gray-50"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
         {/* Overview Cards */}
