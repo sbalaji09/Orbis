@@ -549,6 +549,23 @@ async def get_savings_opportunities(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/cost/by-tag")
+async def get_cost_by_tag(
+    start_date: str = Query(..., description="Start date (YYYY-MM-DD)"),
+    end_date: str = Query(..., description="End date (YYYY-MM-DD)"),
+    user_id: str = Depends(get_user_id_from_token)
+):
+    try:
+        validate_user_id(user_id)
+
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: db.get_cost_by_tag(user_id, start_date, end_date)
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.exception_handler(ValidationError)
 async def validation_error_handler(request, exc: ValidationError):
     return JSONResponse(
@@ -560,3 +577,4 @@ if __name__ == "__main__":
     import uvicorn
     print("Starting Query API on http://localhost:8000")
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
