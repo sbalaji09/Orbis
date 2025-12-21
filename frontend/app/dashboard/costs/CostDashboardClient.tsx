@@ -553,6 +553,69 @@ export default function CostDashboardClient({
             </table>
           </div>
         </div>
+
+        {/* Token Breakdown Over Time */}
+        {activeTab === "tokens" && (
+          <div className="space-y-6">
+            {/* Input vs Output Tokens Chart */}
+            <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6">
+              <h2 className="text-lg font-semibold mb-4">Token Breakdown (Input vs Output)</h2>
+              <div className="h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={tokenBreakdown}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
+                    <XAxis dataKey="date" tickFormatter={formatDate} tick={{ fontSize: 12 }} />
+                    <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} tick={{ fontSize: 12 }} />
+                    <Tooltip
+                      formatter={(value) => [
+                        `${Number(value).toLocaleString()} tokens`,
+                        "",
+                      ]}
+                      labelFormatter={(label) => formatDate(String(label))}
+                      contentStyle={{ border: "2px solid black", borderRadius: 0 }}
+                    />
+                    <Legend />
+                    <Bar dataKey="input_tokens" name="Input" stackId="a" fill="#5b5fff" />
+                    <Bar dataKey="output_tokens" name="Output" stackId="a" fill="#10b981" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Tokens Per Trace Table */}
+            <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6">
+              <h2 className="text-lg font-semibold mb-4">Tokens by Trace</h2>
+              <div className="overflow-x-auto max-h-96">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-white">
+                    <tr className="border-b-2 border-black">
+                      <th className="text-left py-3 px-4 font-semibold">Trace</th>
+                      <th className="text-left py-3 px-4 font-semibold">Agent</th>
+                      <th className="text-right py-3 px-4 font-semibold">LLM Calls</th>
+                      <th className="text-right py-3 px-4 font-semibold">Input</th>
+                      <th className="text-right py-3 px-4 font-semibold">Output</th>
+                      <th className="text-right py-3 px-4 font-semibold">Total</th>
+                      <th className="text-right py-3 px-4 font-semibold">Cost</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tokensPerTrace.map((trace) => (
+                      <tr key={trace.trace_id} className="border-b border-gray-200 hover:bg-gray-50">
+                        <td className="py-3 px-4 font-mono text-xs">{trace.trace_hash_id?.slice(0, 8) || trace.trace_id.slice(0, 8)}</td>
+                        <td className="py-3 px-4">{trace.agent_name}</td>
+                        <td className="text-right py-3 px-4 font-mono">{trace.llm_spans?.length || 0}</td>
+                        <td className="text-right py-3 px-4 font-mono text-blue-600">{trace.input_tokens.toLocaleString()}</td>
+                        <td className="text-right py-3 px-4 font-mono text-green-600">{trace.output_tokens.toLocaleString()}</td>
+                        <td className="text-right py-3 px-4 font-mono font-semibold">{trace.total_tokens.toLocaleString()}</td>
+                        <td className="text-right py-3 px-4 font-mono">${trace.total_cost.toFixed(4)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
