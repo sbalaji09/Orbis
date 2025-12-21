@@ -1528,8 +1528,8 @@ class SupabaseDB:
             LEFT JOIN agents a ON t.agent_id = a.agent_id
             LEFT JOIN spans s ON s.trace_id = t.trace_id
             WHERE t.user_id = %s
-                AND t.starT_time >= %s
-            GROUP BY t.trace_id, t.trace_hash_id, a.agent_name, t.start_time, t.total_tokens, t.total_cost, t.status,
+                AND t.start_time >= %s
+            GROUP BY t.trace_id, t.trace_hash_id, a.agent_name, t.start_time, t.total_tokens, t.total_cost, t.status
             ORDER BY t.start_time DESC
             LIMIT %s
         """

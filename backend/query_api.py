@@ -525,12 +525,12 @@ async def get_token_breakdown(days: int, user_id: str = Depends(get_user_id_from
 
 @app.get("/cost/tokens-per-trace")
 async def get_tokens_per_trace(
-    days: int = Query(default=30, ge=1, le=365), 
+    days: int = Query(default=30, ge=1, le=365),
     limit: int = Query(default=50, ge=1, le=200),
     user_id: str = Depends(get_user_id_from_token)):
     try:
         result = await asyncio.get_event_loop().run_in_executor(
-            None, db.get_tokens_per_trace, user_id, limit
+            None, lambda: db.get_tokens_per_trace(user_id, days, limit)
         )
         return result
     except Exception as e:
