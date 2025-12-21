@@ -210,7 +210,7 @@ export function ProviderKeysPanel({
                         Connect {selectedLabel}
                       </DialogTitle>
                       <p className="text-xs text-black/60 font-mono mt-1">
-                        {`// Stored in Supabase (encrypted server-side)`}
+                        {`// encrypted server-side`}
                       </p>
                     </div>
                     <button
