@@ -33,6 +33,7 @@ export default function PromptComparisonView({
   loading = false,
   error = null,
 }: PromptComparisonViewProps) {
+  console.log(comparisonData);
   const [activeTab, setActiveTab] = useState<TabType>("side-by-side");
   const leftPanelRef = useRef<HTMLDivElement>(null);
   const rightPanelRef = useRef<HTMLDivElement>(null);
@@ -247,9 +248,9 @@ export default function PromptComparisonView({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <DialogPanel className="w-full max-w-7xl h-[90vh] overflow-hidden border-2 border-black bg-white shadow-[8px_8px_0_rgba(0,0,0,0.2)] flex flex-col">
+              <DialogPanel className="w-full max-w-7xl border-2 h-[90vh] overflow-auto border-black bg-white shadow-[8px_8px_0_rgba(0,0,0,0.2)] flex flex-col">
                 {/* Header */}
-                <div className="flex items-start justify-between gap-4 px-6 py-4 border-b-2 border-black bg-linear-to-r from-babyblue/5 to-transparent shrink-0">
+                <div className="flex items-start justify-between gap-4 px-6 py-4 border-b-2 border-black bg-linear-to-r from-babyblue/5 to-transparent shrink-0 overflow-auto">
                   <div className="min-w-0 flex-1">
                     <DialogTitle className="text-lg font-semibold text-foreground">
                       Prompt Comparison
@@ -336,22 +337,8 @@ export default function PromptComparisonView({
                 )}
 
                 {!loading && !error && comparisonData && (
-                  <>
-                    {/* Auto-Generated Insights Card */}
-                    <div className="px-6 py-4 border-b border-black/10 bg-background shrink-0">
-                      <VersionComparisonCard
-                        version1={{
-                          semantic_version: version1Semantic,
-                          analytics: comparisonData.prompts.version1.analytics,
-                        }}
-                        version2={{
-                          semantic_version: version2Semantic,
-                          analytics: comparisonData.prompts.version2.analytics,
-                        }}
-                      />
-                    </div>
-
-                    {/* Metrics Comparison Bar */}
+                  <div className="flex flex-col flex-1 overflow-auto">
+                    {/* Metrics Comparison Bar - Fixed */}
                     <div className="px-6 py-3 border-b border-black/10 bg-black/2 shrink-0">
                       <div className="grid grid-cols-4 gap-4">
                         {/* Traces */}
@@ -416,7 +403,7 @@ export default function PromptComparisonView({
                       </div>
                     </div>
 
-                    {/* Tabs */}
+                    {/* Tabs - Fixed */}
                     <div className="flex gap-0 border-b border-black/10 shrink-0">
                       {tabs.map((tab) => (
                         <button
@@ -446,8 +433,8 @@ export default function PromptComparisonView({
                       )}
                     </div>
 
-                    {/* Tab Content */}
-                    <div className="flex-1 overflow-hidden">
+                    {/* Tab Content - Scrollable */}
+                    <div className="flex-1 overflow-auto min-h-0">
                       {/* Side by Side */}
                       {activeTab === "side-by-side" && (
                         <div className="h-full grid grid-cols-2 divide-x divide-black/10">
@@ -598,7 +585,7 @@ export default function PromptComparisonView({
 
                       {/* Sample Outputs */}
                       {activeTab === "outputs" && (
-                        <div className="h-full grid grid-cols-2 divide-x divide-black/10 overflow-hidden">
+                        <div className="h-full grid grid-cols-2 divide-x divide-black/10">
                           <div className="flex flex-col h-full">
                             <div className="px-4 py-2 bg-black/2 border-b border-black/10 shrink-0">
                               <span className="text-xs font-semibold text-black/60">
@@ -710,7 +697,7 @@ export default function PromptComparisonView({
                         </div>
                       )}
                     </div>
-                  </>
+                  </div>
                 )}
               </DialogPanel>
             </TransitionChild>
