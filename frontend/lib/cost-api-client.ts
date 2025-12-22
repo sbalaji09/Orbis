@@ -98,6 +98,60 @@ export interface CostByTag {
   output_tokens: number;
 }
 
+export interface ModelPromptStats {
+  model: string;
+  call_count: number;
+  avg_input_tokens: number;
+  max_input_tokens: number;
+  min_input_tokens: number;
+  median_input_tokens: number;
+  p90_input_tokens: number;
+  total_input_tokens: number;
+  total_cost: number;
+}
+
+export interface LongPrompt {
+  trace_hash_id: string;
+  agent_name: string;
+  span_name: string;
+  model: string;
+  input_tokens: number;
+  output_tokens: number;
+  cost: number;
+  preview: string;
+}
+
+export interface PromptVersionStats {
+  version: string;
+  usage_count: number;
+  avg_input_tokens: number;
+  avg_output_tokens: number;
+  avg_cost: number;
+}
+
+export interface SystemPromptPattern {
+  model: string;
+  preview: string;
+  occurrence_count: number;
+  avg_tokens: number;
+  total_cost: number;
+}
+
+export interface PromptAnalysisSummary {
+  total_input_tokens: number;
+  avg_tokens_per_call: number;
+  models_analyzed: number;
+  prompts_with_versions: number;
+}
+
+export interface PromptLengthAnalysis {
+  model_stats: ModelPromptStats[];
+  long_prompts: LongPrompt[];
+  prompt_versions: Record<string, PromptVersionStats[]>;
+  system_prompts: SystemPromptPattern[];
+  summary: PromptAnalysisSummary;
+}
+
 function getHeaders(token: string | null): HeadersInit {
   const headers: HeadersInit = {
     "Content-Type": "application/json",
