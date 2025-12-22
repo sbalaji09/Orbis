@@ -1,7 +1,22 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import dynamic from "next/dynamic";
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+} from "recharts";
 import { useAuth } from "@/hooks/useAuth";
 import {
   fetchCostTrends,
@@ -248,6 +263,33 @@ export default function CostDashboardClient({
     const date = new Date(dateStr);
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
+
+  // Calculate summary metrics
+  const metrics = useMemo(() => {
+    const totalCost = trends.reduce((sum, d) => sum + d.total_cost, 0);
+    const totalCalls = trends.reduce((sum, d) => sum + d.call_count, 0);
+    const avgCostPerDay = trends.length > 0 ? totalCost / trends.length : 0;
+
+    const midpoint = Math.floor(trends.length / 2);
+    const recentDays = trends.slice(midpoint);
+    const previousDays = trends.slice(0, midpoint);
+    const recentTotal = recentDays.reduce((sum, d) => sum + d.total_cost, 0);
+    const previousTotal = previousDays.reduce((sum, d) => sum + d.total_cost, 0);
+    const trendPct =
+      previousTotal > 0
+        ? ((recentTotal - previousTotal) / previousTotal) * 100
+        : 0;
+
+    const comparisonDays = Math.floor(selectedPeriod / 2);
+
+    return {
+      totalCost,
+      totalCalls,
+      avgCostPerDay,
+      trendPct,
+      comparisonDays,
+    };
+  }, [trends, selectedPeriod]);
 
   // Show skeleton while auth is loading to prevent layout shift
   if (authLoading) {
