@@ -1831,7 +1831,178 @@ class SupabaseDB:
             return [row[0] for row in rows]
         finally:
             self.return_connection(conn)
-        
+    
+    def get_prompt_length_analysis(self, user_id: str, days: int) -> Dict[str, Any]:
+        since = datetime.now(timezone.utc) - timedelta(days=days)
+
+        # get prompt token distribution by model
+        model_prompt_query = """
+            SELECT 
+                s.llm_model,
+                COUNT(*) as call_count,
+                AVG(s.prompt_tokens) as avg_input_tokens,
+                MAX(s.prompt_tokens) as max_input_tokens,
+                MIN(s.prompt_tokens) as min_input_tokens,
+                PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY s.prompt_tokens) as median_input_tokens,
+                PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY s.prompt_tokens) as p90_input_tokens,
+                SUM(s.prompt_tokens) as total_input_tokens,
+                SUM(s.cost) as total_cost
+            FROM traces t
+            JOIN spans s ON s.trace_id = t.trace_id
+            WHERE t.user_id = %s
+            AND t.start_time >= %s
+            AND s.llm_model IS NOT NULL
+            AND s.prompt_tokens > 0
+            GROUP BY s.llm_model
+            ORDER BY total_input_tokens DESC
+        """
+
+        # find spans with unusually long prompts (top 10 by input tokens)
+        long_prompts_query = """
+            SELECT 
+                t.trace_hash_id,
+                a.agent_name,
+                s.name as span_name,
+                s.llm_model,
+                s.prompt_tokens as input_tokens,
+                s.completion_tokens as output_tokens,
+                s.cost,
+                s.input_preview
+            FROM traces t
+            LEFT JOIN agents a ON t.agent_id = a.agent_id
+            JOIN spans s ON s.trace_id = t.trace_id
+            WHERE t.user_id = %s
+            AND t.start_time >= %s
+            AND s.prompt_tokens > 0
+            ORDER BY s.prompt_tokens DESC
+            LIMIT 15
+        """
+
+        # analyze prompt versions by comparing token usage across versions
+        prompt_version_query = """
+            SELECT 
+                s.prompt_name,
+                s.prompt_version,
+                COUNT(*) as usage_count,
+                AVG(s.prompt_tokens) as avg_input_tokens,
+                AVG(s.completion_tokens) as avg_output_tokens,
+                AVG(s.cost) as avg_cost
+            FROM traces t
+            JOIN spans s ON s.trace_id = t.trace_id
+            WHERE t.user_id = %s
+            AND t.start_time >= %s
+            AND s.prompt_name IS NOT NULL
+            AND s.prompt_version IS NOT NULL
+            GROUP BY s.prompt_name, s.prompt_version
+            ORDER BY s.prompt_name, s.prompt_version DESC
+        """
+
+        # identify potential system prompt bloat (repeated high-token prefixes)
+        system_prompt_query = """
+            SELECT 
+                s.llm_model,
+                s.input_preview,
+                COUNT(*) as occurrence_count,
+                AVG(s.prompt_tokens) as avg_tokens,
+                SUM(s.cost) as total_cost
+            FROM traces t
+            JOIN spans s ON s.trace_id = t.trace_id
+            WHERE t.user_id = %s
+            AND t.start_time >= %s
+            AND s.input_preview IS NOT NULL
+            AND s.prompt_tokens > 500
+            GROUP BY s.llm_model, s.input_preview
+            HAVING COUNT(*) >= 3
+            ORDER BY avg_tokens DESC
+            LIMIT 10
+        """
+
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                # model prompt stats
+                cur.execute(model_prompt_query, (user_id, since))
+                model_rows = cur.fetchall()
+                
+                # long prompts
+                cur.execute(long_prompts_query, (user_id, since))
+                long_prompt_rows = cur.fetchall()
+                
+                # prompt versions
+                cur.execute(prompt_version_query, (user_id, since))
+                version_rows = cur.fetchall()
+                
+                #system prompt patterns
+                cur.execute(system_prompt_query, (user_id, since))
+                system_rows = cur.fetchall()
+            
+            # process model stats
+            model_stats = [{
+                "model": row[0],
+                "call_count": int(row[1]),
+                "avg_input_tokens": float(row[2] or 0),
+                "max_input_tokens": int(row[3] or 0),
+                "min_input_tokens": int(row[4] or 0),
+                "median_input_tokens": float(row[5] or 0),
+                "p90_input_tokens": float(row[6] or 0),
+                "total_input_tokens": int(row[7] or 0),
+                "total_cost": float(row[8] or 0)
+            } for row in model_rows]
+            
+            # process long prompts
+            long_prompts = [{
+                "trace_hash_id": row[0] or "",
+                "agent_name": row[1] or "Unknown",
+                "span_name": row[2] or "",
+                "model": row[3] or "",
+                "input_tokens": int(row[4] or 0),
+                "output_tokens": int(row[5] or 0),
+                "cost": float(row[6] or 0),
+                "preview": (row[7] or "")[:100]
+            } for row in long_prompt_rows]
+            
+            # process prompt versions and group by prompt name
+            prompt_versions: Dict[str, List] = {}
+            for row in version_rows:
+                name = row[0]
+                if name not in prompt_versions:
+                    prompt_versions[name] = []
+                prompt_versions[name].append({
+                    "version": row[1],
+                    "usage_count": int(row[2]),
+                    "avg_input_tokens": float(row[3] or 0),
+                    "avg_output_tokens": float(row[4] or 0),
+                    "avg_cost": float(row[5] or 0)
+                })
+            
+            # process system prompt patterns
+            system_prompts = [{
+                "model": row[0],
+                "preview": (row[1] or "")[:100],
+                "occurrence_count": int(row[2]),
+                "avg_tokens": float(row[3] or 0),
+                "total_cost": float(row[4] or 0)
+            } for row in system_rows]
+            
+            # calculate summary stats
+            total_input_tokens = sum(m["total_input_tokens"] for m in model_stats)
+            avg_tokens_overall = sum(m["avg_input_tokens"] * m["call_count"] for m in model_stats) / max(sum(m["call_count"] for m in model_stats), 1)
+            
+            return {
+                "model_stats": model_stats,
+                "long_prompts": long_prompts,
+                "prompt_versions": prompt_versions,
+                "system_prompts": system_prompts,
+                "summary": {
+                    "total_input_tokens": total_input_tokens,
+                    "avg_tokens_per_call": avg_tokens_overall,
+                    "models_analyzed": len(model_stats),
+                    "prompts_with_versions": len(prompt_versions)
+                }
+            }
+        finally:
+            self.return_connection(conn)
+            
     # closes all the connections in the pool
     def close(self):
         self.pool.closeall()
