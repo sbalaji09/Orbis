@@ -21,27 +21,11 @@ except ImportError as e:
     sys.exit(1)
 
 # Configure Orbis
-# Prefer environment variables so this test doesn't accidentally write traces under a different user/agent.
-# - OBSERVABILITY_API_KEY: your agent API key (X-API-Key)
-# - OBSERVABILITY_PROJECT_ID: your agent_id
-# - OBSERVABILITY_USER_ID: optional (backend derives from API key/JWT)
-api_url = os.getenv("OBSERVABILITY_API_URL", "http://localhost:8080")
-api_key = os.getenv("OBSERVABILITY_API_KEY") or "VGVzdCBBZ2VudCAz7SAX20F5LNf7Ap07jyd8HQ=="
-project_id = os.getenv("OBSERVABILITY_PROJECT_ID") or "7f3ceca9-366a-46ef-a2f4-097829b1a7a4"
-user_id = os.getenv("OBSERVABILITY_USER_ID") or "fbd31533-fe77-427f-9d2d-a1c4c69e9a6d"
-
-if not os.getenv("OBSERVABILITY_API_KEY") or not os.getenv("OBSERVABILITY_PROJECT_ID"):
-    print(
-        "⚠ Using fallback OBSERVABILITY_* values baked into this script. "
-        "If your dashboard user/agents don't match these, traces won't appear. "
-        "Set OBSERVABILITY_API_KEY and OBSERVABILITY_PROJECT_ID to your own agent."
-    )
-
 configure(
-    api_key=api_key,
-    project_id=project_id,
-    user_id=user_id,
-    api_url=api_url,
+    api_key="VGVzdCBBZ2VudCAz7SAX20F5LNf7Ap07jyd8HQ==",
+    project_id="7f3ceca9-366a-46ef-a2f4-097829b1a7a4",
+    user_id="fbd31533-fe77-427f-9d2d-a1c4c69e9a6d",
+    api_url="http://localhost:8080"
 )
 
 # Enable all instrumentation
