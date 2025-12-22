@@ -592,7 +592,70 @@ async def get_prompt_length_analysis(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/cost/anomalies?hours=24")
+async def get_anomalies_last_day(user_id: str = Depends(get_user_id_from_token)):
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: db.get_all_anomalies(user_id, 24)
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/cost/anomalies/history?days=7&include_acknowledged=false")
+async def get_anomalies_last_week_persisted(user_id: str = Depends(get_user_id_from_token)):
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: db.get_anomaly_history(user_id)
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/cost/settings")
+async def get_alert_settings(user_id: str = Depends(get_user_id_from_token)):
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: db.get_user_alert_settings(user_id)
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@app.post("/cost/settings")
+async def update_alert_settings(
+    daily_cost_threshold: float,
+    daily_spike_multiplier: float, 
+    user_id: str = Depends(get_user_id_from_token)):
+
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: db.update_user_alert_settings(user_id, {daily_cost_threshold, daily_spike_multiplier})
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/cost/anomalies/{anomaly_id}/acknowledge")
+async def acknowledge_anomaly(anomaly_id: str, user_id: str = Depends(get_user_id_from_token)):
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: db.acknowledge_anomaly(user_id, anomaly_id)
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/cost/anomalies/acknowledge-all")
+async def acknowledge_all_anomalies(user_id: str = Depends(get_user_id_from_token)):
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: db.acknowledge_all_anomalies(user_id)
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
 @app.exception_handler(ValidationError)
 async def validation_error_handler(request, exc: ValidationError):
     return JSONResponse(
