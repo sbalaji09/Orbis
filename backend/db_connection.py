@@ -59,13 +59,14 @@ class SupabaseDB:
         try:
             with conn.cursor() as cur:
                 # Build dynamic SQL based on whether agent_id is provided
+                tags = trace_data.get('tags', [])
                 if trace_data.get('agent_id') is not None:
                     sql = """
                         INSERT INTO traces (
                             trace_id, trace_hash_id, user_id, agent_id, start_time, status,
-                            total_cost, total_tokens
+                            total_cost, total_tokens, tags
                         ) VALUES (
-                            %s, %s, %s, %s, %s, %s, %s, %s
+                            %s, %s, %s, %s, %s, %s, %s, %s, %s
                         )
                         ON CONFLICT (trace_id) DO NOTHING
                         RETURNING trace_id
@@ -78,15 +79,16 @@ class SupabaseDB:
                         trace_data.get('start_time'),
                         trace_data.get('status', 'running'),
                         trace_data.get('total_cost', 0),
-                        trace_data.get('total_tokens', 0)
+                        trace_data.get('total_tokens', 0),
+                        tags
                     ))
                 else:
                     sql = """
                         INSERT INTO traces (
                             trace_id, trace_hash_id, user_id, start_time, status,
-                            total_cost, total_tokens
+                            total_cost, total_tokens, tags
                         ) VALUES (
-                            %s, %s, %s, %s, %s, %s, %s
+                            %s, %s, %s, %s, %s, %s, %s, %s
                         )
                         ON CONFLICT (trace_id) DO NOTHING
                         RETURNING trace_id
@@ -98,7 +100,8 @@ class SupabaseDB:
                         trace_data.get('start_time'),
                         trace_data.get('status', 'running'),
                         trace_data.get('total_cost', 0),
-                        trace_data.get('total_tokens', 0)
+                        trace_data.get('total_tokens', 0),
+                        tags
                     ))
                 result = cur.fetchone()
                 conn.commit()
@@ -1666,6 +1669,63 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
 
+    def get_cost_by_tag(self, user_id: str, start_date: str, end_date: str) -> List[Dict[str, Any]]:
+        query = """
+            SELECT 
+                unnest(t.tags) as tag,
+                COUNT(DISTINCT t.trace_id) as trace_count,
+                COUNT(s.span_id) as call_count,
+                COALESCE(SUM(s.cost), 0) as total_cost,
+                COALESCE(SUM(s.prompt_tokens), 0) as input_tokens,
+                COALESCE(SUM(s.completion_tokens), 0) as output_tokens
+            FROM traces t
+            LEFT JOIN spans s ON s.trace_id = t.trace_id
+            WHERE t.user_id = %s
+            AND t.start_time >= %s
+            AND t.start_time <= %s
+            AND t.tags IS NOT NULL
+            AND array_length(t.tags, 1) > 0
+            GROUP BY tag
+            ORDER BY total_cost DESC
+        """
+
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(query, (user_id, start_date, end_date))
+                rows = cur.fetchall()
+            
+            return [{
+                "tag": row[0],
+                "trace_count": int(row[1]),
+                "call_count": int[row[2]],
+                "total_cost": float(row[3] or 0),
+                "input_tokens": int(row[4] or 0),
+                "output_tokens": int(row[5] or 0)
+            } for row in rows]
+        finally:
+            self.return_connection(conn)
+
+    def get_top_tags(self, user_id: str, limit: int = 20) -> List[str]:
+        query = """
+            SELECT unnest(tags) as tag, COUNT(*) as usage_count
+            FROM traces
+            WHERE user_id = %s
+            AND tags IS NOT NULL
+            GROUP BY tag
+            ORDER BY usage_count DESC
+            LIMIT %s
+        """
+
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(query, (user_id, limit))
+                rows = cur.fetchall()
+            return [row[0] for row in rows]
+        finally:
+            self.return_connection(conn)
+        
     # closes all the connections in the pool
     def close(self):
         self.pool.closeall()

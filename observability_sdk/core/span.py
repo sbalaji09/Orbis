@@ -96,6 +96,8 @@ class Span:
     # General metadata for any span type (flexible JSONB storage)
     tool_metadata: Optional[Dict[str, Any]] = None
 
+    tags: Optional[List[str]] = None
+
 
     # mark the span as complete
     def complete(self, status: str = "success") -> None:
@@ -156,7 +158,7 @@ class Span:
             "tool_input": self.tool_input,
             "tool_output": self.tool_output,
             "tool_metadata": self.tool_metadata,
-
+            "tags": self.tags,
         }
 
     def __str__(self):

@@ -89,6 +89,15 @@ export interface SavingsOpportunities {
   total_potential_savings: number;
 }
 
+export interface CostByTag {
+  tag: string;
+  trace_count: number;
+  call_count: number;
+  total_cost: number;
+  input_tokens: number;
+  output_tokens: number;
+}
+
 function getHeaders(token: string | null): HeadersInit {
   const headers: HeadersInit = {
     "Content-Type": "application/json",
@@ -263,5 +272,56 @@ export async function fetchSavingsOpportunities(
   } catch (error) {
     console.error("Error fetching savings opportunities:", error);
     return null;
+  }
+}
+
+// fetches the cost of each call based on the tag
+export async function fetchCostByTag(
+  startDate: string,
+  endDate: string,
+  token: string | null
+): Promise<CostByTag[]> {
+  try {
+    const url = new URL(`${API_BASE_URL}/cost/by-tag`);
+    url.searchParams.set("start_date", startDate);
+    url.searchParams.set("end_date", endDate);
+
+    const response = await fetch(url.toString(), {
+      headers: getHeaders(token),
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      console.error(`Failed to fetch cost by tag: ${response.statusText}`);
+      return [];
+    }
+
+    const data = await response.json();
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error("Error fetching cost by tag:", error);
+    return [];
+  }
+}
+
+// fetches the user tags
+export async function fetchUserTags(token: string | null): Promise<string[]> {
+  try {
+    const url = new URL(`${API_BASE_URL}/cost/tags`);
+
+    const response = await fetch(url.toString(), {
+      headers: getHeaders(token),
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      return [];
+    }
+
+    const data = await response.json();
+    return data.tags || [];
+  } catch (error) {
+    console.error("Error fetching user tags:", error);
+    return [];
   }
 }

@@ -24,12 +24,14 @@ import {
   fetchTokenBreakdown,
   fetchTokensPerTrace,
   fetchSavingsOpportunities,
+  fetchCostByTag,
   type CostTrend,
   type CostByAgent,
   type CostByModel,
   type TokenBreakdown,
   type TokensPerTrace,
   type SavingsOpportunities,
+  type CostByTag,
 } from "@/lib/cost-api-client";
 
 
@@ -71,7 +73,8 @@ export default function CostDashboardClient({
   const [tokenBreakdown, setTokenBreakdown] = useState<TokenBreakdown[]>([]);
   const [tokensPerTrace, setTokensPerTrace] = useState<TokensPerTrace[]>([]);
   const [savingsData, setSavingsData] = useState<SavingsOpportunities | null>(null);
-  const [activeTab, setActiveTab] = useState<"overview" | "tokens" | "savings">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "features" | "tokens" | "savings">("overview");
+  const [costByTag, setCostByTag] = useState<CostByTag[]>([]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -100,21 +103,24 @@ export default function CostDashboardClient({
 
     const fetchInitialTokenData = async () => {
       try {
-        const [tokenData, traceTokens, savings] = await Promise.all([
+        const { startDate, endDate } = getDateRange(30);
+        const [tokenData, traceTokens, savings, tagData] = await Promise.all([
           fetchTokenBreakdown(30, token),
           fetchTokensPerTrace(30, token),
           fetchSavingsOpportunities(30, token),
+          fetchCostByTag(startDate, endDate, token),
         ]);
         setTokenBreakdown(tokenData);
         setTokensPerTrace(traceTokens);
         setSavingsData(savings);
+        setCostByTag(tagData);
       } catch (error) {
         console.error("Failed to fetch initial token data:", error);
       }
     };
 
     fetchInitialTokenData();
-  }, [token]);
+  }, [token, getDateRange]);
 
   // Fetch data when period changes
   useEffect(() => {
@@ -130,13 +136,14 @@ export default function CostDashboardClient({
       try {
         const { startDate, endDate } = getDateRange(selectedPeriod);
 
-        const [trendsData, agentData, modelData, tokenData, traceTokens, savings] = await Promise.all([
+        const [trendsData, agentData, modelData, tokenData, traceTokens, savings, tagData] = await Promise.all([
           fetchCostTrends(selectedPeriod, token),
           fetchCostByAgent(startDate, endDate, token),
           fetchCostByModel(startDate, endDate, token),
           fetchTokenBreakdown(selectedPeriod, token),
           fetchTokensPerTrace(selectedPeriod, token),
           fetchSavingsOpportunities(selectedPeriod, token),
+          fetchCostByTag(startDate, endDate, token),
         ]);
 
         setTrends(trendsData);
@@ -145,6 +152,7 @@ export default function CostDashboardClient({
         setTokenBreakdown(tokenData);
         setTokensPerTrace(traceTokens);
         setSavingsData(savings);
+        setCostByTag(tagData);
       } catch (error) {
         console.error("Failed to fetch cost data:", error);
       } finally {
@@ -325,6 +333,7 @@ export default function CostDashboardClient({
         <div className="flex gap-2 mb-6 border-b-2 border-black">
           {[
             { id: "overview", label: "Overview" },
+            { id: "features", label: "Features"},
             { id: "tokens", label: "Token Analytics" },
             { id: "savings", label: "Savings Opportunities" },
           ].map((tab) => (
@@ -578,7 +587,127 @@ export default function CostDashboardClient({
             </div>
           </div>          
           </>
-        )}           
+        )}  
+
+        {activeTab === "features" && (
+          <div className="space-y-6">
+            {/* Features Summary */}
+            <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-lg font-semibold">Cost by Feature / Endpoint</h2>
+                  <p className="text-sm text-muted mt-1">
+                    Track costs by tagging your traces with features like &quot;chat&quot;, &quot;summarization&quot;, or endpoints like &quot;/api/generate&quot;
+                  </p>
+                </div>
+              </div>
+              
+              {costByTag.length > 0 ? (
+                <>
+                  {/* Bar Chart */}
+                  <div className="h-64 mb-6">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={costByTag.slice(0, 10)} layout="vertical" margin={{ top: 5, right: 30, left: 100, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
+                        <XAxis
+                          type="number"
+                          tickFormatter={(v) => `$${v.toFixed(2)}`}
+                          tick={{ fontSize: 12 }}
+                          stroke="#666"
+                        />
+                        <YAxis
+                          type="category"
+                          dataKey="tag"
+                          tick={{ fontSize: 12 }}
+                          stroke="#666"
+                          width={90}
+                        />
+                        <Tooltip
+                          formatter={(value) => [formatCost(Number(value)), "Cost"]}
+                          contentStyle={{ border: "2px solid black", borderRadius: 0 }}
+                        />
+                        <Bar dataKey="total_cost" fill="#5b5fff" radius={[0, 4, 4, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Detailed Table */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b-2 border-black">
+                          <th className="text-left py-3 px-4 font-semibold">Tag / Feature</th>
+                          <th className="text-right py-3 px-4 font-semibold">Traces</th>
+                          <th className="text-right py-3 px-4 font-semibold">LLM Calls</th>
+                          <th className="text-right py-3 px-4 font-semibold">Input Tokens</th>
+                          <th className="text-right py-3 px-4 font-semibold">Output Tokens</th>
+                          <th className="text-right py-3 px-4 font-semibold">Total Cost</th>
+                          <th className="text-right py-3 px-4 font-semibold">% of Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(() => {
+                          const totalTagCost = costByTag.reduce((sum, t) => sum + t.total_cost, 0);
+                          return costByTag.map((tag, i) => {
+                            const pct = totalTagCost > 0 ? (tag.total_cost / totalTagCost) * 100 : 0;
+                            return (
+                              <tr key={tag.tag} className="border-b border-gray-200 hover:bg-gray-50">
+                                <td className="py-3 px-4">
+                                  <div className="flex items-center gap-2">
+                                    <div
+                                      className="w-3 h-3 rounded-sm"
+                                      style={{ backgroundColor: COLORS[i % COLORS.length] }}
+                                    />
+                                    <span className="font-mono text-sm">{tag.tag}</span>
+                                  </div>
+                                </td>
+                                <td className="text-right py-3 px-4 font-mono">{tag.trace_count.toLocaleString()}</td>
+                                <td className="text-right py-3 px-4 font-mono">{tag.call_count.toLocaleString()}</td>
+                                <td className="text-right py-3 px-4 font-mono text-blue-600">{tag.input_tokens.toLocaleString()}</td>
+                                <td className="text-right py-3 px-4 font-mono text-green-600">{tag.output_tokens.toLocaleString()}</td>
+                                <td className="text-right py-3 px-4 font-mono font-semibold">{formatCost(tag.total_cost)}</td>
+                                <td className="text-right py-3 px-4">
+                                  <div className="flex items-center justify-end gap-2">
+                                    <div className="w-16 bg-gray-200 h-2 rounded-full overflow-hidden">
+                                      <div
+                                        className="h-full rounded-full"
+                                        style={{
+                                          width: `${pct}%`,
+                                          backgroundColor: COLORS[i % COLORS.length]
+                                        }}
+                                      />
+                                    </div>
+                                    <span className="font-mono w-12 text-right">{pct.toFixed(1)}%</span>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          });
+                        })()}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-12 text-muted">
+                  <svg className="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                  </svg>
+                  <p className="font-medium mb-2">No tagged traces found</p>
+                  <p className="text-sm max-w-md mx-auto">
+                    Add tags to your traces to track costs by feature. In your SDK, set tags when creating a trace:
+                  </p>
+                  <pre className="mt-4 bg-gray-100 border-2 border-black p-4 text-left text-xs font-mono max-w-lg mx-auto overflow-x-auto">
+        {`orbis.start_trace(
+            name="my_trace",
+            tags=["feature:chat", "env:prod"]
+        )`}
+                  </pre>
+                </div>
+              )}
+            </div>
+          </div>
+        )}         
         {/* Token Breakdown Over Time */}
         {activeTab === "tokens" && (
           <div className="space-y-6">
@@ -644,22 +773,136 @@ export default function CostDashboardClient({
 
         {activeTab === "savings" && savingsData && (
           <div className="space-y-6">
-            {/* Potential Savings Summary Card */}
-            <div className="bg-green-50 border-2 border-green-600 p-6">
-              <div className="flex items-center gap-3">
-                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <div>
-                  <h2 className="text-lg font-semibold text-green-800">Potential Savings</h2>
-                  <p className="text-2xl font-bold text-green-600">${savingsData.total_potential_savings.toFixed(2)}</p>
-                </div>
-              </div>
-            </div>
+            {/* Personalized Recommendations Based on User Data */}
+            {(() => {
+              // Calculate personalized insights from user data
+              const expensiveModels = savingsData.model_analysis.filter(m =>
+                (m.model.includes('gpt-4') && !m.model.includes('mini')) ||
+                m.model.includes('claude-3-5-sonnet') ||
+                m.model.includes('claude-3-opus')
+              );
+              const expensiveModelCost = expensiveModels.reduce((sum, m) => sum + m.total_cost, 0);
+              const expensiveModelCalls = expensiveModels.reduce((sum, m) => sum + m.call_count, 0);
+              const potentialModelSavings = expensiveModelCost * 0.9; // ~90% savings switching to mini
+
+              const verboseCost = savingsData.verbose_traces.reduce((sum, t) => sum + t.total_cost, 0);
+              const avgVerboseRatio = savingsData.verbose_traces.length > 0
+                ? savingsData.verbose_traces.reduce((sum, t) => sum + t.output_input_ratio, 0) / savingsData.verbose_traces.length
+                : 0;
+
+              const cacheSavings = savingsData.total_potential_savings;
+              const totalRepetitions = savingsData.repeated_prompts.reduce((sum, p) => sum + p.repetition_count, 0);
+
+              const totalPotentialSavings = potentialModelSavings + cacheSavings + (verboseCost * 0.3);
+
+              const recommendations = [];
+
+              // Only show recommendations that apply to this user
+              if (expensiveModelCalls > 0) {
+                recommendations.push({
+                  priority: expensiveModelCost,
+                  title: `Switch ${expensiveModelCalls.toLocaleString()} expensive model calls`,
+                  description: `You spent $${expensiveModelCost.toFixed(2)} on ${expensiveModels.map(m => m.model).join(', ')}. Using GPT-4o-mini or Claude Haiku for simple tasks could save ~$${potentialModelSavings.toFixed(2)}.`,
+                  savings: potentialModelSavings,
+                  color: 'green'
+                });
+              }
+
+              if (savingsData.repeated_prompts.length > 0) {
+                recommendations.push({
+                  priority: cacheSavings,
+                  title: `Cache ${totalRepetitions} repeated prompts`,
+                  description: `You're sending the same prompts multiple times. Enable prompt caching to save $${cacheSavings.toFixed(2)}.`,
+                  savings: cacheSavings,
+                  color: 'blue'
+                });
+              }
+
+              if (savingsData.verbose_traces.length > 0 && avgVerboseRatio > 2) {
+                const verboseSavings = verboseCost * 0.3;
+                recommendations.push({
+                  priority: verboseSavings,
+                  title: `Reduce verbose outputs (${avgVerboseRatio.toFixed(1)}x avg ratio)`,
+                  description: `${savingsData.verbose_traces.length} traces have outputs ${avgVerboseRatio.toFixed(1)}x longer than inputs. Add "Be concise" to save ~$${verboseSavings.toFixed(2)}.`,
+                  savings: verboseSavings,
+                  color: 'amber'
+                });
+              }
+
+              // Sort by potential savings
+              recommendations.sort((a, b) => b.priority - a.priority);
+
+              return (
+                <>
+                  {/* Total Savings Header */}
+                  <div className="bg-green-50 border-2 border-green-600 p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div>
+                          <h2 className="text-lg font-semibold text-green-800">You Could Save Up To</h2>
+                          <p className="text-2xl font-bold text-green-600">${totalPotentialSavings.toFixed(2)}</p>
+                        </div>
+                      </div>
+                      <div className="text-right text-sm text-green-700">
+                        <p>Based on your actual usage over the last {selectedPeriod} days</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Personalized Recommendations */}
+                  {recommendations.length > 0 ? (
+                    <div className="space-y-3">
+                      <h3 className="font-semibold text-lg">Your Top Opportunities</h3>
+                      {recommendations.map((rec, i) => (
+                        <div key={i} className={`border-2 p-4 ${
+                          rec.color === 'green' ? 'border-green-500 bg-green-50' :
+                          rec.color === 'blue' ? 'border-blue-500 bg-blue-50' :
+                          'border-amber-500 bg-amber-50'
+                        }`}>
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className={`text-xs font-bold px-2 py-0.5 rounded ${
+                                  rec.color === 'green' ? 'bg-green-600 text-white' :
+                                  rec.color === 'blue' ? 'bg-blue-600 text-white' :
+                                  'bg-amber-600 text-white'
+                                }`}>
+                                  #{i + 1}
+                                </span>
+                                <h4 className="font-semibold">{rec.title}</h4>
+                              </div>
+                              <p className="text-sm mt-1 text-gray-700">{rec.description}</p>
+                            </div>
+                            <div className="text-right ml-4">
+                              <p className="text-xs text-gray-500">Potential savings</p>
+                              <p className={`text-lg font-bold ${
+                                rec.color === 'green' ? 'text-green-600' :
+                                rec.color === 'blue' ? 'text-blue-600' :
+                                'text-amber-600'
+                              }`}>
+                                ${rec.savings.toFixed(2)}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="bg-gray-50 border-2 border-gray-300 p-6 text-center">
+                      <p className="text-gray-600">No specific optimization opportunities detected. Your usage looks efficient!</p>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
 
             {/* Model Cost Analysis */}
+            {savingsData.model_analysis.length > 0 && (
             <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6">
-              <h2 className="text-lg font-semibold mb-4">Cost by Model (Consider Cheaper Alternatives)</h2>
+              <h2 className="text-lg font-semibold mb-4">Model Usage Breakdown</h2>
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b-2 border-black">
@@ -667,7 +910,7 @@ export default function CostDashboardClient({
                     <th className="text-right py-3 px-4 font-semibold">Calls</th>
                     <th className="text-right py-3 px-4 font-semibold">Total Cost</th>
                     <th className="text-right py-3 px-4 font-semibold">Avg Tokens</th>
-                    <th className="text-right py-3 px-4 font-semibold">Avg Cost/Call</th>
+                    <th className="text-right py-3 px-4 font-semibold">Cost/Call</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -683,36 +926,39 @@ export default function CostDashboardClient({
                 </tbody>
               </table>
             </div>
+            )}
 
-            {/* Verbose Traces */}
-            <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6">
-              <h2 className="text-lg font-semibold mb-2">Verbose Responses (High Output/Input Ratio)</h2>
-              <p className="text-sm text-muted mb-4">Traces where output tokens significantly exceed input - consider prompting for concise responses.</p>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b-2 border-black">
-                    <th className="text-left py-3 px-4 font-semibold">Trace</th>
-                    <th className="text-left py-3 px-4 font-semibold">Agent</th>
-                    <th className="text-right py-3 px-4 font-semibold">Input</th>
-                    <th className="text-right py-3 px-4 font-semibold">Output</th>
-                    <th className="text-right py-3 px-4 font-semibold">Ratio</th>
-                    <th className="text-right py-3 px-4 font-semibold">Cost</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {savingsData.verbose_traces.slice(0, 5).map((t) => (
-                    <tr key={t.trace_hash_id} className="border-b border-gray-200">
-                      <td className="py-3 px-4 font-mono text-xs">{t.trace_hash_id?.slice(0, 8)}</td>
-                      <td className="py-3 px-4">{t.agent_name}</td>
-                      <td className="text-right py-3 px-4 font-mono">{t.input_tokens.toLocaleString()}</td>
-                      <td className="text-right py-3 px-4 font-mono">{t.output_tokens.toLocaleString()}</td>
-                      <td className="text-right py-3 px-4 font-mono text-orange-600">{t.output_input_ratio}x</td>
-                      <td className="text-right py-3 px-4 font-mono">${t.total_cost.toFixed(4)}</td>
+            {/* Verbose Traces - Only show if there are verbose traces */}
+            {savingsData.verbose_traces.length > 0 && (
+              <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6">
+                <h2 className="text-lg font-semibold mb-2">Verbose Responses Detected</h2>
+                <p className="text-sm text-muted mb-4">These {savingsData.verbose_traces.length} traces have unusually high output/input ratios.</p>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b-2 border-black">
+                      <th className="text-left py-3 px-4 font-semibold">Trace</th>
+                      <th className="text-left py-3 px-4 font-semibold">Agent</th>
+                      <th className="text-right py-3 px-4 font-semibold">Input</th>
+                      <th className="text-right py-3 px-4 font-semibold">Output</th>
+                      <th className="text-right py-3 px-4 font-semibold">Ratio</th>
+                      <th className="text-right py-3 px-4 font-semibold">Cost</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {savingsData.verbose_traces.slice(0, 5).map((t) => (
+                      <tr key={t.trace_hash_id} className="border-b border-gray-200">
+                        <td className="py-3 px-4 font-mono text-xs">{t.trace_hash_id?.slice(0, 8)}</td>
+                        <td className="py-3 px-4">{t.agent_name}</td>
+                        <td className="text-right py-3 px-4 font-mono">{t.input_tokens.toLocaleString()}</td>
+                        <td className="text-right py-3 px-4 font-mono">{t.output_tokens.toLocaleString()}</td>
+                        <td className="text-right py-3 px-4 font-mono text-orange-600">{t.output_input_ratio}x</td>
+                        <td className="text-right py-3 px-4 font-mono">${t.total_cost.toFixed(4)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
 
             {/* Repeated Prompts (Caching Opportunities) */}
             {savingsData.repeated_prompts.length > 0 && (

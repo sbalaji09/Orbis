@@ -139,6 +139,7 @@ class SpanWorker:
                 "cli_stderr": span.get('cli_stderr'),
                 "tool_name": span.get('tool_name'),
                 "tool_category": span.get('tool_category'),
+                "tags": span.get('tags'),
             }
             
             # Accumulate token/cost/duration in Redis for trace-level aggregation

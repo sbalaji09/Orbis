@@ -83,6 +83,8 @@ class SpanIn(BaseModel):
     tool_input: Optional[dict] = None
     tool_output: Optional[dict] = None
 
+    tags: Optional[list[str]] = None
+
 class WebSocketMetrics:
     def __init__(self) -> None:
         self.active_connections: int = 0
