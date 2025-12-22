@@ -40,7 +40,7 @@ export interface PromptComparisonResult {
 export interface PromptVersionAnalytics {
   prompt_id: string;
   name: string;
-  version_number: number;
+  semantic_version: string;
   trace_count: number;
   avg_cost: number;
   avg_latency: number;
@@ -58,7 +58,9 @@ function getHeaders(token: string | null): HeadersInit {
   return headers;
 }
 
-export async function fetchPromptFamilies(token: string | null): Promise<PromptFamily[]> {
+export async function fetchPromptFamilies(
+  token: string | null
+): Promise<PromptFamily[]> {
   try {
     const response = await fetch(`${API_BASE_URL}/prompts/families`, {
       headers: getHeaders(token),
@@ -78,7 +80,10 @@ export async function fetchPromptFamilies(token: string | null): Promise<PromptF
   }
 }
 
-export async function fetchPromptVersions(prompt_name: string, token: string | null) {
+export async function fetchPromptVersions(
+  prompt_name: string,
+  token: string | null
+) {
   try {
     const response = await fetch(
       `${API_BASE_URL}/prompts/${prompt_name}/versions`,
@@ -103,12 +108,14 @@ export async function fetchPromptVersions(prompt_name: string, token: string | n
 
 export async function fetchPromptContent(
   prompt_name: string,
-  versionId: number,
+  semanticVersion: string,
   token: string | null
 ) {
   try {
     const response = await fetch(
-      `${API_BASE_URL}/prompts/${prompt_name}/content?version_number=${versionId}`,
+      `${API_BASE_URL}/prompts/${prompt_name}/content?semantic_version=${encodeURIComponent(
+        semanticVersion
+      )}`,
       {
         headers: getHeaders(token),
         cache: "no-store",
@@ -156,11 +163,15 @@ export async function fetchPromptDiff(
   }
 }
 
-export async function rollbackPrompt(name: string, versionNumber: number, token: string | null) {
+export async function rollbackPrompt(
+  name: string,
+  semanticVersion: string,
+  token: string | null
+) {
   const url = new URL(
     `${API_BASE_URL}/prompts/${encodeURIComponent(name)}/rollback`
   );
-  url.searchParams.set("version_number", String(versionNumber));
+  url.searchParams.set("semantic_version", semanticVersion);
 
   try {
     const response = await fetch(url.toString(), {

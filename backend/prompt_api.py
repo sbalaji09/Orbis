@@ -5,6 +5,7 @@ from s3connect import *
 import hashlib
 from llm_service import get_llm_comparison_analysis
 from auth_utils import get_user_id_from_token
+from semantic_versioning import SemanticVersionAnalyzer, get_next_version
 
 router = APIRouter(
     prefix="/prompts",
@@ -14,13 +15,17 @@ router = APIRouter(
 
 @router.post("/prompts")
 async def create_prompt(agent_id: str, name: str, content: str):
+    """
+    Create a new prompt version with automatic semantic versioning.
+    Detects if changes are major (2.0) or minor (1.1) based on content analysis.
+    """
     # generate hash for content
     content_hash = compute_hash_sha256(content)
 
     try:
         # Check if prompt with identical hash already exists
         if db.check_identical_hash(content_hash, agent_id):
-            # Return the existing prompt instead of empty response
+            # Return the existing prompt instead of creating duplicate
             existing_prompt = db.get_prompt_by_hash(content_hash, agent_id)
             if existing_prompt:
                 return existing_prompt
@@ -30,7 +35,33 @@ async def create_prompt(agent_id: str, name: str, content: str):
         bucket_name = os.getenv('S3_BUCKET_NAME')
         aws_region = os.getenv('AWS_REGION')
 
-        version_number = db.max_version_prompt_number(name)["Version number"]
+        # Get version info including latest content for semantic analysis
+        version_info = db.max_version_prompt_number(name)
+        version_number = version_info["Version number"]
+        latest_semantic_version = version_info.get("semantic_version", "0.0")
+        latest_content = version_info.get("latest_content", "")
+
+        # Determine semantic version based on content changes
+        semantic_version = None
+        if latest_content and latest_content.strip():
+            # Auto-detect version based on changes
+            new_semantic_version, change_analysis = get_next_version(
+                latest_semantic_version,
+                latest_content,
+                content
+            )
+            semantic_version = new_semantic_version
+
+            # Log the change analysis
+            print(
+                f"Auto-versioning: {latest_semantic_version} -> {semantic_version} ({change_analysis.change_type} change)")
+            print(f"  - Diff ratio: {change_analysis.diff_ratio:.2%}")
+            print(
+                f"  - Structural changes: {change_analysis.structural_changes}")
+            print(f"  - Semantic changes: {change_analysis.semantic_changes}")
+        else:
+            # First version
+            semantic_version = "1.0"
 
         if bucket_name:
             try:
@@ -42,8 +73,11 @@ async def create_prompt(agent_id: str, name: str, content: str):
         else:
             s3URL = None
 
-        prompt_version = db.insert_prompt_row(name, version_number, s3URL, agent_id,
-                                              content_hash, content[:min(500, len(content))])
+        prompt_version = db.insert_prompt_row(
+            name, version_number, s3URL, agent_id,
+            content_hash, content[:min(500, len(content))],
+            semantic_version=semantic_version
+        )
         return prompt_version
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -131,20 +165,21 @@ async def get_version_numbers(name: str):
 
 
 @router.get("/{name}/content")
-async def get_prompt_content(name: str, version_number: int | None = None):
+async def get_prompt_content(name: str, semantic_version: str | None = None):
     try:
-        # If no version_number provided, get the latest version
-        if version_number is None:
+        # If no semantic_version provided, get the latest version
+        if semantic_version is None:
             versions = db.get_prompts_versions(name)
             if not versions or len(versions) == 0:
                 raise HTTPException(
                     status_code=404, detail="No versions found for this prompt")
-            version_number = int(versions[0]["version_number"])
+            semantic_version = versions[0]["semantic_version"]
 
-        prompt_record = db.get_prompt_version(name, int(version_number))
+        prompt_record = db.get_prompt_by_semantic_version(
+            name, semantic_version)
         if not prompt_record:
             raise HTTPException(
-                status_code=404, detail=f"Version {version_number} not found for prompt '{name}'")
+                status_code=404, detail=f"Version {semantic_version} not found for prompt '{name}'")
 
         s3_url = prompt_record.get("s3_url")
 
@@ -163,12 +198,33 @@ async def get_prompt_content(name: str, version_number: int | None = None):
 
 
 @router.post("/{name}/rollback")
-async def rollback_prompt(name: str, version_number: int):
+async def rollback_prompt(name: str, semantic_version: str):
+    """
+    Rollback to a previous version by creating a new version with the old content.
+    Maintains semantic versioning by incrementing as a minor change.
+    """
     try:
-        prompt_rollback = db.get_prompt_version(name, version_number)
-        db.deactivate_version(name, version_number)
-        new_version_number = db.max_version_prompt_number(name)[
-            "Version number"]
+        prompt_rollback = db.get_prompt_by_semantic_version(
+            name, semantic_version)
+        if not prompt_rollback:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Version {semantic_version} not found for prompt '{name}'"
+            )
+
+        db.deactivate_version_by_semantic(name, semantic_version)
+
+        # Get current version info for semantic versioning
+        version_info = db.max_version_prompt_number(name)
+        new_version_number = version_info["Version number"]
+        current_semantic = version_info.get("semantic_version", "1.0")
+
+        # Parse current semantic version and increment minor
+        from semantic_versioning import SemanticVersionAnalyzer
+        analyzer = SemanticVersionAnalyzer()
+        major, minor = analyzer.parse_version(current_semantic)
+        new_semantic = analyzer.format_version(major, minor + 1)
+
         new_version = db.insert_prompt_row(
             name,
             new_version_number,
@@ -176,15 +232,19 @@ async def rollback_prompt(name: str, version_number: int):
             prompt_rollback["agent_id"],
             prompt_rollback["prompt_hash"],
             prompt_rollback["content_preview"],
-            parent_version_id=str(prompt_rollback["prompt_id"])
+            parent_version_id=str(prompt_rollback["prompt_id"]),
+            semantic_version=new_semantic
         )
         return {
             "name": name,
-            "rolled_back_to_version": version_number,
+            "rolled_back_to_semantic_version": semantic_version,
             "new_version_number": new_version_number,
+            "new_semantic_version": new_semantic,
             "new_version_id": new_version["prompt_id"],
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -299,6 +359,7 @@ async def compare_prompt_analytics(prompt_id1: str, prompt_id2: str):
             "llm_analysis": llm_analysis
         }
     except Exception as e:
+        print(e)
         raise HTTPException(status_code=500, detail=str(e))
 
 

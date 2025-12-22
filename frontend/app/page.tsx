@@ -6,9 +6,11 @@ import { AnimatedDAG } from "@/components/AnimatedDAG";
 import { ArrowUpRight, Copy, Zap, Shield, Database } from "lucide-react";
 import { Tab, TabGroup, TabList, TabPanel, TabPanels } from "@headlessui/react";
 import { useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function Home() {
   const [copied, setCopied] = useState(false);
+  const { user, signOut, loading: authLoading } = useAuth();
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -48,15 +50,47 @@ export default function Home() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <button className="text-sm px-4 py-2 hover:opacity-70 transition-opacity">
-              login()
-            </button>
-            <Link
-              href="/dashboard"
-              className="text-sm px-4 py-2 bg-black hover:bg-black/90 text-mustard border border-black transition-colors"
-            >
-              dashboard.open()
-            </Link>
+            {authLoading ? (
+              <>
+                {/* Skeleton for login button */}
+                <div className="h-9 w-[72px] bg-gray-200 animate-pulse rounded" />
+                {/* Skeleton for dashboard button */}
+                <div className="h-9 w-[148px] bg-gray-200 animate-pulse rounded" />
+              </>
+            ) : user ? (
+              <>
+                {/* Logged in state */}
+
+                <button
+                  onClick={signOut}
+                  className="text-sm px-4 py-2 hover:opacity-70 transition-opacity cursor-pointer"
+                >
+                  logout()
+                </button>
+                <Link
+                  href="/dashboard"
+                  className="text-sm px-4 py-2 bg-black hover:bg-black/90 text-mustard border border-black transition-colors"
+                >
+                  dashboard.open()
+                </Link>
+              </>
+            ) : (
+              <>
+                {/* Logged out state */}
+                <Link
+                  href="/login"
+                  className="text-sm px-4 py-2 hover:opacity-70 transition-opacity"
+                >
+                  login()
+                </Link>
+                <Link
+                  href="/signup"
+                  className="text-sm px-4 py-2 bg-black hover:bg-black/90 text-mustard border border-black transition-colors"
+                >
+                  signup()
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </nav>

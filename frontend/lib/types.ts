@@ -60,7 +60,7 @@ export interface Span {
 export interface PromptVersion {
   prompt_version_id: string;
   name: string;
-  version_number: number;
+  semantic_version: string;
   content_preview: string;
   created_at: Date;
   is_active: string;

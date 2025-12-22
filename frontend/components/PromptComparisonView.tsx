@@ -7,14 +7,15 @@ import {
   DialogTitle,
 } from "@headlessui/react";
 import PromptBadge from "./PromptBadge";
-import { PromptComparisonResult } from "@/lib/prompt-api";
+import VersionComparisonCard from "./VersionComparisonCard";
+import { PromptComparisonResult } from "@/lib/prompt-api-client";
 
 interface PromptComparisonViewProps {
   isOpen: boolean;
   onClose: () => void;
   promptName: string;
-  version1: number;
-  version2: number;
+  version1Semantic: string;
+  version2Semantic: string;
   comparisonData: PromptComparisonResult | null;
   loading?: boolean;
   error?: string | null;
@@ -26,8 +27,8 @@ export default function PromptComparisonView({
   isOpen,
   onClose,
   promptName,
-  version1,
-  version2,
+  version1Semantic,
+  version2Semantic,
   comparisonData,
   loading = false,
   error = null,
@@ -256,7 +257,7 @@ export default function PromptComparisonView({
                     <div className="mt-2 flex items-center gap-2">
                       <PromptBadge
                         promptId={promptName}
-                        promptVersion={`v${version1}`}
+                        promptVersion={`v${version1Semantic}`}
                       />
                       <svg
                         className="w-4 h-4 text-black/40"
@@ -273,7 +274,7 @@ export default function PromptComparisonView({
                       </svg>
                       <PromptBadge
                         promptId={promptName}
-                        promptVersion={`v${version2}`}
+                        promptVersion={`v${version2Semantic}`}
                       />
                     </div>
                   </div>
@@ -336,6 +337,20 @@ export default function PromptComparisonView({
 
                 {!loading && !error && comparisonData && (
                   <>
+                    {/* Auto-Generated Insights Card */}
+                    <div className="px-6 py-4 border-b border-black/10 bg-background shrink-0">
+                      <VersionComparisonCard
+                        version1={{
+                          semantic_version: version1Semantic,
+                          analytics: comparisonData.prompts.version1.analytics,
+                        }}
+                        version2={{
+                          semantic_version: version2Semantic,
+                          analytics: comparisonData.prompts.version2.analytics,
+                        }}
+                      />
+                    </div>
+
                     {/* Metrics Comparison Bar */}
                     <div className="px-6 py-3 border-b border-black/10 bg-black/2 shrink-0">
                       <div className="grid grid-cols-4 gap-4">
@@ -440,7 +455,7 @@ export default function PromptComparisonView({
                             <div className="px-4 py-2 bg-black/2 border-b border-black/10 shrink-0">
                               <PromptBadge
                                 promptId={promptName}
-                                promptVersion={`v${version1}`}
+                                promptVersion={`v${version1Semantic}`}
                               />
                             </div>
                             <div
@@ -456,7 +471,7 @@ export default function PromptComparisonView({
                             <div className="px-4 py-2 bg-black/2 border-b border-black/10 shrink-0">
                               <PromptBadge
                                 promptId={promptName}
-                                promptVersion={`v${version2}`}
+                                promptVersion={`v${version2Semantic}`}
                               />
                             </div>
                             <div
@@ -587,7 +602,7 @@ export default function PromptComparisonView({
                           <div className="flex flex-col h-full">
                             <div className="px-4 py-2 bg-black/2 border-b border-black/10 shrink-0">
                               <span className="text-xs font-semibold text-black/60">
-                                v{version1} Outputs (
+                                v{version1Semantic} Outputs (
                                 {
                                   comparisonData.prompts.version1.sample_outputs
                                     .length
@@ -623,7 +638,7 @@ export default function PromptComparisonView({
                           <div className="flex flex-col h-full">
                             <div className="px-4 py-2 bg-black/2 border-b border-black/10 shrink-0">
                               <span className="text-xs font-semibold text-black/60">
-                                v{version2} Outputs (
+                                v{version2Semantic} Outputs (
                                 {
                                   comparisonData.prompts.version2.sample_outputs
                                     .length

@@ -15,6 +15,7 @@ import {
 
 interface Version {
   version_number: number;
+  semantic_version?: string;
   created_at: string;
   is_active: boolean;
   metadata?: Record<string, unknown>;
@@ -186,7 +187,11 @@ export default function PromptVersionPanel({
                             <div className="flex items-center justify-between mb-2">
                               <PromptBadge
                                 promptId={promptName}
-                                promptVersion={`v${version.version_number}`}
+                                promptVersion={
+                                  version.semantic_version
+                                    ? `v${version.semantic_version}`
+                                    : `v${version.version_number}`
+                                }
                                 onClick={() =>
                                   setSelectedVersion(
                                     selectedVersion === version.version_number
