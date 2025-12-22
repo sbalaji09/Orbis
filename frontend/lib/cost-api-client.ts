@@ -379,3 +379,28 @@ export async function fetchUserTags(token: string | null): Promise<string[]> {
     return [];
   }
 }
+
+export async function fetchPromptLengthAnalysis(
+  days: number,
+  token: string | null
+): Promise<PromptLengthAnalysis | null> {
+  try {
+    const url = new URL(`${API_BASE_URL}/cost/prompt-analysis`);
+    url.searchParams.set("days", String(days));
+
+    const response = await fetch(url.toString(), {
+      headers: getHeaders(token),
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      console.error(`Failed to fetch prompt analysis: ${response.statusText}`);
+      return null;
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching prompt analysis:", error);
+    return null;
+  }
+}
