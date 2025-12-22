@@ -195,7 +195,7 @@ export async function getPromptVersions(promptName: string) {
     }
 
     const data = await response.json();
-    return data || [];
+    return unwrapList(data);
   } catch (error) {
     console.error("Error fetching prompt versions:", error);
     return [];
@@ -221,7 +221,7 @@ export async function getPromptAnalytics(promptName: string) {
     }
 
     const data = await response.json();
-    return data || [];
+    return unwrapList(data);
   } catch (error) {
     console.error("Error fetching prompt analytics:", error);
     return [];
@@ -234,7 +234,7 @@ function unwrapList(data: any) {
   if (Array.isArray(data?.results)) return data.results;
   if (Array.isArray(data?.data)) return data.data;
   if (Array.isArray(data?.items)) return data.items;
-  if (Array.isArray(data?.versions)) return data; // keep as fallback if some endpoints still do this
+  if (Array.isArray(data?.versions)) return data.versions;
   return [];
 }
 

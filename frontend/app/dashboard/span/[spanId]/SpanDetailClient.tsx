@@ -42,15 +42,23 @@ export default function SpanDetailClient({
   initialAnalytics = [],
 }: SpanDetailClientProps) {
   const { session } = useAuth();
+  const safeInitialVersions = Array.isArray(initialVersions)
+    ? initialVersions
+    : [];
+  const safeInitialAnalytics = Array.isArray(initialAnalytics)
+    ? initialAnalytics
+    : [];
   const [selectedTab, setSelectedTab] = useState(0);
-  const [versions, setVersions] = useState<Version[]>(initialVersions);
+  const [versions, setVersions] = useState<Version[]>(safeInitialVersions);
 
   // Initialize analytics from server data
   const [analytics, setAnalytics] = useState<
     Map<number, PromptVersionAnalytics>
   >(() => {
     const analyticsMap = new Map<number, PromptVersionAnalytics>();
-    initialAnalytics.forEach((a) => analyticsMap.set(a.version_number, a));
+    safeInitialAnalytics.forEach((a) =>
+      analyticsMap.set(a.version_number, a)
+    );
     return analyticsMap;
   });
 
