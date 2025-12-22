@@ -37,6 +37,11 @@ const FeaturesTab = dynamic(() => import("./FeaturesTab"), {
   ssr: false,
 });
 
+const PromptsTab = dynamic(() => import("./PromptsTab"), {
+  loading: () => <TabLoader />,
+  ssr: false,
+});
+
 function TabLoader() {
   return (
     <div className="flex items-center justify-center py-12 text-black/60">
@@ -127,7 +132,7 @@ export default function CostDashboardClient({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const hasFetchedRef = useRef(false);
   const [activeTab, setActiveTab] = useState<
-    "overview" | "features" | "tokens" | "savings"
+    "overview" | "features" | "tokens" | "prompts" | "savings"
   >("overview");
 
   // Close dropdown when clicking outside
@@ -716,6 +721,7 @@ export default function CostDashboardClient({
             { id: "overview", label: "Overview" },
             { id: "features", label: "Features" },
             { id: "tokens", label: "Token Analytics" },
+            { id: "prompts", label: "Prompt Analysis" },
             { id: "savings", label: "Savings Opportunities" },
           ].map((tab) => (
             <button
@@ -1029,6 +1035,8 @@ export default function CostDashboardClient({
         {activeTab === "tokens" && (
           <TokensTab selectedPeriod={selectedPeriod} formatDate={formatDate} />
         )}
+
+        {activeTab === "prompts" && <PromptsTab selectedPeriod={selectedPeriod} />}
 
         {activeTab === "savings" && <SavingsTab selectedPeriod={selectedPeriod} />}
       </div>
