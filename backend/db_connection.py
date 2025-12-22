@@ -784,39 +784,77 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
 
-    def max_version_prompt_number(self, name: str) -> int:
+    def max_version_prompt_number(self, name: str) -> dict:
+        """
+        Get the next version number for a prompt.
+        Returns both integer version and semantic version.
+        """
         conn = self.get_connection()
         try:
             with conn.cursor() as cur:
-                query = """
+                # Get max integer version for backward compatibility
+                query_int = """
                     SELECT COALESCE(MAX(version_number), 0) + 1 
                     FROM prompt_versions 
                     WHERE name = %s
                 """
+                cur.execute(query_int, (name,))
+                next_int_version = cur.fetchone()[0]
 
-                cur.execute(query, (
-                    name,
-                ))
+                # Get latest semantic version
+                query_semantic = """
+                    SELECT semantic_version, content_preview
+                    FROM prompt_versions 
+                    WHERE name = %s 
+                    ORDER BY created_at DESC 
+                    LIMIT 1
+                """
+                cur.execute(query_semantic, (name,))
                 result = cur.fetchone()
+
+                if result:
+                    latest_semantic_version = result[0]
+                    latest_content = result[1]
+                else:
+                    latest_semantic_version = "0.0"
+                    latest_content = None
+
                 conn.commit()
-                return {"Version number": result}
+
+                return {
+                    "Version number": next_int_version,
+                    "semantic_version": latest_semantic_version,
+                    "latest_content": latest_content
+                }
         except Exception as e:
             conn.rollback()
-            raise Exception(f"Failed to query largest prompt number")
+            raise Exception(f"Failed to query largest prompt number: {e}")
         finally:
             self.return_connection(conn)
 
     def insert_prompt_row(self, name: str, version_number: int, s3_url: str,
                           agent_id: str, prompt_hash: str, content_preview: str,
-                          parent_version_id: str = None):
+                          parent_version_id: str = None, semantic_version: str = None):
+        """
+        Insert a new prompt version with semantic versioning support.
+
+        Args:
+            semantic_version: Optional semantic version string (e.g., "1.2"). 
+                            If not provided, defaults to "{version_number}.0"
+        """
         conn = self.get_connection()
         try:
             with conn.cursor() as cur:
+                # Default semantic version if not provided
+                if semantic_version is None:
+                    semantic_version = f"{version_number}.0"
+
                 query = """
                     INSERT INTO prompt_versions (
                         prompt_id,
                         name,
                         version_number,
+                        semantic_version,
                         s3_url,
                         created_at,
                         is_active,
@@ -829,6 +867,7 @@ class SupabaseDB:
                         gen_random_uuid(),  -- prompt_id
                         %s,                 -- name
                         %s,                 -- version_number
+                        %s,                 -- semantic_version
                         %s,                 -- s3_url
                         NOW(),              -- created_at
                         TRUE,               -- is_active
@@ -842,6 +881,7 @@ class SupabaseDB:
                         prompt_id,
                         name,
                         version_number,
+                        semantic_version,
                         s3_url,
                         created_at,
                         is_active,
@@ -854,13 +894,13 @@ class SupabaseDB:
 
                 cur.execute(
                     query,
-                    (name, version_number, s3_url, agent_id,
+                    (name, version_number, semantic_version, s3_url, agent_id,
                      prompt_hash, content_preview, parent_version_id)
                 )
                 created_prompt = cur.fetchone()
                 conn.commit()
                 columns = [
-                    "prompt_id", "name", "version_number", "s3_url",
+                    "prompt_id", "name", "version_number", "semantic_version", "s3_url",
                     "created_at", "is_active", "agent_id", "prompt_hash",
                     "content_preview", "metadata", "parent_version_id"
                 ]
@@ -868,7 +908,7 @@ class SupabaseDB:
             return dict(zip(columns, created_prompt))
         except Exception as e:
             conn.rollback()
-            raise Exception(f"Failed to insert row into prompt versions")
+            raise Exception(f"Failed to insert row into prompt versions: {e}")
         finally:
             self.return_connection(conn)
 
@@ -973,7 +1013,7 @@ class SupabaseDB:
         try:
             with conn.cursor() as cur:
                 query = """
-                    SELECT version_number, metadata, created_at, is_active, prompt_hash, prompt_id
+                    SELECT version_number, semantic_version, metadata, created_at, is_active, prompt_hash, prompt_id
                     FROM prompt_versions
                     WHERE name = %s
                     ORDER BY version_number DESC
@@ -987,17 +1027,18 @@ class SupabaseDB:
             versions = [
                 {
                     "version_number": row[0],
-                    "metadata": row[1],
-                    "created_at": row[2],
-                    "is_active": row[3],
-                    "prompt_hash": row[4],
-                    "prompt_id": row[5]
+                    "semantic_version": row[1],
+                    "metadata": row[2],
+                    "created_at": row[3],
+                    "is_active": row[4],
+                    "prompt_hash": row[5],
+                    "prompt_id": row[6]
                 }
                 for row in rows
             ]
             return versions
         except Exception as e:
-            raise Exception(f"Failed to get all prompt versions")
+            raise Exception(f"Failed to get all prompt versions: {e}")
         finally:
             self.return_connection(conn)
 
@@ -1035,6 +1076,38 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
 
+    def get_prompt_by_semantic_version(self, name: str, semantic_version: str) -> Dict:
+        """Get a specific prompt version by semantic version (e.g., '1.2')"""
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                query = """
+                    SELECT prompt_id, s3_url, agent_id, prompt_hash, content_preview, metadata, parent_version_id
+                    FROM prompt_versions
+                    WHERE name = %s
+                    AND semantic_version = %s
+                """
+                cur.execute(query, (name, semantic_version))
+                row = cur.fetchone()
+
+            if not row:
+                return None
+
+            return {
+                "prompt_id": row[0],
+                "s3_url": row[1],
+                "agent_id": row[2],
+                "prompt_hash": row[3],
+                "content_preview": row[4],
+                "metadata": row[5],
+                "parent_version_id": row[6],
+            }
+
+        except Exception as e:
+            raise Exception(f"Failed to get prompt by semantic version: {e}")
+        finally:
+            self.return_connection(conn)
+
     def deactivate_version(self, name: str, version_number: int) -> bool:
         conn = self.get_connection()
         try:
@@ -1055,6 +1128,25 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
 
+    def deactivate_version_by_semantic(self, name: str, semantic_version: str) -> str:
+        """Deactivate a prompt version by semantic version"""
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                query = """
+                    UPDATE prompt_versions
+                    SET is_active = False
+                    WHERE name = %s
+                    AND semantic_version = %s
+                """
+                cur.execute(query, (name, semantic_version))
+            return "sucessful"
+        except Exception as e:
+            raise Exception(
+                f"Failed to deactivate version by semantic version: {e}")
+        finally:
+            self.return_connection(conn)
+
     def get_prompt_analytics(self, prompt_name: str) -> List[Dict[str, Any]]:
         """
         Get consolidated analytics for all versions of a prompt family.
@@ -1067,7 +1159,7 @@ class SupabaseDB:
                     SELECT
                         pv.prompt_id,
                         pv.name,
-                        pv.version_number,
+                        pv.semantic_version,
                         COUNT(DISTINCT s.trace_id) AS trace_count,
                         COALESCE(AVG(s.cost), 0) AS avg_cost,
                         COALESCE(AVG(s.duration) / 1000.0, 0) AS avg_latency,
@@ -1079,8 +1171,8 @@ class SupabaseDB:
                     FROM prompt_versions pv
                     LEFT JOIN spans s ON s.prompt_id = pv.prompt_id
                     WHERE pv.name = %s
-                    GROUP BY pv.prompt_id, pv.name, pv.version_number
-                    ORDER BY pv.version_number DESC;
+                    GROUP BY pv.prompt_id, pv.name, pv.semantic_version
+                    ORDER BY pv.semantic_version DESC;
                 """
                 cur.execute(query, (prompt_name,))
                 rows = cur.fetchall()
@@ -1120,7 +1212,7 @@ class SupabaseDB:
                     SELECT
                         pv.prompt_id,
                         pv.name,
-                        pv.version_number,
+                        pv.semantic_version,
                         COUNT(DISTINCT s.trace_id) AS trace_count,
                         COALESCE(AVG(s.cost), 0) AS avg_cost,
                         COALESCE(AVG(s.duration) / 1000.0, 0) AS avg_latency,
@@ -1132,8 +1224,8 @@ class SupabaseDB:
                     FROM prompt_versions pv
                     LEFT JOIN spans s ON s.prompt_id = pv.prompt_id
                     WHERE pv.prompt_id IN (%s, %s)
-                    GROUP BY pv.prompt_id, pv.name, pv.version_number
-                    ORDER BY pv.version_number DESC;
+                    GROUP BY pv.prompt_id, pv.name, pv.semantic_version
+                    ORDER BY pv.semantic_version DESC;
                 """
                 cur.execute(query, (prompt_id1, prompt_id2))
                 rows = cur.fetchall()
@@ -1167,7 +1259,7 @@ class SupabaseDB:
             raise Exception(f"Failed to get prompt analytics: {e}")
         finally:
             self.return_connection(conn)
-    
+
     def get_cost_summary_by_user(self, user_id: str, period: str) -> List[Dict[str, Any]]:
         conn = self.get_connection()
         try:
@@ -1180,11 +1272,14 @@ class SupabaseDB:
                 end_date = None
             else:
                 period = period.strip().lower()
-                range_match = re.match(r"^(\d{4}-\d{2}-\d{2})\s*:\s*(\d{4}-\d{2}-\d{2})$", period)
+                range_match = re.match(
+                    r"^(\d{4}-\d{2}-\d{2})\s*:\s*(\d{4}-\d{2}-\d{2})$", period)
 
                 if range_match:
-                    s = datetime.fromisoformat(range_match.group(1)).replace(tzinfo=timezone.utc)
-                    e = datetime.fromisoformat(range_match.group(2)).replace(tzinfo=timezone.utc)
+                    s = datetime.fromisoformat(
+                        range_match.group(1)).replace(tzinfo=timezone.utc)
+                    e = datetime.fromisoformat(
+                        range_match.group(2)).replace(tzinfo=timezone.utc)
                     start_date = s
                     end_date = e + timedelta(days=1)
                 elif period.endswith("d") and period[:-1].isdigit():
@@ -1192,10 +1287,12 @@ class SupabaseDB:
                     start_date = now - timedelta(days=days)
                     end_date = now + timedelta(seconds=1)
                 elif period == "month":
-                    start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+                    start_date = now.replace(
+                        day=1, hour=0, minute=0, second=0, microsecond=0)
                     end_date = now + timedelta(seconds=1)
                 elif period == "year":
-                    start_date = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+                    start_date = now.replace(
+                        month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
                     end_date = now + timedelta(seconds=1)
                 else:
                     raise ValueError(f"Unsupported period format: {period}")
@@ -1228,7 +1325,8 @@ class SupabaseDB:
             with conn.cursor() as cur:
                 cur.execute(query, params)
                 rows = cur.fetchall()
-                columns = [col.name for col in cur.description] if hasattr(cur, "description") else ["day", "model", "total_cost", "call_count"]
+                columns = [col.name for col in cur.description] if hasattr(
+                    cur, "description") else ["day", "model", "total_cost", "call_count"]
 
                 results: List[Dict[str, Any]] = []
                 for row in rows:
@@ -1264,10 +1362,12 @@ class SupabaseDB:
                     hour=0, minute=0, second=0, microsecond=0, tzinfo=timezone.utc
                 )
             except ValueError:
-                raise ValueError("start_date and end_date must be in YYYY-MM-DD format")
+                raise ValueError(
+                    "start_date and end_date must be in YYYY-MM-DD format")
 
             if end_dt < start_dt:
-                raise ValueError("end_date must be greater than or equal to start_date")
+                raise ValueError(
+                    "end_date must be greater than or equal to start_date")
 
             end_dt_exclusive = end_dt + timedelta(days=1)
 
@@ -1308,7 +1408,7 @@ class SupabaseDB:
             raise Exception(f"Failed to get cost by agent: {e}")
         finally:
             self.return_connection(conn)
-    
+
     def get_cost_by_model(self, user_id: str, start_date: str, end_date: str) -> List[Dict[str, Any]]:
         conn = self.get_connection()
         try:
@@ -1320,10 +1420,12 @@ class SupabaseDB:
                     hour=0, minute=0, second=0, microsecond=0, tzinfo=timezone.utc
                 )
             except ValueError:
-                raise ValueError("start_date and end_date must be in YYYY-MM-DD format")
+                raise ValueError(
+                    "start_date and end_date must be in YYYY-MM-DD format")
 
             if end_dt < start_dt:
-                raise ValueError("end_date must be greater than or equal to start_date")
+                raise ValueError(
+                    "end_date must be greater than or equal to start_date")
 
             end_dt_exclusive = end_dt + timedelta(days=1)
 
@@ -1364,7 +1466,6 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
 
-
     def get_cost_trends(self, user_id: str, days: int) -> List[Dict[str, Any]]:
         if days is None or not isinstance(days, int) or days < 1:
             raise ValueError("`days` must be an integer >= 1")
@@ -1373,8 +1474,10 @@ class SupabaseDB:
         try:
             now = datetime.now(timezone.utc)
 
-            start_dt = (now - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0, microsecond=0)
-            end_dt = now.replace(hour=0, minute=0, second=0, microsecond=0)  # today's date at 00:00
+            start_dt = (now - timedelta(days=days - 1)
+                        ).replace(hour=0, minute=0, second=0, microsecond=0)
+            # today's date at 00:00
+            end_dt = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
             start_date_str = start_dt.date().isoformat()
             end_date_str = end_dt.date().isoformat()
@@ -1402,7 +1505,8 @@ class SupabaseDB:
                 cur.execute(query, params)
                 rows = cur.fetchall()
 
-                columns = [col.name for col in cur.description] if hasattr(cur, "description") else ["day", "total_cost", "call_count"]
+                columns = [col.name for col in cur.description] if hasattr(
+                    cur, "description") else ["day", "total_cost", "call_count"]
 
                 results: List[Dict[str, Any]] = []
                 for row in rows:
@@ -1430,7 +1534,6 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
 
-    
     def get_token_breakdown(self, user_id: str, days: int) -> List[Dict[str, Any]]:
         if days is None or not isinstance(days, int) or days < 1:
             raise ValueError("`days` must be an integer >= 1")
@@ -1489,7 +1592,8 @@ class SupabaseDB:
                 breakdown[day_str]["total_tokens"] += in_tok + out_tok
 
                 if model not in breakdown[day_str]["by_model"]:
-                    breakdown[day_str]["by_model"][model] = {"input": 0, "output": 0}
+                    breakdown[day_str]["by_model"][model] = {
+                        "input": 0, "output": 0}
 
                 breakdown[day_str]["by_model"][model]["input"] += in_tok
                 breakdown[day_str]["by_model"][model]["output"] += out_tok
@@ -1500,7 +1604,7 @@ class SupabaseDB:
             raise Exception(f"Failed to get token breakdown: {e}")
         finally:
             self.return_connection(conn)
-    
+
     def get_tokens_per_trace(self, user_id: str, days: int, limit: int = 50) -> List[Dict[str, Any]]:
         since = datetime.now(timezone.utc) - timedelta(days=days)
 
@@ -1538,7 +1642,7 @@ class SupabaseDB:
         try:
             with conn.cursor() as cur:
                 cur.execute(query, (user_id, since, limit))
-                rows =  cur.fetchall()
+                rows = cur.fetchall()
             return [{
                 "trace_id": str(row[0]),
                 "trace_hash_id": row[1],
@@ -1574,7 +1678,7 @@ class SupabaseDB:
             GROUP BY s.llm_model
             ORDER BY total_cost DESC
         """
-        
+
         # this query finds traces with a high output / input ratio which could mean that the input is too verbose
         verbosity_query = """
             SELECT 
@@ -1621,13 +1725,13 @@ class SupabaseDB:
             with conn.cursor() as cur:
                 cur.execute(model_query, (user_id, since))
                 model_rows = cur.fetchall()
-                
+
                 cur.execute(verbosity_query, (user_id, since))
                 verbosity_rows = cur.fetchall()
-                
+
                 cur.execute(repetition_query, (user_id, since))
                 repetition_rows = cur.fetchall()
-            
+
             # calculate potential savings by using the results from all three queries
             model_analysis = []
             for row in model_rows:
@@ -1647,15 +1751,17 @@ class SupabaseDB:
                 "output_input_ratio": round(float(row[4] or 0), 2),
                 "total_cost": float(row[5] or 0)
             } for row in verbosity_rows]
-            
+
             repeated_prompts = [{
                 "model": row[0],
                 "preview": row[1][:100] if row[1] else "",
                 "repetition_count": int(row[2]),
-                "potential_savings": float(row[3] or 0) * 0.9  # 90% could be cached
+                # 90% could be cached
+                "potential_savings": float(row[3] or 0) * 0.9
             } for row in repetition_rows]
 
-            total_potential_savings = sum(r["potential_savings"] for r in repeated_prompts)
+            total_potential_savings = sum(
+                r["potential_savings"] for r in repeated_prompts)
 
             return {
                 "model_analysis": model_analysis,

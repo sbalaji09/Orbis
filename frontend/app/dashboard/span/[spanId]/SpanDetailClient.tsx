@@ -23,54 +23,78 @@ import { useAuth } from "@/hooks/useAuth";
 interface Version {
   prompt_id: string;
   name: string;
-  version_number: number;
+  semantic_version: string;
   content: string;
   prompt_hash: string;
   created_at: string;
   is_active: boolean;
 }
 
+interface VersionsResponse {
+  versions: Version[];
+}
+
+interface AnalyticsResponse {
+  prompt_name: string;
+  versions: PromptVersionAnalytics[];
+}
+
 interface SpanDetailClientProps {
   initialSpan: Span;
-  initialVersions?: Version[];
-  initialAnalytics?: PromptVersionAnalytics[];
+  initialVersions?: Version[] | VersionsResponse;
+  initialAnalytics?: PromptVersionAnalytics[] | AnalyticsResponse;
 }
 
 export default function SpanDetailClient({
   initialSpan,
-  initialVersions = [],
-  initialAnalytics = [],
+  initialVersions,
+  initialAnalytics,
 }: SpanDetailClientProps) {
+  console.log(initialVersions, initialAnalytics);
   const { session } = useAuth();
   const [selectedTab, setSelectedTab] = useState(0);
-  const [versions, setVersions] = useState<Version[]>(initialVersions);
+
+  // Extract versions array from the API response
+  const versionsArray = Array.isArray(initialVersions)
+    ? initialVersions
+    : initialVersions?.versions || [];
+  const [versions, setVersions] = useState<Version[]>(versionsArray);
 
   // Initialize analytics from server data
   const [analytics, setAnalytics] = useState<
-    Map<number, PromptVersionAnalytics>
+    Map<string, PromptVersionAnalytics>
   >(() => {
-    const analyticsMap = new Map<number, PromptVersionAnalytics>();
-    initialAnalytics.forEach((a) => analyticsMap.set(a.version_number, a));
+    const analyticsMap = new Map<string, PromptVersionAnalytics>();
+    // Extract analytics array from the API response
+    const analyticsArray = Array.isArray(initialAnalytics)
+      ? initialAnalytics
+      : initialAnalytics?.versions || [];
+
+    if (Array.isArray(analyticsArray)) {
+      analyticsArray.forEach((a) => {
+        analyticsMap.set(a.semantic_version, a);
+      });
+    }
     return analyticsMap;
   });
 
   const [versionsLoading, setVersionsLoading] = useState(false);
-  const [selectedVersions, setSelectedVersions] = useState<Set<number>>(
+  const [selectedVersions, setSelectedVersions] = useState<Set<string>>(
     new Set()
   );
   const [viewingContent, setViewingContent] = useState<{
     content: string;
-    version: number;
+    semanticVersion: string;
   } | null>(null);
   const [comparisonOpen, setComparisonOpen] = useState(false);
   const [comparisonVersions, setComparisonVersions] = useState<
-    [number, number] | null
+    [string, string] | null
   >(null);
   const [comparisonLoading, setComparisonLoading] = useState(false);
   const [comparisonError, setComparisonError] = useState<string | null>(null);
   const [comparisonData, setComparisonData] =
     useState<PromptComparisonResult | null>(null);
-  const [rollbackLoading, setRollbackLoading] = useState<number | null>(null);
+  const [rollbackLoading, setRollbackLoading] = useState<string | null>(null);
 
   // SSE Subscription for real-time span updates (only if streaming)
   const { data: streamData } = useSWRSubscription<Span>(
@@ -138,8 +162,10 @@ export default function SpanDetailClient({
         fetchPromptAnalytics(promptName, token),
       ]);
       setVersions(versionsData);
-      const analyticsMap = new Map<number, PromptVersionAnalytics>();
-      analyticsData.forEach((a) => analyticsMap.set(a.version_number, a));
+      const analyticsMap = new Map<string, PromptVersionAnalytics>();
+      if (Array.isArray(analyticsData)) {
+        analyticsData.forEach((a) => analyticsMap.set(a.semantic_version, a));
+      }
       setAnalytics(analyticsMap);
     } catch (err) {
       console.error("Failed to load versions:", err);
@@ -148,24 +174,36 @@ export default function SpanDetailClient({
     }
   };
 
-  const handleView = async (version: number) => {
+  const handleView = async (semanticVersion: string) => {
     if (!currentSpan?.prompt_name) return;
     const token = session?.access_token ?? null;
-    const content = await fetchPromptContent(currentSpan.prompt_name, version, token);
+
+    const content = await fetchPromptContent(
+      currentSpan.prompt_name,
+      semanticVersion,
+      token
+    );
     if (content) {
-      setViewingContent({ content, version });
+      setViewingContent({
+        content,
+        semanticVersion,
+      });
     }
   };
 
   const handleCompare = async () => {
     if (!currentSpan?.prompt_name || selectedVersions.size !== 2) return;
 
-    const [v1, v2] = Array.from(selectedVersions).sort((a, b) => b - a);
-    const version1 = versions.find((v) => v.version_number === v1);
-    const version2 = versions.find((v) => v.version_number === v2);
+    const [sv1, sv2] = Array.from(selectedVersions).sort((a, b) => {
+      // Sort by semantic version for proper ordering
+      return a.localeCompare(b, undefined, { numeric: true });
+    });
+
+    const version1 = versions.find((v) => v.semantic_version === sv1);
+    const version2 = versions.find((v) => v.semantic_version === sv2);
     if (!version1 || !version2) return;
 
-    setComparisonVersions([v1, v2]);
+    setComparisonVersions([sv1, sv2]);
     setComparisonOpen(true);
     setComparisonLoading(true);
     setComparisonError(null);
@@ -173,7 +211,11 @@ export default function SpanDetailClient({
     console.log(versions);
     try {
       const token = session?.access_token ?? null;
-      const data = await comparePrompts(version1.prompt_id, version2.prompt_id, token);
+      const data = await comparePrompts(
+        version1.prompt_id,
+        version2.prompt_id,
+        token
+      );
       setComparisonData(data);
     } catch (err) {
       setComparisonError(
@@ -184,14 +226,17 @@ export default function SpanDetailClient({
     }
   };
 
-  const handleRollback = async (versionNumber: number) => {
-    if (!currentSpan?.prompt_name || !confirm(`Rollback to v${versionNumber}?`))
+  const handleRollback = async (semanticVersion: string) => {
+    if (
+      !currentSpan?.prompt_name ||
+      !confirm(`Rollback to v${semanticVersion}?`)
+    )
       return;
 
-    setRollbackLoading(versionNumber);
+    setRollbackLoading(semanticVersion);
     try {
       const token = session?.access_token ?? null;
-      await rollbackPrompt(currentSpan.prompt_name, versionNumber, token);
+      await rollbackPrompt(currentSpan.prompt_name, semanticVersion, token);
       await loadVersions(currentSpan.prompt_name);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Rollback failed");
@@ -200,11 +245,11 @@ export default function SpanDetailClient({
     }
   };
 
-  const toggleVersionSelection = (versionNumber: number) => {
+  const toggleVersionSelection = (semanticVersion: string) => {
     setSelectedVersions((prev) => {
       const next = new Set(prev);
-      if (next.has(versionNumber)) {
-        next.delete(versionNumber);
+      if (next.has(semanticVersion)) {
+        next.delete(semanticVersion);
       } else {
         // Only allow 2 selections max
         if (next.size >= 2) {
@@ -212,7 +257,7 @@ export default function SpanDetailClient({
           const oldest = next.values().next().value;
           if (oldest !== undefined) next.delete(oldest);
         }
-        next.add(versionNumber);
+        next.add(semanticVersion);
       }
       return next;
     });
@@ -313,7 +358,7 @@ export default function SpanDetailClient({
             <TabPanel>
               {currentSpan.prompt_name ? (
                 <PromptAnalytics
-                  analytics={initialAnalytics}
+                  analytics={Array.from(analytics.values())}
                   loading={versionsLoading}
                 />
               ) : (
@@ -369,7 +414,7 @@ export default function SpanDetailClient({
           isOpen={true}
           onClose={() => setViewingContent(null)}
           content={viewingContent.content}
-          versionNumber={viewingContent.version}
+          semanticVersion={viewingContent.semanticVersion}
           promptName={currentSpan.prompt_name || "Unknown"}
         />
       )}
@@ -384,8 +429,8 @@ export default function SpanDetailClient({
             setComparisonError(null);
           }}
           promptName={currentSpan.prompt_name || "Unknown"}
-          version1={comparisonVersions[0]}
-          version2={comparisonVersions[1]}
+          version1Semantic={comparisonVersions[0]}
+          version2Semantic={comparisonVersions[1]}
           comparisonData={comparisonData}
           loading={comparisonLoading}
           error={comparisonError}

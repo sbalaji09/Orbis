@@ -204,6 +204,7 @@ export interface PromptVersionAnalytics {
   prompt_id: string;
   name: string;
   version_number: number;
+  semantic_version?: string;
   trace_count: number;
   avg_cost: number;
   avg_latency: number;

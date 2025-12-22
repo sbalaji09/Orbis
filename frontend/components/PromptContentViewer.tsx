@@ -12,7 +12,7 @@ interface PromptContentViewerProps {
   isOpen: boolean;
   onClose: () => void;
   promptName: string;
-  versionNumber: number;
+  semanticVersion: string;
   content: string;
   metadata?: {
     author?: string;
@@ -25,7 +25,7 @@ export default function PromptContentViewer({
   isOpen,
   onClose,
   promptName,
-  versionNumber,
+  semanticVersion,
   content,
   metadata,
 }: PromptContentViewerProps) {
@@ -77,7 +77,7 @@ export default function PromptContentViewer({
                     <div className="mt-2">
                       <PromptBadge
                         promptId={promptName}
-                        promptVersion={`v${versionNumber}`}
+                        promptVersion={`v${semanticVersion}`}
                       />
                     </div>
                   </div>

@@ -1,10 +1,11 @@
-import { PromptVersionAnalytics } from "@/lib/prompt-api";
+import { PromptVersionAnalytics } from "@/lib/prompt-api-client";
 import PromptBadge from "@/components/PromptBadge";
+import VersionChangeIndicator from "@/components/VersionChangeIndicator";
 
 interface Version {
   prompt_id: string;
   name: string;
-  version_number: number;
+  semantic_version: string;
   content: string;
   prompt_hash: string;
   created_at: string;
@@ -13,16 +14,16 @@ interface Version {
 
 interface VersionsListProps {
   versions: Version[];
-  analytics: Map<number, PromptVersionAnalytics>;
+  analytics: Map<string, PromptVersionAnalytics>;
   bestVersion: PromptVersionAnalytics | null;
   currentPromptVersion: string | null;
   promptName: string;
-  selectedVersions: Set<number>;
-  onToggleSelection: (versionNumber: number) => void;
-  onView: (versionNumber: number) => void;
-  onRollback: (versionNumber: number) => void;
+  selectedVersions: Set<string>;
+  onToggleSelection: (semanticVersion: string) => void;
+  onView: (semanticVersion: string) => void;
+  onRollback: (semanticVersion: string) => void;
   onCompare: () => void;
-  rollbackLoading: number | null;
+  rollbackLoading: string | null;
 }
 
 export default function VersionsList({
@@ -51,12 +52,15 @@ export default function VersionsList({
             </span>
             <div className="flex items-center gap-2">
               {Array.from(selectedVersions)
-                .sort((a, b) => a - b)
-                .map((v) => (
+                .sort((a, b) => {
+                  // Sort by semantic version numerically
+                  return a.localeCompare(b, undefined, { numeric: true });
+                })
+                .map((sv) => (
                   <PromptBadge
-                    key={v}
+                    key={sv}
                     promptId={promptName}
-                    promptVersion={`v${v}`}
+                    promptVersion={`v${sv}`}
                   />
                 ))}
             </div>
@@ -114,20 +118,31 @@ export default function VersionsList({
           {versions
             .sort((a, b) => b.version_number - a.version_number)
             .map((version) => {
-              const versionAnalytics = analytics.get(version.version_number);
+              const semanticVersion =
+                version.semantic_version || version.version_number.toString();
+              const versionAnalytics = analytics.get(semanticVersion);
               const isBest =
                 bestVersion &&
-                version.version_number === bestVersion.version_number &&
+                bestVersion.semantic_version === semanticVersion &&
                 versionAnalytics &&
                 versionAnalytics.trace_count > 0;
-              const isSelected = selectedVersions.has(version.version_number);
+              const isSelected = selectedVersions.has(semanticVersion);
               const isCurrent =
                 currentPromptVersion &&
-                parseInt(currentPromptVersion) === version.version_number;
+                currentPromptVersion === semanticVersion;
+
+              // Get previous version for change indicator
+              const versionIndex = versions.findIndex(
+                (v) => v.semantic_version === semanticVersion
+              );
+              const previousVersion =
+                versionIndex < versions.length - 1
+                  ? versions[versionIndex + 1]
+                  : null;
 
               return (
                 <div
-                  key={version.version_number}
+                  key={semanticVersion}
                   className={`p-4 transition-colors ${
                     isSelected ? "bg-babyblue/10" : "hover:bg-black/2"
                   } ${isBest ? "ring-2 ring-inset ring-success/30" : ""}`}
@@ -138,9 +153,7 @@ export default function VersionsList({
                       <input
                         type="checkbox"
                         checked={isSelected}
-                        onChange={() =>
-                          onToggleSelection(version.version_number)
-                        }
+                        onChange={() => onToggleSelection(semanticVersion)}
                         className="w-4 h-4 border-2 border-black/30 rounded-sm text-babyblue focus:ring-babyblue cursor-pointer"
                       />
                     </label>
@@ -149,7 +162,7 @@ export default function VersionsList({
                       <div className="flex items-center gap-2 mb-2">
                         <PromptBadge
                           promptId={promptName}
-                          promptVersion={`v${version.version_number}`}
+                          promptVersion={`v${semanticVersion}`}
                         />
                         {version.is_active && (
                           <span className="px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide bg-success text-white">
@@ -168,8 +181,20 @@ export default function VersionsList({
                         )}
                       </div>
 
-                      <div className="text-[10px] text-black/40 mb-3">
-                        Created {new Date(version.created_at).toLocaleString()}
+                      <div className="text-[10px] text-black/40 mb-3 space-y-1">
+                        <div>
+                          Created{" "}
+                          {new Date(version.created_at).toLocaleString()}
+                        </div>
+                        {version.semantic_version &&
+                          previousVersion?.semantic_version && (
+                            <VersionChangeIndicator
+                              semantic_version={version.semantic_version}
+                              previous_semantic_version={
+                                previousVersion.semantic_version
+                              }
+                            />
+                          )}
                       </div>
 
                       {/* Analytics Stats */}
@@ -243,17 +268,17 @@ export default function VersionsList({
                     {/* Actions */}
                     <div className="flex flex-col gap-2">
                       <button
-                        onClick={() => onView(version.version_number)}
+                        onClick={() => onView(semanticVersion)}
                         className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide border-2 border-babyblue bg-babyblue text-white hover:bg-babyblue/90 transition-colors shadow-[2px_2px_0_rgba(0,0,0,0.1)]"
                       >
                         View
                       </button>
                       <button
-                        onClick={() => onRollback(version.version_number)}
+                        onClick={() => onRollback(semanticVersion)}
                         disabled={rollbackLoading !== null}
                         className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide border-2 border-error bg-[#D1437C] text-white hover:bg-[#D1437C]/90 disabled:opacity-50 transition-colors shadow-[2px_2px_0_rgba(0,0,0,0.1)]"
                       >
-                        {rollbackLoading === version.version_number
+                        {rollbackLoading === semanticVersion
                           ? "..."
                           : "Rollback"}
                       </button>

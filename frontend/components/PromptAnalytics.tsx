@@ -1,5 +1,5 @@
 import React from "react";
-import { PromptVersionAnalytics } from "@/lib/prompt-api";
+import { PromptVersionAnalytics } from "@/lib/prompt-api-client";
 
 interface PromptAnalyticsProps {
   analytics?: PromptVersionAnalytics[];
@@ -36,6 +36,8 @@ export default function PromptAnalytics({
         })
       : null;
 
+  console.log(analytics);
+
   return (
     <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] overflow-hidden">
       {/* Header */}
@@ -65,7 +67,7 @@ export default function PromptAnalytics({
             />
           </svg>
           <span className="text-[10px] font-medium text-success">
-            Best performing: v{bestVersion.version_number} (
+            Best performing: v{bestVersion.semantic_version} (
             {bestVersion.trace_count} traces, {bestVersion.error_rate_pct ?? 0}%
             error rate)
           </span>
@@ -99,15 +101,22 @@ export default function PromptAnalytics({
           </thead>
           <tbody>
             {analytics
-              .sort((a, b) => b.version_number - a.version_number)
+              .sort((a, b) =>
+                b.semantic_version.localeCompare(
+                  a.semantic_version,
+                  undefined,
+                  { numeric: true }
+                )
+              )
               .map((row, idx) => {
                 const isBest =
                   bestVersion &&
-                  row.version_number === bestVersion.version_number &&
+                  row.semantic_version === bestVersion.semantic_version &&
                   row.trace_count > 0;
+                console.log(row);
                 return (
                   <tr
-                    key={row.version_number}
+                    key={row.semantic_version}
                     className={`border-b border-black/5 hover:bg-babyblue/5 transition-colors ${
                       idx % 2 === 0 ? "bg-white" : "bg-background/50"
                     } ${isBest ? "ring-2 ring-success/30 ring-inset" : ""}`}
@@ -115,7 +124,7 @@ export default function PromptAnalytics({
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-mono font-semibold bg-babyblue/10 text-babyblue border border-babyblue/30">
-                          v{row.version_number}
+                          v{row.semantic_version}
                         </span>
                         {isBest && (
                           <span className="px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide bg-success text-white">
