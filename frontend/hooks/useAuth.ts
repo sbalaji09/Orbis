@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { User, Session } from "@supabase/supabase-js";
 import { useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -10,6 +11,8 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
 
   const supabase = createClient();
+  const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     // Get initial session
@@ -25,18 +28,35 @@ export function useAuth() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
-      (_event: string, session: Session | null) => {
+      (event: string, session: Session | null) => {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+
+        // Ensure navigation matches auth state for client-side flows
+        if (event === "SIGNED_IN") {
+          if (pathname === "/login" || pathname === "/signup" || pathname === "/") {
+            router.replace("/dashboard");
+            router.refresh();
+          }
+        }
+
+        if (event === "SIGNED_OUT") {
+          if (pathname !== "/login") {
+            router.replace("/login");
+            router.refresh();
+          }
+        }
       }
     );
 
     return () => subscription.unsubscribe();
-  }, [supabase]);
+  }, [supabase, router, pathname]);
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    router.replace("/login");
+    router.refresh();
   };
 
   return {

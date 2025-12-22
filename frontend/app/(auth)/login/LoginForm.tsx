@@ -4,9 +4,11 @@ import { useSupabase } from "@/hooks/useSupabase";
 import Link from "next/link";
 import { useState } from "react";
 import { OrbisLogo } from "@/components/OrbisLogo";
+import { useRouter } from "next/navigation";
 
 export default function LoginForm() {
   const supabase = useSupabase();
+  const router = useRouter();
   const origin = typeof window !== "undefined" ? window.location.origin : "";
 
   const [email, setEmail] = useState("");
@@ -31,6 +33,8 @@ export default function LoginForm() {
       setLoading(false);
     } else {
       setMessage("Login successful! Redirecting...");
+      router.replace("/dashboard");
+      router.refresh();
     }
   };
 

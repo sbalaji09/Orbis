@@ -40,10 +40,6 @@ type SavedBaseline = {
 };
 
 type ActiveBaseline = SavedBaseline & { source: "saved" | "trace" };
-
-const BASELINES_STORAGE_KEY = "orbis.playground.baselines.v1";
-const RUN_HISTORY_STORAGE_KEY = "orbis.playground.runHistory.v1";
-const PLAYGROUND_STATE_STORAGE_KEY = "orbis.playground.state.v1";
 const RUN_HISTORY_LIMIT = 10;
 
 type PlaygroundRun = {
@@ -244,64 +240,7 @@ export default function App() {
     [guardrailsDraft]
   );
 
-  const skipPersistBaselinesRef = useRef(true);
-  const skipPersistRunHistoryRef = useRef(true);
-  const skipPersistPlaygroundStateRef = useRef(true);
   const skipRemoteStatePersistRef = useRef(true);
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(BASELINES_STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return;
-      setSavedBaselines(
-        parsed
-          .filter((b) => b && typeof b.id === "string" && Array.isArray(b.outputs))
-          .slice(0, 50)
-      );
-    } catch {}
-  }, []);
-
-  useEffect(() => {
-    if (skipPersistBaselinesRef.current) {
-      skipPersistBaselinesRef.current = false;
-      return;
-    }
-    try {
-      localStorage.setItem(
-        BASELINES_STORAGE_KEY,
-        JSON.stringify(savedBaselines.slice(0, 50))
-      );
-    } catch {}
-  }, [savedBaselines]);
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(RUN_HISTORY_STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return;
-      setRunHistory(
-        parsed
-          .filter((r) => r && typeof r.id === "string" && Array.isArray(r.outputs))
-          .slice(0, RUN_HISTORY_LIMIT)
-      );
-    } catch {}
-  }, []);
-
-  useEffect(() => {
-    if (skipPersistRunHistoryRef.current) {
-      skipPersistRunHistoryRef.current = false;
-      return;
-    }
-    try {
-      localStorage.setItem(
-        RUN_HISTORY_STORAGE_KEY,
-        JSON.stringify(runHistory.slice(0, RUN_HISTORY_LIMIT))
-      );
-    } catch {}
-  }, [runHistory]);
 
   useEffect(() => {
     let cancelled = false;
@@ -338,11 +277,7 @@ export default function App() {
             .filter((b) => Number.isFinite(b.createdAt))
             .slice(0, 50);
 
-          setSavedBaselines((local) => {
-            const seen = new Set(remote.map((b) => b.id));
-            const merged = [...remote, ...local.filter((b) => !seen.has(b.id))];
-            return merged.slice(0, 50);
-          });
+          setSavedBaselines(remote);
         }
 
         if (runsRes.ok) {
@@ -358,11 +293,7 @@ export default function App() {
             .filter((r) => Number.isFinite(r.createdAt))
             .slice(0, RUN_HISTORY_LIMIT);
 
-          setRunHistory((local) => {
-            const seen = new Set(remote.map((r) => r.id));
-            const merged = [...remote, ...local.filter((r) => !seen.has(r.id))];
-            return merged.slice(0, RUN_HISTORY_LIMIT);
-          });
+          setRunHistory(remote);
         }
 
         if (stateRes.ok) {
@@ -460,80 +391,6 @@ export default function App() {
     customModelsDraft,
   ]);
 
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(PLAYGROUND_STATE_STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      if (typeof parsed !== "object" || !parsed) return;
-      if (typeof parsed.inputPrompt === "string") setInputPrompt(parsed.inputPrompt);
-      if (Array.isArray(parsed.outputs)) setOutputs(parsed.outputs);
-      if (Array.isArray(parsed.previousOutputs)) setPreviousOutputs(parsed.previousOutputs);
-      if (parsed.baseline && typeof parsed.baseline === "object") setBaseline(parsed.baseline);
-      if (parsed.guardrailsDraft && typeof parsed.guardrailsDraft === "object") {
-        setGuardrailsDraft((prev) => ({ ...prev, ...parsed.guardrailsDraft }));
-      }
-      if (typeof parsed.compareRunAId === "string" || parsed.compareRunAId === null) {
-        setCompareRunAId(parsed.compareRunAId);
-      }
-      if (typeof parsed.compareRunBId === "string" || parsed.compareRunBId === null) {
-        setCompareRunBId(parsed.compareRunBId);
-      }
-      if (typeof parsed.compareLabel === "string" || parsed.compareLabel === null) {
-        setCompareLabel(parsed.compareLabel);
-      }
-      if (parsed.inputPanel && typeof parsed.inputPanel === "object") {
-        const selectedModelIds = Array.isArray(parsed.inputPanel.selectedModelIds)
-          ? parsed.inputPanel.selectedModelIds.filter((v: any) => typeof v === "string")
-          : [];
-        const customModels = Array.isArray(parsed.inputPanel.customModels)
-          ? parsed.inputPanel.customModels.filter((m: any) => m && typeof m.id === "string")
-          : [];
-        setRestoredInputPanel({ selectedModelIds, customModels });
-        setCustomModelsDraft(customModels);
-        setRestoreToken((t) => t + 1);
-      }
-    } catch {}
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    // Prevent the initial empty render from overwriting saved session state.
-    if (skipPersistPlaygroundStateRef.current) {
-      skipPersistPlaygroundStateRef.current = false;
-      return;
-    }
-    try {
-      localStorage.setItem(
-        PLAYGROUND_STATE_STORAGE_KEY,
-        JSON.stringify({
-          inputPrompt,
-          outputs,
-          previousOutputs,
-          baseline,
-          guardrailsDraft,
-          compareRunAId,
-          compareRunBId,
-          compareLabel,
-          inputPanel: {
-            selectedModelIds: selectedModelsDraft.map((m) => m.id),
-            customModels: customModelsDraft,
-          },
-        })
-      );
-    } catch {}
-  }, [
-    inputPrompt,
-    outputs,
-    previousOutputs,
-    baseline,
-    guardrailsDraft,
-    compareRunAId,
-    compareRunBId,
-    compareLabel,
-    selectedModelsDraft,
-    customModelsDraft,
-  ]);
 
   const handleGenerate = async (
     selectedModels: ModelConfig[],
@@ -1060,7 +917,7 @@ export default function App() {
                   onChange={(e) =>
                     setGuardrailsDraft((p) => ({ ...p, mustContain: e.target.value }))
                   }
-                  placeholder="e.g. followers, repos, stars"
+                  placeholder="e.g. req_1, req_2, req_3"
                   className="mt-1 w-full px-3 py-2 border-2 border-black font-mono text-xs focus:outline-none focus:ring-2 focus:ring-babyblue/50"
                 />
               </label>
@@ -1181,7 +1038,7 @@ export default function App() {
                 <input
                   value={baselineNameDraft}
                   onChange={(e) => setBaselineNameDraft(e.target.value)}
-                  placeholder="e.g. Octocat plan v1"
+                  placeholder="e.g. baseline_plan_v1"
                   className="mt-1 w-full px-3 py-2 border-2 border-black font-mono text-xs focus:outline-none focus:ring-2 focus:ring-babyblue/50"
                 />
               </label>

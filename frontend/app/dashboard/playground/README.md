@@ -10,8 +10,8 @@ A powerful comparison tool for testing and evaluating multiple AI models side-by
 - **Diff Mode**: Line-by-line output diffs and metric deltas (tokens/cost/time) vs a baseline/previous run
 - **Guardrails**: Lightweight checks (JSON validity, must-contain keywords, max latency, max cost)
 - **Replay From Trace**: Load a real production trace as a baseline to re-run and compare
-- **Baseline Library**: Save approved runs and reload them later (stored in browser localStorage)
-- **Run History + A/B Compare**: Keep the last 10 runs and diff any two runs (A vs B)
+- **Baseline Library**: Save approved runs and reload them later (persisted server-side when authenticated)
+- **Run History + A/B Compare**: Keep the last 10 runs and diff any two runs (persisted server-side when authenticated)
 - **Regression Report**: One-click report table (pass/fail + deltas) across selected models
 - **Smart Caching**: In-memory LRU cache (1-hour TTL) prevents duplicate API calls and saves credits
 - **Code Export**: Provider-aware exports (Python/TypeScript/cURL) + VS Code Dark+ syntax highlighting
@@ -211,11 +211,11 @@ Guardrails are lightweight checks that only affect pass/fail badges and the Regr
 - Click "Save Current Run" to store an approved run as a baseline
 - Click "Load" to set the baseline + restore the prompt/outputs
 
-Baselines are stored in the browser via localStorage (not in Supabase yet).
+Baselines are persisted server-side when authenticated; otherwise they are kept in-memory for the current session only.
 
 ### Run History + A/B Compare
 
-- The last 10 runs are stored (localStorage)
+- The last 10 runs are persisted server-side when authenticated
 - Rename runs for clarity
 - Pick any two runs as **A** and **B**, then click “Compare A/B”
   - A becomes the “compare-to”
@@ -289,8 +289,7 @@ The playground includes comprehensive error handling:
 - Check that traces exist in your database
 
 ### Baselines / Runs Reset When Navigating
-- The playground stores state in localStorage
-- If you are in private browsing mode, storage may be cleared between navigations
+- When unauthenticated, playground state is not persisted (refreshing will reset it)
 
 ## Development
 
@@ -335,7 +334,7 @@ curl -X POST http://localhost:3000/api/playground/generate \
 - API keys are server-side only (not exposed to browser)
 - API routes use Next.js middleware for authentication
 - Trace data access is user-scoped via Supabase auth
-- Baselines / run history are stored in localStorage (do not store secrets in prompts)
+- Playground state is not stored in browser localStorage
 
 ## Future Enhancements
 
