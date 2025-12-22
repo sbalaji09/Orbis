@@ -162,7 +162,8 @@ class SpanWorker:
                     "total_tokens": 0,
                     "status": "running",
                     "user_id": str(span.get('user_id')),  # Keep as UUID string
-                    "trace_hash_id": generate_hash_key(str(span.get('user_id')), str(span.get('agent_id')))
+                    "trace_hash_id": generate_hash_key(str(span.get('user_id')), str(span.get('agent_id'))),
+                    "tags": span.get('tags', [])
                 }
                 trace["trace_id"] = trace_id
 
