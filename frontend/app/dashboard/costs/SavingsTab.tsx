@@ -6,6 +6,7 @@ import {
   fetchSavingsOpportunities,
   type SavingsOpportunities,
 } from "@/lib/cost-api-client";
+import { getModelLogo } from "@/lib/model-logos";
 
 interface SavingsTabProps {
   selectedPeriod: number;
@@ -42,76 +43,36 @@ export default function SavingsTab({ selectedPeriod }: SavingsTabProps) {
     fetchData();
   }, [selectedPeriod, token, authLoading]);
 
-  // Show skeleton while auth is loading
-  if (authLoading) {
+  const formatCost = (value: number) => `$${value.toFixed(4)}`;
+
+  if (authLoading || isLoading) {
     return (
-      <div className="space-y-6">
-        {/* Summary Card Skeleton */}
-        <div className="bg-green-50 border-2 border-green-600 p-6">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-green-200 animate-pulse rounded" />
-            <div>
-              <div className="h-5 w-32 bg-green-200 animate-pulse mb-2" />
-              <div className="h-8 w-24 bg-green-200 animate-pulse" />
-            </div>
-          </div>
-        </div>
-        {/* Table Skeletons */}
-        {[...Array(3)].map((_, i) => (
-          <div
-            key={i}
-            className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6"
-          >
-            <div className="h-6 w-64 bg-gray-200 animate-pulse mb-4" />
-            <div className="space-y-3">
-              {[...Array(3)].map((_, j) => (
-                <div key={j} className="h-12 bg-gray-100 animate-pulse" />
-              ))}
-            </div>
-          </div>
-        ))}
+      <div className="flex items-center justify-center py-12 text-black/60">
+        Loading...
       </div>
     );
   }
 
-  if (isLoading) {
+  if (!token) {
     return (
-      <div className="flex items-center justify-center py-12 text-muted">
-        <div className="flex items-center gap-2">
-          <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-              fill="none"
-            />
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            />
-          </svg>
-          <span>Loading savings data...</span>
-        </div>
+      <div className="text-center py-12 text-black/60">
+        Sign in to see savings data.
       </div>
     );
   }
 
   if (!savingsData) {
     return (
-      <div className="text-center py-12 text-muted">
-        No savings data available
+      <div className="text-center py-12 text-black/60">
+        No savings data available.
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Potential Savings Summary Card */}
-      <div className="bg-green-50 border-2 border-green-600 p-6">
+      {/* Potential Savings Summary */}
+      <div className="bg-green-50 border-2 border-green-600 shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6">
         <div className="flex items-center gap-3">
           <svg
             className="w-8 h-8 text-green-600"
@@ -130,18 +91,24 @@ export default function SavingsTab({ selectedPeriod }: SavingsTabProps) {
             <h2 className="text-lg font-semibold text-green-800">
               Potential Savings
             </h2>
-            <p className="text-2xl font-bold text-green-600">
-              ${savingsData.total_potential_savings.toFixed(2)}
+            <p className="text-2xl font-bold text-green-600 font-mono">
+              {formatCost(savingsData.total_potential_savings)}
             </p>
+            <div className="text-xs text-green-800/70 font-mono mt-1">
+              Last {selectedPeriod} days
+            </div>
           </div>
         </div>
       </div>
 
       {/* Model Cost Analysis */}
       <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6">
-        <h2 className="text-lg font-semibold mb-4">
-          Cost by Model (Consider Cheaper Alternatives)
+        <h2 className="text-lg font-semibold mb-2">
+          <span className="text-black/40">{`// `}</span>Cost by Model
         </h2>
+        <p className="text-sm text-black/60 mb-4">
+          Consider cheaper alternatives for high-volume use cases
+        </p>
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b-2 border-black">
@@ -155,23 +122,40 @@ export default function SavingsTab({ selectedPeriod }: SavingsTabProps) {
             </tr>
           </thead>
           <tbody>
-            {savingsData.model_analysis.map((m) => (
-              <tr key={m.model} className="border-b border-gray-200">
-                <td className="py-3 px-4 font-mono">{m.model}</td>
-                <td className="text-right py-3 px-4 font-mono">
-                  {m.call_count.toLocaleString()}
-                </td>
-                <td className="text-right py-3 px-4 font-mono">
-                  ${m.total_cost.toFixed(4)}
-                </td>
-                <td className="text-right py-3 px-4 font-mono">
-                  {Math.round(m.avg_tokens).toLocaleString()}
-                </td>
-                <td className="text-right py-3 px-4 font-mono">
-                  ${m.avg_cost_per_call.toFixed(4)}
-                </td>
-              </tr>
-            ))}
+            {savingsData.model_analysis.map((m) => {
+              const logo = getModelLogo(m.model);
+              return (
+                <tr
+                  key={m.model}
+                  className="border-b border-gray-200 hover:bg-gray-50"
+                >
+                  <td className="py-3 px-4">
+                    <div className="flex items-center gap-2">
+                      {logo ? (
+                        <img
+                          src={logo.src}
+                          alt={logo.alt}
+                          className="w-4 h-4"
+                        />
+                      ) : null}
+                      <span className="font-mono">{m.model}</span>
+                    </div>
+                  </td>
+                  <td className="text-right py-3 px-4 font-mono">
+                    {m.call_count.toLocaleString()}
+                  </td>
+                  <td className="text-right py-3 px-4 font-mono">
+                    {formatCost(m.total_cost)}
+                  </td>
+                  <td className="text-right py-3 px-4 font-mono">
+                    {Math.round(m.avg_tokens).toLocaleString()}
+                  </td>
+                  <td className="text-right py-3 px-4 font-mono">
+                    {formatCost(m.avg_cost_per_call)}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -179,11 +163,10 @@ export default function SavingsTab({ selectedPeriod }: SavingsTabProps) {
       {/* Verbose Traces */}
       <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6">
         <h2 className="text-lg font-semibold mb-2">
-          Verbose Responses (High Output/Input Ratio)
+          <span className="text-black/40">{`// `}</span>Verbose Responses
         </h2>
-        <p className="text-sm text-muted mb-4">
-          Traces where output tokens significantly exceed input - consider
-          prompting for concise responses.
+        <p className="text-sm text-black/60 mb-4">
+          High output/input ratio - consider prompting for concise responses
         </p>
         <table className="w-full text-sm">
           <thead>
@@ -197,8 +180,11 @@ export default function SavingsTab({ selectedPeriod }: SavingsTabProps) {
             </tr>
           </thead>
           <tbody>
-            {savingsData.verbose_traces.slice(0, 5).map((t) => (
-              <tr key={t.trace_hash_id} className="border-b border-gray-200">
+            {savingsData.verbose_traces.slice(0, 10).map((t) => (
+              <tr
+                key={t.trace_hash_id}
+                className="border-b border-gray-200 hover:bg-gray-50"
+              >
                 <td className="py-3 px-4 font-mono text-xs">
                   {t.trace_hash_id.slice(0, 8)}
                 </td>
@@ -209,11 +195,11 @@ export default function SavingsTab({ selectedPeriod }: SavingsTabProps) {
                 <td className="text-right py-3 px-4 font-mono">
                   {t.output_tokens.toLocaleString()}
                 </td>
-                <td className="text-right py-3 px-4 font-mono">
+                <td className="text-right py-3 px-4 font-mono text-warning">
                   {t.output_input_ratio.toFixed(2)}x
                 </td>
                 <td className="text-right py-3 px-4 font-mono">
-                  ${t.total_cost.toFixed(4)}
+                  {formatCost(t.total_cost)}
                 </td>
               </tr>
             ))}
@@ -221,15 +207,14 @@ export default function SavingsTab({ selectedPeriod }: SavingsTabProps) {
         </table>
       </div>
 
-      {/* Repeated Prompts (Caching Opportunities) */}
+      {/* Repeated Prompts */}
       {savingsData.repeated_prompts.length > 0 && (
         <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6">
           <h2 className="text-lg font-semibold mb-2">
-            Repeated Prompts (Cache Opportunities)
+            <span className="text-black/40">{`// `}</span>Repeated Prompts
           </h2>
-          <p className="text-sm text-muted mb-4">
-            Similar prompts sent multiple times - consider implementing prompt
-            caching.
+          <p className="text-sm text-black/60 mb-4">
+            Cache opportunities - similar prompts sent multiple times
           </p>
           <table className="w-full text-sm">
             <thead>
@@ -247,18 +232,37 @@ export default function SavingsTab({ selectedPeriod }: SavingsTabProps) {
               </tr>
             </thead>
             <tbody>
-              {savingsData.repeated_prompts.slice(0, 5).map((p, i) => (
-                <tr key={i} className="border-b border-gray-200">
-                  <td className="py-3 px-4 font-mono">{p.model}</td>
-                  <td className="py-3 px-4 max-w-md truncate">{p.preview}</td>
-                  <td className="text-right py-3 px-4 font-mono">
-                    {p.repetition_count}
-                  </td>
-                  <td className="text-right py-3 px-4 font-mono">
-                    ${p.potential_savings.toFixed(4)}
-                  </td>
-                </tr>
-              ))}
+              {savingsData.repeated_prompts.slice(0, 10).map((p, i) => {
+                const logo = getModelLogo(p.model);
+                return (
+                  <tr
+                    key={`${p.model}:${i}`}
+                    className="border-b border-gray-200 hover:bg-gray-50"
+                  >
+                    <td className="py-3 px-4">
+                      <div className="flex items-center gap-2">
+                        {logo ? (
+                          <img
+                            src={logo.src}
+                            alt={logo.alt}
+                            className="w-4 h-4"
+                          />
+                        ) : null}
+                        <span className="font-mono text-xs">{p.model}</span>
+                      </div>
+                    </td>
+                    <td className="py-3 px-4 max-w-md truncate text-black/60">
+                      {p.preview}
+                    </td>
+                    <td className="text-right py-3 px-4 font-mono">
+                      {p.repetition_count}x
+                    </td>
+                    <td className="text-right py-3 px-4 font-mono text-success">
+                      {formatCost(p.potential_savings)}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

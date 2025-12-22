@@ -2,36 +2,19 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import dynamic from "next/dynamic";
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
-} from "recharts";
 import { useAuth } from "@/hooks/useAuth";
+import { getModelLogo } from "@/lib/model-logos";
+import { CHART_PALETTE, SERIES_COLORS } from "@/lib/echarts-theme";
 import {
   fetchCostTrends,
   fetchCostByAgent,
   fetchCostByModel,
-  fetchTokenBreakdown,
-  fetchTokensPerTrace,
-  fetchSavingsOpportunities,
   type CostTrend,
   type CostByAgent,
   type CostByModel,
-  type TokenBreakdown,
-  type TokensPerTrace,
-  type SavingsOpportunities,
 } from "@/lib/cost-api-client";
+import ECharts from "@/components/ECharts";
+import type { EChartsOption } from "echarts";
 
 // Lazy load tab components to reduce initial bundle size
 const OverviewTab = dynamic(() => import("./OverviewTab"), {
@@ -49,9 +32,14 @@ const SavingsTab = dynamic(() => import("./SavingsTab"), {
   ssr: false,
 });
 
+const FeaturesTab = dynamic(() => import("./FeaturesTab"), {
+  loading: () => <TabLoader />,
+  ssr: false,
+});
+
 function TabLoader() {
   return (
-    <div className="flex items-center justify-center py-12 text-muted">
+    <div className="flex items-center justify-center py-12 text-black/60">
       <div className="flex items-center gap-2">
         <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
           <circle
@@ -81,15 +69,9 @@ interface CostDashboardClientProps {
   initialByModel: CostByModel[];
 }
 
-const COLORS = [
-  "#5b5fff",
-  "#e8c302",
-  "#10b981",
-  "#f59e0b",
-  "#dc2626",
-  "#8b5cf6",
-  "#06b6d4",
-];
+// Reference palette (blue / orange / green / pink)
+const AGENT_COLORS = SERIES_COLORS;
+const MODEL_COLORS = SERIES_COLORS;
 
 const PERIOD_OPTIONS = [
   { label: "Last 7 days", value: 7 },
@@ -99,6 +81,32 @@ const PERIOD_OPTIONS = [
   { label: "Last 90 days", value: 90 },
   { label: "Custom", value: -1 },
 ];
+
+function shortModelName(modelName: string): string {
+  const s = modelName.trim();
+  if (s.length <= 16) return s;
+  const parts = s.split(/[-_]/);
+  const prefix = parts.slice(0, 3).join("-");
+  return prefix.length <= 16 ? `${prefix}…` : `${s.slice(0, 15)}…`;
+}
+
+function hashString(input: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < input.length; i++) {
+    h ^= input.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function getAgentColor(agentName: string): string {
+  const idx = hashString(agentName) % AGENT_COLORS.length;
+  return AGENT_COLORS[idx] ?? CHART_PALETTE.blue;
+}
+
+function getModelColor(modelName: string, index: number): string {
+  return MODEL_COLORS[index % MODEL_COLORS.length] ?? CHART_PALETTE.blue;
+}
 
 export default function CostDashboardClient({
   initialTrends,
@@ -118,14 +126,9 @@ export default function CostDashboardClient({
   const [isLoading, setIsLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const hasFetchedRef = useRef(false);
-  const [tokenBreakdown, setTokenBreakdown] = useState<TokenBreakdown[]>([]);
-  const [tokensPerTrace, setTokensPerTrace] = useState<TokensPerTrace[]>([]);
-  const [savingsData, setSavingsData] = useState<SavingsOpportunities | null>(
-    null
-  );
-  const [activeTab, setActiveTab] = useState<"overview" | "tokens" | "savings">(
-    "overview"
-  );
+  const [activeTab, setActiveTab] = useState<
+    "overview" | "features" | "tokens" | "savings"
+  >("overview");
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -151,31 +154,8 @@ export default function CostDashboardClient({
     };
   }, []);
 
-  // Fetch data when period changes (only overview tab data)
-  useEffect(() => {
-    if (!token) return;
-
-    const fetchInitialTokenData = async () => {
-      try {
-        const [tokenData, traceTokens, savings] = await Promise.all([
-          fetchTokenBreakdown(30, token),
-          fetchTokensPerTrace(30, token),
-          fetchSavingsOpportunities(30, token),
-        ]);
-        setTokenBreakdown(tokenData);
-        setTokensPerTrace(traceTokens);
-        setSavingsData(savings);
-      } catch (error) {
-        console.error("Failed to fetch initial token data:", error);
-      }
-    };
-
-    fetchInitialTokenData();
-  }, [token]);
-
   // Fetch data when period changes
   useEffect(() => {
-    // Skip if this is the initial render with 30 days (already have server data)
     if (selectedPeriod === 30 && !hasFetchedRef.current) {
       return;
     }
@@ -187,28 +167,15 @@ export default function CostDashboardClient({
       try {
         const { startDate, endDate } = getDateRange(selectedPeriod);
 
-        const [
-          trendsData,
-          agentData,
-          modelData,
-          tokenData,
-          traceTokens,
-          savings,
-        ] = await Promise.all([
+        const [trendsData, agentData, modelData] = await Promise.all([
           fetchCostTrends(selectedPeriod, token),
           fetchCostByAgent(startDate, endDate, token),
           fetchCostByModel(startDate, endDate, token),
-          fetchTokenBreakdown(selectedPeriod, token),
-          fetchTokensPerTrace(selectedPeriod, token),
-          fetchSavingsOpportunities(selectedPeriod, token),
         ]);
 
         setTrends(trendsData);
         setByAgent(agentData);
         setByModel(modelData);
-        setTokenBreakdown(tokenData);
-        setTokensPerTrace(traceTokens);
-        setSavingsData(savings);
       } catch (error) {
         console.error("Failed to fetch cost data:", error);
       } finally {
@@ -290,6 +257,282 @@ export default function CostDashboardClient({
       comparisonDays,
     };
   }, [trends, selectedPeriod]);
+
+  const costOverTimeOption: EChartsOption = useMemo(() => {
+    const x = trends.map((d) => formatDate(d.date));
+    const y = trends.map((d) => d.total_cost);
+
+    return {
+      animation: false,
+      grid: { left: 55, right: 20, top: 20, bottom: 30 },
+      xAxis: {
+        type: "category",
+        data: x,
+        axisLine: { lineStyle: { color: "#000" } },
+        axisTick: { lineStyle: { color: "#000" } },
+        axisLabel: { fontFamily: "JetBrains Mono, monospace", fontSize: 12 },
+      },
+      yAxis: {
+        type: "value",
+        axisLine: { lineStyle: { color: "#000" } },
+        axisTick: { lineStyle: { color: "#000" } },
+        splitLine: { lineStyle: { color: "rgba(0,0,0,0.1)", type: "dashed" } },
+        axisLabel: {
+          formatter: (v: number) => `$${Number(v).toFixed(2)}`,
+          fontFamily: "JetBrains Mono, monospace",
+          fontSize: 12,
+        },
+      },
+      tooltip: {
+        trigger: "axis",
+        borderColor: "#000",
+        borderWidth: 2,
+        backgroundColor: "#fff",
+        textStyle: { fontFamily: "JetBrains Mono, monospace", color: "#000" },
+        formatter: (params: any) => {
+          const p = Array.isArray(params) ? params[0] : params;
+          const label = p?.axisValueLabel ?? "";
+          const raw = p?.value ?? p?.data?.value ?? p?.data;
+          const value = typeof raw === "number" ? raw : Number(raw ?? 0);
+          return `${label}<br/>Cost : ${formatCost(value)}`;
+        },
+      },
+      series: [
+        {
+          type: "line",
+          data: y,
+          smooth: true,
+          symbol: "circle",
+          symbolSize: 8,
+          showSymbol: false,
+          lineStyle: { color: "#5b5fff", width: 3 },
+          itemStyle: { color: "#5b5fff", borderColor: "#000", borderWidth: 2 },
+          emphasis: { focus: "series" },
+        },
+      ],
+    };
+  }, [trends, formatCost, formatDate]);
+
+  // Enhanced Cost by Agent with beautiful gradients and styling
+  const costByAgentOption: EChartsOption = useMemo(() => {
+    const categories = byAgent.map((d) => d.agent);
+    const values = byAgent.map((d) => d.total_cost);
+    
+    return {
+      animation: false,
+      grid: { 
+        left: 44,
+        right: 14,
+        top: 14,
+        bottom: 54,
+        containLabel: false
+      },
+      xAxis: {
+        type: "category",
+        data: categories,
+        boundaryGap: true,
+        axisLine: { 
+          show: true,
+          lineStyle: { color: CHART_PALETTE.grid, width: 1 } 
+        },
+        axisTick: { 
+          show: false
+        },
+        axisLabel: {
+          interval: 0,
+          rotate: categories.length > 6 ? 25 : 15,
+          fontFamily: "JetBrains Mono, monospace",
+          fontSize: 11,
+          color: CHART_PALETTE.text,
+          margin: 16,
+        },
+      },
+      yAxis: {
+        type: "value",
+        min: 0,
+        splitNumber: 5,
+        max: (v: any) => {
+          const max = Number(v?.max ?? 0);
+          return max > 0 ? max * 1.05 : 0;
+        },
+        axisLine: { show: false },
+        axisTick: { show: false },
+        splitLine: { 
+          lineStyle: { 
+            color: CHART_PALETTE.grid, 
+            width: 1
+          } 
+        },
+        axisLabel: {
+          formatter: (v: number) => `$${Number(v).toFixed(2)}`,
+          fontFamily: "JetBrains Mono, monospace",
+          fontSize: 12,
+          color: CHART_PALETTE.text,
+          margin: 14,
+        },
+      },
+      tooltip: {
+        trigger: "axis",
+        axisPointer: { 
+          type: "shadow",
+          shadowStyle: {
+            color: "rgba(0, 0, 0, 0.05)"
+          }
+        },
+        borderColor: CHART_PALETTE.tooltipBorder,
+        borderWidth: 1,
+        backgroundColor: "#fff",
+        extraCssText: "box-shadow: 0 12px 24px rgba(0,0,0,0.12); border-radius: 10px;",
+        textStyle: { fontFamily: "JetBrains Mono, monospace", color: "#111827" },
+        padding: [12, 16],
+        formatter: (params: any) => {
+          const p = Array.isArray(params) ? params[0] : params;
+          const label = p?.name ?? "";
+          const value = Number(p?.value ?? 0);
+          return `<div style="font-weight: 600; margin-bottom: 6px;">${label}</div><div style="font-size: 13px;">Cost: ${formatCost(value)}</div>`;
+        },
+      },
+      series: [
+        {
+          type: "bar",
+          data: values.map((v, i) => ({
+            value: v,
+            itemStyle: {
+              color: getAgentColor(categories[i] ?? String(i)),
+              borderRadius: 0,
+            },
+          })),
+          barMaxWidth: 64,
+          barCategoryGap: categories.length <= 4 ? "35%" : "20%",
+          emphasis: { disabled: true },
+        },
+      ],
+    };
+  }, [byAgent, formatCost]);
+
+  // Enhanced Cost by Model with beautiful gradients and styling
+  const costByModelOption: EChartsOption = useMemo(() => {
+    const models = byModel.map((d) => d.model);
+    const costs = byModel.map((d) => d.total_cost);
+    const costByModelName: Record<string, number> = Object.fromEntries(
+      byModel.map((row) => [row.model, row.total_cost])
+    );
+
+    const rich: Record<string, any> = {
+      text: {
+        fontFamily: "JetBrains Mono, monospace",
+        fontSize: 11,
+        color: "#374151",
+        padding: [0, 0, 0, 0],
+      },
+    };
+
+    const logoForModel: Record<string, string> = {};
+    for (const [i, m] of models.entries()) {
+      const logo = getModelLogo(m);
+      if (logo) {
+        const key = `logo${i}`;
+        rich[key] = {
+          height: 14,
+          width: 14,
+          align: "center",
+          backgroundColor: { image: logo.src },
+        };
+        logoForModel[m] = key;
+      }
+    }
+
+    return {
+      animation: false,
+      grid: { left: 54, right: 18, top: 14, bottom: 70, containLabel: false },
+      xAxis: {
+        type: "category",
+        data: models,
+        axisLine: { 
+          show: true,
+          lineStyle: { color: CHART_PALETTE.grid, width: 1 } 
+        },
+        axisTick: { show: false },
+        axisLabel: {
+          interval: 0,
+          rotate: 35,
+          fontFamily: "JetBrains Mono, monospace",
+          fontSize: 11,
+          color: CHART_PALETTE.text,
+          margin: 12,
+          formatter: (value: string) => {
+            const k = logoForModel[value];
+            if (k) return `{${k}|} {text|${shortModelName(value)}}`;
+            return `{text|${shortModelName(value)}}`;
+          },
+          rich,
+        },
+      },
+      yAxis: {
+        type: "value",
+        axisLine: { show: false },
+        axisTick: { show: false },
+        splitLine: { 
+          lineStyle: { 
+            color: CHART_PALETTE.grid, 
+            width: 1
+          } 
+        },
+        axisLabel: {
+          formatter: (v: number) => `$${Number(v).toFixed(2)}`,
+          fontFamily: "JetBrains Mono, monospace",
+          fontSize: 12,
+          color: CHART_PALETTE.text,
+        },
+      },
+      tooltip: {
+        trigger: "axis",
+        axisPointer: { 
+          type: "shadow",
+          shadowStyle: {
+            color: "rgba(0, 0, 0, 0.05)"
+          }
+        },
+        borderColor: CHART_PALETTE.tooltipBorder,
+        borderWidth: 1,
+        backgroundColor: "#fff",
+        extraCssText: "box-shadow: 0 12px 24px rgba(0,0,0,0.12); border-radius: 10px;",
+        textStyle: { fontFamily: "JetBrains Mono, monospace", color: "#111827" },
+        padding: [12, 16],
+        formatter: (params: any) => {
+          const p = Array.isArray(params) ? params[0] : params;
+          const label = String(p?.name ?? p?.axisValue ?? p?.axisValueLabel ?? "");
+          const direct = costByModelName[label];
+          const raw = p?.value ?? p?.data?.value ?? p?.data;
+          const fallback =
+            typeof raw === "number"
+              ? raw
+              : Array.isArray(raw)
+                ? Number(raw[0])
+                : typeof raw === "object" && raw && "value" in raw
+                  ? Number((raw as any).value)
+                  : Number(raw ?? 0);
+          const value = Number.isFinite(direct) ? direct : fallback;
+          return `<div style="font-weight: 600; margin-bottom: 6px;">${label}</div><div style="font-size: 13px;">Cost: ${formatCost(Number.isFinite(value) ? value : 0)}</div>`;
+        },
+      },
+      series: [
+        {
+          type: "bar",
+          data: costs.map((v, i) => ({
+            value: v,
+            itemStyle: {
+              color: getModelColor(models[i] ?? "", i),
+              borderRadius: 0,
+            },
+          })),
+          barMaxWidth: 46,
+          barCategoryGap: "22%",
+          emphasis: { disabled: true },
+        },
+      ],
+    };
+  }, [byModel, formatCost]);
 
   // Show skeleton while auth is loading to prevent layout shift
   if (authLoading) {
@@ -373,7 +616,7 @@ export default function CostDashboardClient({
             <button
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               disabled={isLoading}
-              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-2 border-black bg-white hover:bg-gray-50 transition-all ${
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-2 border-black bg-white hover:bg-gray-50 transition-all shadow-[2px_2px_0_rgba(0,0,0,0.1)] hover:shadow-[4px_4px_0_rgba(0,0,0,0.15)] ${
                 isLoading ? "opacity-50 cursor-not-allowed" : ""
               }`}
             >
@@ -424,11 +667,11 @@ export default function CostDashboardClient({
                 value={customDays}
                 onChange={(e) => setCustomDays(e.target.value)}
                 placeholder="Days (1-365)"
-                className="w-32 px-3 py-2 text-sm border-2 border-black focus:outline-none focus:ring-2 focus:ring-babyblue"
+                className="w-32 px-3 py-2 text-sm border-2 border-black focus:outline-none focus:ring-2 focus:ring-babyblue font-mono"
               />
               <button
                 onClick={handleCustomSubmit}
-                className="px-4 py-2 text-sm font-medium border-2 border-black bg-babyblue text-white hover:bg-babyblue/90"
+                className="px-4 py-2 text-sm font-medium border-2 border-black bg-babyblue text-white hover:bg-babyblue/90 shadow-[2px_2px_0_rgba(0,0,0,0.1)]"
               >
                 Apply
               </button>
@@ -437,7 +680,7 @@ export default function CostDashboardClient({
                   setShowCustomInput(false);
                   setCustomDays("");
                 }}
-                className="px-4 py-2 text-sm font-medium border-2 border-black bg-white hover:bg-gray-50"
+                className="px-4 py-2 text-sm font-medium border-2 border-black bg-white hover:bg-gray-50 shadow-[2px_2px_0_rgba(0,0,0,0.1)]"
               >
                 Cancel
               </button>
@@ -445,7 +688,7 @@ export default function CostDashboardClient({
           )}
 
           {isLoading && (
-            <div className="flex items-center gap-2 text-sm text-muted">
+            <div className="flex items-center gap-2 text-sm text-black/60">
               <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
                 <circle
                   className="opacity-25"
@@ -481,7 +724,7 @@ export default function CostDashboardClient({
               className={`px-4 py-2 text-sm font-medium -mb-[2px] border-2 border-b-0 transition-colors ${
                 activeTab === tab.id
                   ? "border-black bg-white"
-                  : "border-transparent hover:bg-gray-50"
+                  : "border-transparent"
               }`}
             >
               {tab.label}
@@ -498,7 +741,7 @@ export default function CostDashboardClient({
               <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-5">
                 <div className="flex items-center gap-2 mb-2">
                   <svg
-                    className="w-4 h-4 text-muted"
+                    className="w-4 h-4 text-black/60"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -510,14 +753,14 @@ export default function CostDashboardClient({
                       d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                     />
                   </svg>
-                  <span className="text-xs font-medium text-muted uppercase tracking-wide">
+                  <span className="text-xs font-medium text-black/60 uppercase tracking-wide">
                     Total Cost
                   </span>
                 </div>
                 <div className="text-2xl font-bold font-mono">
                   {formatCostShort(metrics.totalCost)}
                 </div>
-                <div className="text-xs text-muted mt-1">
+                <div className="text-xs text-black/60 mt-1">
                   Last {selectedPeriod} days
                 </div>
               </div>
@@ -526,7 +769,7 @@ export default function CostDashboardClient({
               <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-5">
                 <div className="flex items-center gap-2 mb-2">
                   <svg
-                    className="w-4 h-4 text-muted"
+                    className="w-4 h-4 text-black/60"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -538,14 +781,14 @@ export default function CostDashboardClient({
                       d="M13 10V3L4 14h7v7l9-11h-7z"
                     />
                   </svg>
-                  <span className="text-xs font-medium text-muted uppercase tracking-wide">
+                  <span className="text-xs font-medium text-black/60 uppercase tracking-wide">
                     LLM Calls
                   </span>
                 </div>
                 <div className="text-2xl font-bold font-mono">
                   {metrics.totalCalls.toLocaleString()}
                 </div>
-                <div className="text-xs text-muted mt-1">
+                <div className="text-xs text-black/60 mt-1">
                   Last {selectedPeriod} days
                 </div>
               </div>
@@ -554,7 +797,7 @@ export default function CostDashboardClient({
               <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-5">
                 <div className="flex items-center gap-2 mb-2">
                   <svg
-                    className="w-4 h-4 text-muted"
+                    className="w-4 h-4 text-black/60"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -566,21 +809,21 @@ export default function CostDashboardClient({
                       d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
                     />
                   </svg>
-                  <span className="text-xs font-medium text-muted uppercase tracking-wide">
+                  <span className="text-xs font-medium text-black/60 uppercase tracking-wide">
                     Avg/Day
                   </span>
                 </div>
                 <div className="text-2xl font-bold font-mono">
                   {formatCostShort(metrics.avgCostPerDay)}
                 </div>
-                <div className="text-xs text-muted mt-1">Daily average</div>
+                <div className="text-xs text-black/60 mt-1">Daily average</div>
               </div>
 
               {/* Trend */}
               <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-5">
                 <div className="flex items-center gap-2 mb-2">
                   <svg
-                    className="w-4 h-4 text-muted"
+                    className="w-4 h-4 text-black/60"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -592,7 +835,7 @@ export default function CostDashboardClient({
                       d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
                     />
                   </svg>
-                  <span className="text-xs font-medium text-muted uppercase tracking-wide">
+                  <span className="text-xs font-medium text-black/60 uppercase tracking-wide">
                     Trend
                   </span>
                 </div>
@@ -604,7 +847,7 @@ export default function CostDashboardClient({
                   {metrics.trendPct >= 0 ? "+" : ""}
                   {metrics.trendPct.toFixed(1)}%
                 </div>
-                <div className="text-xs text-muted mt-1">
+                <div className="text-xs text-black/60 mt-1">
                   vs previous {metrics.comparisonDays}D
                 </div>
               </div>
@@ -612,49 +855,14 @@ export default function CostDashboardClient({
 
             {/* Charts Row 1: Cost Trend */}
             <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6 mb-6">
-              <h2 className="text-lg font-semibold mb-4">Cost Over Time</h2>
+              <h2 className="text-lg font-semibold mb-4">
+                <span className="text-black/40">{`// `}</span>Cost Over Time
+              </h2>
               <div className="h-72">
                 {trends.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart
-                      data={trends}
-                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
-                      <XAxis
-                        dataKey="date"
-                        tickFormatter={formatDate}
-                        tick={{ fontSize: 12 }}
-                        stroke="#666"
-                      />
-                      <YAxis
-                        tickFormatter={(v) => `$${v.toFixed(2)}`}
-                        tick={{ fontSize: 12 }}
-                        stroke="#666"
-                      />
-                      <Tooltip
-                        formatter={(value) => [
-                          formatCost(Number(value)),
-                          "Cost",
-                        ]}
-                        labelFormatter={(label) => formatDate(String(label))}
-                        contentStyle={{
-                          border: "2px solid black",
-                          borderRadius: 0,
-                        }}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="total_cost"
-                        stroke="#5b5fff"
-                        strokeWidth={2}
-                        dot={{ fill: "#5b5fff", strokeWidth: 0, r: 3 }}
-                        activeDot={{ r: 5, fill: "#5b5fff" }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
+                  <ECharts option={costOverTimeOption} height={288} />
                 ) : (
-                  <div className="h-full flex items-center justify-center text-muted">
+                  <div className="h-full flex items-center justify-center text-black/60">
                     {isLoading ? "Loading..." : "No cost data available"}
                   </div>
                 )}
@@ -665,48 +873,14 @@ export default function CostDashboardClient({
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Cost by Agent */}
               <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6">
-                <h2 className="text-lg font-semibold mb-4">Cost by Agent</h2>
+                <h2 className="text-lg font-semibold mb-4">
+                  <span className="text-black/40">{`// `}</span>Cost by Agent
+                </h2>
                 <div className="h-64">
                   {byAgent.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={byAgent}
-                        layout="vertical"
-                        margin={{ top: 5, right: 30, left: 80, bottom: 5 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
-                        <XAxis
-                          type="number"
-                          tickFormatter={(v) => `$${v.toFixed(2)}`}
-                          tick={{ fontSize: 12 }}
-                          stroke="#666"
-                        />
-                        <YAxis
-                          type="category"
-                          dataKey="agent"
-                          tick={{ fontSize: 12 }}
-                          stroke="#666"
-                          width={70}
-                        />
-                        <Tooltip
-                          formatter={(value) => [
-                            formatCost(Number(value)),
-                            "Cost",
-                          ]}
-                          contentStyle={{
-                            border: "2px solid black",
-                            borderRadius: 0,
-                          }}
-                        />
-                        <Bar
-                          dataKey="total_cost"
-                          fill="#5b5fff"
-                          radius={[0, 4, 4, 0]}
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
+                    <ECharts option={costByAgentOption} height={256} />
                   ) : (
-                    <div className="h-full flex items-center justify-center text-muted">
+                    <div className="h-full flex items-center justify-center text-black/60">
                       {isLoading ? "Loading..." : "No agent data available"}
                     </div>
                   )}
@@ -715,45 +889,14 @@ export default function CostDashboardClient({
 
               {/* Cost by Model */}
               <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6">
-                <h2 className="text-lg font-semibold mb-4">Cost by Model</h2>
+                <h2 className="text-lg font-semibold mb-4">
+                  <span className="text-black/40">{`// `}</span>Cost by Model
+                </h2>
                 <div className="h-64">
                   {byModel.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={byModel}
-                          dataKey="total_cost"
-                          nameKey="model"
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={80}
-                          label={({ name, percent }) =>
-                            `${name} (${((percent ?? 0) * 100).toFixed(0)}%)`
-                          }
-                          labelLine={true}
-                        >
-                          {byModel.map((_, index) => (
-                            <Cell
-                              key={`cell-${index}`}
-                              fill={COLORS[index % COLORS.length]}
-                            />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          formatter={(value) => [
-                            formatCost(Number(value)),
-                            "Cost",
-                          ]}
-                          contentStyle={{
-                            border: "2px solid black",
-                            borderRadius: 0,
-                          }}
-                        />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
+                    <ECharts option={costByModelOption} height={256} />
                   ) : (
-                    <div className="h-full flex items-center justify-center text-muted">
+                    <div className="h-full flex items-center justify-center text-black/60">
                       {isLoading ? "Loading..." : "No model data available"}
                     </div>
                   )}
@@ -764,7 +907,8 @@ export default function CostDashboardClient({
             {/* Cost Breakdown Table */}
             <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6 mt-6">
               <h2 className="text-lg font-semibold mb-4">
-                Cost Breakdown by Model
+                <span className="text-black/40">{`// `}</span>Cost Breakdown by
+                Model
               </h2>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -810,12 +954,26 @@ export default function CostDashboardClient({
                           >
                             <td className="py-3 px-4">
                               <div className="flex items-center gap-2">
-                                <div
-                                  className="w-3 h-3 rounded-sm"
-                                  style={{
-                                    backgroundColor: COLORS[i % COLORS.length],
-                                  }}
-                                />
+                                {(() => {
+                                  const logo = getModelLogo(row.model);
+                                  if (logo) {
+                                    return (
+                                      <img
+                                        src={logo.src}
+                                        alt={logo.alt}
+                                        className="w-4 h-4"
+                                      />
+                                    );
+                                  }
+                                  return (
+                                    <div
+                                      className="w-3 h-3 rounded-full"
+                                      style={{
+                                        backgroundColor: getModelColor(row.model, i),
+                                      }}
+                                    />
+                                  );
+                                })()}
                                 <span className="font-mono">{row.model}</span>
                               </div>
                             </td>
@@ -835,8 +993,7 @@ export default function CostDashboardClient({
                                     className="h-full rounded-full"
                                     style={{
                                       width: `${pct}%`,
-                                      backgroundColor:
-                                        COLORS[i % COLORS.length],
+                                      backgroundColor: getModelColor(row.model, i),
                                     }}
                                   />
                                 </div>
@@ -850,7 +1007,10 @@ export default function CostDashboardClient({
                       })
                     ) : (
                       <tr>
-                        <td colSpan={5} className="py-8 text-center text-muted">
+                        <td
+                          colSpan={5}
+                          className="py-8 text-center text-black/60"
+                        >
                           {isLoading ? "Loading..." : "No model data available"}
                         </td>
                       </tr>
@@ -861,189 +1021,16 @@ export default function CostDashboardClient({
             </div>
           </>
         )}
-        {/* Token Breakdown Over Time */}
+
+        {activeTab === "features" && (
+          <FeaturesTab selectedPeriod={selectedPeriod} colors={MODEL_COLORS} />
+        )}
+        
         {activeTab === "tokens" && (
           <TokensTab selectedPeriod={selectedPeriod} formatDate={formatDate} />
         )}
 
-        {activeTab === "savings" && savingsData && (
-          <div className="space-y-6">
-            {/* Potential Savings Summary Card */}
-            <div className="bg-green-50 border-2 border-green-600 p-6">
-              <div className="flex items-center gap-3">
-                <svg
-                  className="w-8 h-8 text-green-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                <div>
-                  <h2 className="text-lg font-semibold text-green-800">
-                    Potential Savings
-                  </h2>
-                  <p className="text-2xl font-bold text-green-600">
-                    ${savingsData.total_potential_savings.toFixed(2)}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Model Cost Analysis */}
-            <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6">
-              <h2 className="text-lg font-semibold mb-4">
-                Cost by Model (Consider Cheaper Alternatives)
-              </h2>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b-2 border-black">
-                    <th className="text-left py-3 px-4 font-semibold">Model</th>
-                    <th className="text-right py-3 px-4 font-semibold">
-                      Calls
-                    </th>
-                    <th className="text-right py-3 px-4 font-semibold">
-                      Total Cost
-                    </th>
-                    <th className="text-right py-3 px-4 font-semibold">
-                      Avg Tokens
-                    </th>
-                    <th className="text-right py-3 px-4 font-semibold">
-                      Avg Cost/Call
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {savingsData.model_analysis.map((m) => (
-                    <tr key={m.model} className="border-b border-gray-200">
-                      <td className="py-3 px-4 font-mono">{m.model}</td>
-                      <td className="text-right py-3 px-4 font-mono">
-                        {m.call_count.toLocaleString()}
-                      </td>
-                      <td className="text-right py-3 px-4 font-mono">
-                        ${m.total_cost.toFixed(4)}
-                      </td>
-                      <td className="text-right py-3 px-4 font-mono">
-                        {m.avg_tokens.toFixed(0)}
-                      </td>
-                      <td className="text-right py-3 px-4 font-mono">
-                        ${m.avg_cost_per_call.toFixed(6)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Verbose Traces */}
-            <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6">
-              <h2 className="text-lg font-semibold mb-2">
-                Verbose Responses (High Output/Input Ratio)
-              </h2>
-              <p className="text-sm text-muted mb-4">
-                Traces where output tokens significantly exceed input - consider
-                prompting for concise responses.
-              </p>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b-2 border-black">
-                    <th className="text-left py-3 px-4 font-semibold">Trace</th>
-                    <th className="text-left py-3 px-4 font-semibold">Agent</th>
-                    <th className="text-right py-3 px-4 font-semibold">
-                      Input
-                    </th>
-                    <th className="text-right py-3 px-4 font-semibold">
-                      Output
-                    </th>
-                    <th className="text-right py-3 px-4 font-semibold">
-                      Ratio
-                    </th>
-                    <th className="text-right py-3 px-4 font-semibold">Cost</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {savingsData.verbose_traces.slice(0, 5).map((t) => (
-                    <tr
-                      key={t.trace_hash_id}
-                      className="border-b border-gray-200"
-                    >
-                      <td className="py-3 px-4 font-mono text-xs">
-                        {t.trace_hash_id?.slice(0, 8)}
-                      </td>
-                      <td className="py-3 px-4">{t.agent_name}</td>
-                      <td className="text-right py-3 px-4 font-mono">
-                        {t.input_tokens.toLocaleString()}
-                      </td>
-                      <td className="text-right py-3 px-4 font-mono">
-                        {t.output_tokens.toLocaleString()}
-                      </td>
-                      <td className="text-right py-3 px-4 font-mono text-orange-600">
-                        {t.output_input_ratio}x
-                      </td>
-                      <td className="text-right py-3 px-4 font-mono">
-                        ${t.total_cost.toFixed(4)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Repeated Prompts (Caching Opportunities) */}
-            {savingsData.repeated_prompts.length > 0 && (
-              <div className="bg-white border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,0.15)] p-6">
-                <h2 className="text-lg font-semibold mb-2">
-                  Repeated Prompts (Cache Opportunities)
-                </h2>
-                <p className="text-sm text-muted mb-4">
-                  Similar prompts sent multiple times - consider implementing
-                  prompt caching.
-                </p>
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b-2 border-black">
-                      <th className="text-left py-3 px-4 font-semibold">
-                        Model
-                      </th>
-                      <th className="text-left py-3 px-4 font-semibold">
-                        Prompt Preview
-                      </th>
-                      <th className="text-right py-3 px-4 font-semibold">
-                        Repetitions
-                      </th>
-                      <th className="text-right py-3 px-4 font-semibold">
-                        Potential Savings
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {savingsData.repeated_prompts.slice(0, 5).map((p, i) => (
-                      <tr key={i} className="border-b border-gray-200">
-                        <td className="py-3 px-4 font-mono text-xs">
-                          {p.model}
-                        </td>
-                        <td className="py-3 px-4 text-xs truncate max-w-xs">
-                          {p.preview}
-                        </td>
-                        <td className="text-right py-3 px-4 font-mono">
-                          {p.repetition_count}x
-                        </td>
-                        <td className="text-right py-3 px-4 font-mono text-green-600">
-                          ${p.potential_savings.toFixed(4)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
+        {activeTab === "savings" && <SavingsTab selectedPeriod={selectedPeriod} />}
       </div>
     </div>
   );

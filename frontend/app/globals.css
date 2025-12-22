@@ -80,6 +80,19 @@ h6 {
   box-sizing: border-box;
 }
 
+/* Recharts: avoid the default blue focus ring on mouse click */
+.recharts-wrapper:focus:not(:focus-visible),
+.recharts-surface:focus:not(:focus-visible),
+.recharts-responsive-container:focus:not(:focus-visible),
+svg.recharts-surface:focus:not(:focus-visible) {
+  outline: none !important;
+}
+
+/* ECharts: avoid focus ring on mouse click */
+.echarts-for-react:focus:not(:focus-visible) {
+  outline: none !important;
+}
+
 /* Custom scrollbar
 ::-webkit-scrollbar {
   width: 8px;
