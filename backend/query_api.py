@@ -577,7 +577,22 @@ async def get_user_tags(
         return {"tags": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
+
+# analyze prompt lengths to identify bloated prompts and optimization opportunities    
+@app.get("/cost/prompt-analysis")
+async def get_prompt_length_analysis(
+    days: int = Query(default=30, ge=1, le=365),
+    user_id: str = Depends(get_user_id_from_token)
+):
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: db.get_prompt_length_analysis(user_id, days)
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.exception_handler(ValidationError)
 async def validation_error_handler(request, exc: ValidationError):
     return JSONResponse(
