@@ -1,10 +1,10 @@
 import os
 from db_connection import db
-from fastapi import APIRouter, HTTPException, Header, Depends
+from fastapi import APIRouter, HTTPException, Header, Depends, Query
 from s3connect import *
 import hashlib
 from llm_service import get_llm_comparison_analysis
-from auth_utils import get_user_id_from_token
+from auth_utils import get_auth_context, get_user_id_from_auth
 from semantic_versioning import SemanticVersionAnalyzer, get_next_version
 
 router = APIRouter(
@@ -12,9 +12,20 @@ router = APIRouter(
     tags=["prompts"]
 )
 
+def _require_agent_owner(user_id: str, agent_id: str) -> None:
+    try:
+        db.assert_user_owns_agent(user_id, agent_id)
+    except Exception:
+        raise HTTPException(status_code=403, detail="Access denied")
+
 
 @router.post("/prompts")
-async def create_prompt(agent_id: str, name: str, content: str):
+async def create_prompt(
+    agent_id: str,
+    name: str,
+    content: str,
+    auth: dict = Depends(get_auth_context),
+):
     """
     Create a new prompt version with automatic semantic versioning.
     Detects if changes are major (2.0) or minor (1.1) based on content analysis.
@@ -23,10 +34,21 @@ async def create_prompt(agent_id: str, name: str, content: str):
     content_hash = compute_hash_sha256(content)
 
     try:
+        user_id = auth.get("user_id")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+
+        # If authenticated via API key and we know which agent it belongs to, lock prompts to that agent.
+        if auth.get("auth_type") == "api_key" and auth.get("agent_id") and str(agent_id) != str(auth["agent_id"]):
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        # Ensure user can only write prompts for their own agents
+        _require_agent_owner(user_id, agent_id)
+
         # Check if prompt with identical hash already exists
-        if db.check_identical_hash(content_hash, agent_id):
+        if db.check_identical_hash(content_hash, agent_id, user_id):
             # Return the existing prompt instead of creating duplicate
-            existing_prompt = db.get_prompt_by_hash(content_hash, agent_id)
+            existing_prompt = db.get_prompt_by_hash(content_hash, agent_id, user_id)
             if existing_prompt:
                 return existing_prompt
             # If not found, continue to create new one
@@ -36,7 +58,7 @@ async def create_prompt(agent_id: str, name: str, content: str):
         aws_region = os.getenv('AWS_REGION')
 
         # Get version info including latest content for semantic analysis
-        version_info = db.max_version_prompt_number(name)
+        version_info = db.max_version_prompt_number(name, agent_id, user_id)
         version_number = version_info["Version number"]
         latest_semantic_version = version_info.get("semantic_version", "0.0")
         latest_content = version_info.get("latest_content", "")
@@ -79,6 +101,8 @@ async def create_prompt(agent_id: str, name: str, content: str):
             semantic_version=semantic_version
         )
         return prompt_version
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -86,12 +110,14 @@ async def create_prompt(agent_id: str, name: str, content: str):
 
 
 @router.get("/families")
-async def get_all_prompt_families(user_id: str = Depends(get_user_id_from_token)):
+async def get_all_prompt_families(user_id: str = Depends(get_user_id_from_auth)):
     try:
         print(f"Fetching prompt families for user_id: {user_id}")
         families = db.get_all_prompt_families(user_id)
         print(f"Found {len(families)} families")
         return {"families": families}
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error fetching prompt families: {str(e)}")
         import traceback
@@ -100,18 +126,27 @@ async def get_all_prompt_families(user_id: str = Depends(get_user_id_from_token)
 
 
 @router.get("/diff")
-async def get_prompt_differences(prompt_id1: str, prompt_id2: str):
+async def get_prompt_differences(
+    prompt_id1: str,
+    prompt_id2: str,
+    user_id: str = Depends(get_user_id_from_auth),
+):
     try:
         # Get prompt records with both s3_url and content_preview
         conn = db.get_connection()
         try:
             with conn.cursor() as cur:
                 query = """
-                    SELECT prompt_id, s3_url, content_preview
-                    FROM prompt_versions
-                    WHERE prompt_id IN (%s, %s)
+                    SELECT pv.prompt_id, pv.s3_url, pv.content_preview
+                    FROM prompt_versions pv
+                    LEFT JOIN agents a ON pv.agent_id = a.agent_id
+                    WHERE pv.prompt_id IN (%s, %s)
+                    AND (
+                        pv.agent_id IS NULL
+                        OR a.user_id = %s
+                    )
                 """
-                cur.execute(query, (prompt_id1, prompt_id2))
+                cur.execute(query, (prompt_id1, prompt_id2, user_id))
                 rows = cur.fetchall()
 
                 prompt_data = {}
@@ -142,41 +177,96 @@ async def get_prompt_differences(prompt_id1: str, prompt_id2: str):
             content2 = download_prompt_from_s3(s3_url2)
 
         return prompt_diff(content1, prompt_id1, content2, prompt_id2)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/agent/{agent_id}")
-async def get_prompt_by_agent_id(agent_id: str):
+async def get_prompt_by_agent_id(
+    agent_id: str,
+    auth: dict = Depends(get_auth_context),
+):
     try:
-        prompt_families = db.get_prompts_by_agent_id(agent_id)
+        user_id = auth.get("user_id")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+
+        # If authenticated via API key and we know which agent it belongs to, lock reads to that agent.
+        if auth.get("auth_type") == "api_key" and auth.get("agent_id") and str(agent_id) != str(auth["agent_id"]):
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        _require_agent_owner(user_id, agent_id)
+        prompt_families = db.get_prompts_by_agent_id(agent_id, user_id)
         return prompt_families
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/{name}/versions")
-async def get_version_numbers(name: str):
+async def get_version_numbers(
+    name: str,
+    agent_id: str | None = Query(None, description="Optional agent_id to scope versions"),
+    auth: dict = Depends(get_auth_context),
+):
     try:
-        prompt_versions = db.get_prompts_versions(name)
+        user_id = auth.get("user_id")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+
+        if auth.get("auth_type") == "api_key" and auth.get("agent_id"):
+            # API key auth can only access its own agent-scoped prompts
+            if agent_id is None or str(agent_id) != str(auth["agent_id"]):
+                raise HTTPException(status_code=403, detail="Access denied")
+
+        if agent_id is not None:
+            _require_agent_owner(user_id, agent_id)
+        prompt_versions = db.get_prompts_versions(name, user_id, agent_id=agent_id)
         return {"versions": prompt_versions}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/{name}/content")
-async def get_prompt_content(name: str, semantic_version: str | None = None):
+async def get_prompt_content(
+    name: str,
+    semantic_version: str | None = Query(None, description="Semantic version (e.g., 1.2)"),
+    version_number: int | None = Query(None, description="Integer version number (legacy)"),
+    agent_id: str | None = Query(None, description="Optional agent_id to scope prompt"),
+    auth: dict = Depends(get_auth_context),
+):
     try:
-        # If no semantic_version provided, get the latest version
-        if semantic_version is None:
-            versions = db.get_prompts_versions(name)
-            if not versions or len(versions) == 0:
-                raise HTTPException(
-                    status_code=404, detail="No versions found for this prompt")
-            semantic_version = versions[0]["semantic_version"]
+        user_id = auth.get("user_id")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Unauthorized")
 
-        prompt_record = db.get_prompt_by_semantic_version(
-            name, semantic_version)
+        if auth.get("auth_type") == "api_key" and auth.get("agent_id"):
+            if agent_id is None or str(agent_id) != str(auth["agent_id"]):
+                raise HTTPException(status_code=403, detail="Access denied")
+
+        if agent_id is not None:
+            _require_agent_owner(user_id, agent_id)
+
+        prompt_record = None
+        if version_number is not None:
+            prompt_record = db.get_prompt_version(name, version_number, user_id, agent_id=agent_id)
+        else:
+            # If no semantic_version provided, get the latest version
+            if semantic_version is None:
+                versions = db.get_prompts_versions(name, user_id, agent_id=agent_id)
+                if not versions:
+                    raise HTTPException(
+                        status_code=404, detail="No versions found for this prompt")
+                semantic_version = versions[0]["semantic_version"]
+
+            prompt_record = db.get_prompt_by_semantic_version(
+                name, semantic_version, user_id, agent_id=agent_id)
+
         if not prompt_record:
             raise HTTPException(
                 status_code=404, detail=f"Version {semantic_version} not found for prompt '{name}'")
@@ -198,24 +288,49 @@ async def get_prompt_content(name: str, semantic_version: str | None = None):
 
 
 @router.post("/{name}/rollback")
-async def rollback_prompt(name: str, semantic_version: str):
+async def rollback_prompt(
+    name: str,
+    semantic_version: str,
+    agent_id: str | None = Query(None, description="Optional agent_id to scope rollback"),
+    auth: dict = Depends(get_auth_context),
+):
     """
     Rollback to a previous version by creating a new version with the old content.
     Maintains semantic versioning by incrementing as a minor change.
     """
     try:
+        user_id = auth.get("user_id")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+
+        if auth.get("auth_type") == "api_key" and auth.get("agent_id"):
+            if agent_id is None or str(agent_id) != str(auth["agent_id"]):
+                raise HTTPException(status_code=403, detail="Access denied")
+
+        if agent_id is not None:
+            _require_agent_owner(user_id, agent_id)
         prompt_rollback = db.get_prompt_by_semantic_version(
-            name, semantic_version)
+            name, semantic_version, user_id, agent_id=agent_id)
         if not prompt_rollback:
             raise HTTPException(
                 status_code=404,
                 detail=f"Version {semantic_version} not found for prompt '{name}'"
             )
 
-        db.deactivate_version_by_semantic(name, semantic_version)
+        if not prompt_rollback.get("agent_id"):
+            raise HTTPException(status_code=403, detail="Rollback not allowed for global prompts")
+
+        db.deactivate_version_by_semantic(
+            name,
+            semantic_version,
+            user_id,
+            agent_id=str(prompt_rollback["agent_id"]),
+        )
 
         # Get current version info for semantic versioning
-        version_info = db.max_version_prompt_number(name)
+        version_info = db.max_version_prompt_number(
+            name, str(prompt_rollback["agent_id"]), user_id
+        )
         new_version_number = version_info["Version number"]
         current_semantic = version_info.get("semantic_version", "1.0")
 
@@ -250,27 +365,52 @@ async def rollback_prompt(name: str, semantic_version: str):
 
 
 @router.get("/analytics/{prompt_name}")
-async def get_prompt_analytics(prompt_name: str):
+async def get_prompt_analytics(
+    prompt_name: str,
+    agent_id: str | None = Query(None, description="Optional agent_id to scope analytics"),
+    auth: dict = Depends(get_auth_context),
+):
     try:
-        analytics = db.get_prompt_analytics(prompt_name)
+        user_id = auth.get("user_id")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+
+        if auth.get("auth_type") == "api_key" and auth.get("agent_id"):
+            if agent_id is None or str(agent_id) != str(auth["agent_id"]):
+                raise HTTPException(status_code=403, detail="Access denied")
+
+        if agent_id is not None:
+            _require_agent_owner(user_id, agent_id)
+        analytics = db.get_prompt_analytics(prompt_name, user_id, agent_id=agent_id)
         return {"prompt_name": prompt_name, "versions": analytics}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/compare")
-async def compare_prompt_analytics(prompt_id1: str, prompt_id2: str):
+async def compare_prompt_analytics(
+    prompt_id1: str,
+    prompt_id2: str,
+    user_id: str = Depends(get_user_id_from_auth),
+):
     try:
         # Get prompt records with both s3_url and content_preview
         conn = db.get_connection()
         try:
             with conn.cursor() as cur:
                 query = """
-                    SELECT prompt_id, s3_url, content_preview
-                    FROM prompt_versions
-                    WHERE prompt_id IN (%s, %s)
+                    SELECT pv.prompt_id, pv.s3_url, pv.content_preview
+                    FROM prompt_versions pv
+                    LEFT JOIN agents a ON pv.agent_id = a.agent_id
+                    WHERE pv.prompt_id IN (%s, %s)
+                    AND (
+                        pv.agent_id IS NULL
+                        OR a.user_id = %s
+                    )
                 """
-                cur.execute(query, (prompt_id1, prompt_id2))
+                cur.execute(query, (prompt_id1, prompt_id2, user_id))
                 rows = cur.fetchall()
 
                 prompt_data = {}
@@ -302,15 +442,16 @@ async def compare_prompt_analytics(prompt_id1: str, prompt_id2: str):
 
         # get analytics for both prompts
         analytics_list = db.get_prompt_analytics_for_prompt_ids(
-            prompt_id1, prompt_id2)
+            prompt_id1, prompt_id2, user_id
+        )
         analytics1 = next((a for a in analytics_list if str(
             a['prompt_id']) == prompt_id1), {})
         analytics2 = next((a for a in analytics_list if str(
             a['prompt_id']) == prompt_id2), {})
 
         # get sample outputs for each version
-        outputs1 = db.get_output_preview(prompt_id1, limit=5)
-        outputs2 = db.get_output_preview(prompt_id2, limit=5)
+        outputs1 = db.get_output_preview(prompt_id1, user_id, limit=5)
+        outputs2 = db.get_output_preview(prompt_id2, user_id, limit=5)
 
         output_texts1 = [o['output_preview']
                          for o in outputs1 if o['output_preview']]
@@ -358,6 +499,8 @@ async def compare_prompt_analytics(prompt_id1: str, prompt_id2: str):
             "diff": diff_result,
             "llm_analysis": llm_analysis
         }
+    except HTTPException:
+        raise
     except Exception as e:
         print(e)
         raise HTTPException(status_code=500, detail=str(e))

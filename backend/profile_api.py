@@ -38,11 +38,17 @@ def cache_api_key_in_redis(user_id: str, api_key: str):
     redis_key = f"api_key:{api_key}"
     redis_client.set(redis_key, user_id)
 
+def cache_agent_id_in_redis(agent_id: str, api_key: str):
+    """Cache agent_id for API key to support API-key auth on other services."""
+    redis_key = f"api_key_agent:{api_key}"
+    redis_client.set(redis_key, agent_id)
+
 
 def remove_api_key_from_redis(api_key: str):
     """Remove API key from Redis cache"""
     redis_key = f"api_key:{api_key}"
     redis_client.delete(redis_key)
+    redis_client.delete(f"api_key_agent:{api_key}")
 
 # api key endpoint for users
 
@@ -69,8 +75,11 @@ async def create_ai_agent(agent_name: str, user_id: str = Depends(get_user_id_fr
         agent_id = res.split(":")[-1].strip()
 
         # Cache plaintext API key in Redis for fast auth lookup by data-pipeline
-        # Redis stores: api_key:{plaintext} -> user_id
+        # Redis stores:
+        # - api_key:{plaintext} -> user_id
+        # - api_key_agent:{plaintext} -> agent_id
         cache_api_key_in_redis(user_id, api_key)
+        cache_agent_id_in_redis(agent_id, api_key)
 
         return {
             "agent_id": agent_id,

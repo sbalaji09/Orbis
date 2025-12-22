@@ -60,7 +60,24 @@ class SupabaseDB:
             with conn.cursor() as cur:
                 # Build dynamic SQL based on whether agent_id is provided
                 tags = trace_data.get('tags', [])
-                if trace_data.get('agent_id') is not None:
+                agent_id = trace_data.get('agent_id')
+                if agent_id is not None:
+                    # Prevent cross-tenant agent_id association (never trust client-provided agent_id)
+                    cur.execute(
+                        """
+                        SELECT 1 FROM agents
+                        WHERE agent_id = %s AND user_id = %s
+                        LIMIT 1
+                        """,
+                        (agent_id, trace_data.get('user_id')),
+                    )
+                    if cur.fetchone() is None:
+                        print(
+                            f"[SECURITY] Ignoring agent_id not owned by user: user_id={trace_data.get('user_id')} agent_id={agent_id}"
+                        )
+                        agent_id = None
+
+                if agent_id is not None:
                     sql = """
                         INSERT INTO traces (
                             trace_id, trace_hash_id, user_id, agent_id, start_time, status,
@@ -75,7 +92,7 @@ class SupabaseDB:
                         trace_data.get('trace_id'),
                         trace_data.get('trace_hash_id'),
                         trace_data.get('user_id'),
-                        trace_data.get('agent_id'),
+                        agent_id,
                         trace_data.get('start_time'),
                         trace_data.get('status', 'running'),
                         trace_data.get('total_cost', 0),
@@ -662,6 +679,28 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
 
+    def user_owns_agent(self, user_id: str, agent_id: str) -> bool:
+        """Return True if the agent exists and belongs to the given user."""
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT 1
+                    FROM agents
+                    WHERE agent_id = %s AND user_id = %s
+                    LIMIT 1
+                    """,
+                    (agent_id, user_id),
+                )
+                return cur.fetchone() is not None
+        finally:
+            self.return_connection(conn)
+
+    def assert_user_owns_agent(self, user_id: str, agent_id: str) -> None:
+        if not self.user_owns_agent(user_id, agent_id):
+            raise Exception("Access denied: agent does not belong to user")
+
     # insert multiple spans in a single query for batch processing
     # includes streaming metrics: is_streaming, time_to_first_token, tokens_per_second
     def insert_spans_batch(self, spans: list) -> list:
@@ -744,14 +783,16 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
 
-    def check_identical_hash(self, hash_val: str, agent_id: str) -> Optional[bool]:
+    def check_identical_hash(self, hash_val: str, agent_id: str, user_id: str) -> Optional[bool]:
         conn = self.get_connection()
         try:
+            self.assert_user_owns_agent(user_id, agent_id)
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 query = """
-                    SELECT * FROM prompt_versions
+                    SELECT 1 FROM prompt_versions
                     WHERE prompt_hash = %s
                     AND agent_id = %s
+                    LIMIT 1
                 """
                 cur.execute(query, (hash_val, agent_id))
 
@@ -759,20 +800,18 @@ class SupabaseDB:
                 if not result:
                     return None
 
-                span = dict(result)
-                if len(span) != 0:
-                    return True
-                return False
+                return True
         except Exception as e:
             conn.rollback()
             raise Exception(f"Failed to check for identical hash: {e}")
         finally:
             self.return_connection(conn)
 
-    def get_prompt_by_hash(self, hash_val: str, agent_id: str) -> Optional[dict]:
+    def get_prompt_by_hash(self, hash_val: str, agent_id: str, user_id: str) -> Optional[dict]:
         """Get prompt version by hash - returns the prompt data"""
         conn = self.get_connection()
         try:
+            self.assert_user_owns_agent(user_id, agent_id)
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 query = """
                     SELECT * FROM prompt_versions
@@ -787,32 +826,33 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
 
-    def max_version_prompt_number(self, name: str) -> dict:
+    def max_version_prompt_number(self, name: str, agent_id: str, user_id: str) -> dict:
         """
         Get the next version number for a prompt.
         Returns both integer version and semantic version.
         """
         conn = self.get_connection()
         try:
+            self.assert_user_owns_agent(user_id, agent_id)
             with conn.cursor() as cur:
                 # Get max integer version for backward compatibility
                 query_int = """
                     SELECT COALESCE(MAX(version_number), 0) + 1 
                     FROM prompt_versions 
-                    WHERE name = %s
+                    WHERE name = %s AND agent_id = %s
                 """
-                cur.execute(query_int, (name,))
+                cur.execute(query_int, (name, agent_id))
                 next_int_version = cur.fetchone()[0]
 
                 # Get latest semantic version
                 query_semantic = """
                     SELECT semantic_version, content_preview
                     FROM prompt_versions 
-                    WHERE name = %s 
+                    WHERE name = %s AND agent_id = %s
                     ORDER BY created_at DESC 
                     LIMIT 1
                 """
-                cur.execute(query_semantic, (name,))
+                cur.execute(query_semantic, (name, agent_id))
                 result = cur.fetchone()
 
                 if result:
@@ -929,12 +969,17 @@ class SupabaseDB:
                         MAX(pv.version_number) as latest_version,
                         MAX(pv.created_at) as last_updated
                     FROM prompt_versions pv
-                    LEFT JOIN agents a ON pv.agent_id = a.agent_id
-                    WHERE a.user_id = %s OR pv.agent_id IS NULL OR a.user_id IS NULL
+                    LEFT JOIN agents a ON pv.agent_id = a.agent_id AND a.user_id = %s
+                    WHERE
+                        pv.agent_id IS NULL
+                        OR EXISTS (
+                            SELECT 1 FROM agents a2
+                            WHERE a2.agent_id = pv.agent_id AND a2.user_id = %s
+                        )
                     GROUP BY pv.name, pv.agent_id, a.agent_name
                     ORDER BY MAX(pv.created_at) DESC
                 """
-                cur.execute(query, (user_id,))
+                cur.execute(query, (user_id, user_id))
                 return cur.fetchall()  # fetchall() will return a list of dictionaries
         except Exception as e:
             conn.rollback()
@@ -942,9 +987,10 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
 
-    def get_prompts_by_agent_id(self, agent_id: str) -> List[Dict]:
+    def get_prompts_by_agent_id(self, agent_id: str, user_id: str) -> List[Dict]:
         conn = self.get_connection()
         try:
+            self.assert_user_owns_agent(user_id, agent_id)
             with conn.cursor() as cur:
                 query = """
                     SELECT * from prompt_versions
@@ -1011,20 +1057,42 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
 
-    def get_prompts_versions(self, name: str) -> List[Dict]:
+    def get_prompts_versions(self, name: str, user_id: str, agent_id: Optional[str] = None) -> List[Dict]:
         conn = self.get_connection()
         try:
             with conn.cursor() as cur:
-                query = """
-                    SELECT version_number, semantic_version, metadata, created_at, is_active, prompt_hash, prompt_id
-                    FROM prompt_versions
-                    WHERE name = %s
-                    ORDER BY version_number DESC
-                """
-                cur.execute(
-                    query,
-                    (name,)
+                agent_clause = ""
+                params: List[Any] = [name, user_id]
+                if agent_id is not None:
+                    self.assert_user_owns_agent(user_id, agent_id)
+                    agent_clause = " AND pv.agent_id = %s"
+                    params.append(agent_id)
+
+                query = (
+                    """
+                    SELECT
+                        pv.version_number,
+                        pv.semantic_version,
+                        pv.metadata,
+                        pv.created_at,
+                        pv.is_active,
+                        pv.prompt_hash,
+                        pv.prompt_id
+                    FROM prompt_versions pv
+                    LEFT JOIN agents a ON pv.agent_id = a.agent_id
+                    WHERE
+                        pv.name = %s
+                        AND (
+                            pv.agent_id IS NULL
+                            OR a.user_id = %s
+                        )
+                    """
+                    + agent_clause
+                    + """
+                    ORDER BY pv.version_number DESC
+                    """
                 )
+                cur.execute(query, tuple(params))
                 rows = cur.fetchall()
 
             versions = [
@@ -1045,20 +1113,40 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
 
-    def get_prompt_version(self, name: str, version_number: int) -> List[Dict]:
+    def get_prompt_version(self, name: str, version_number: int, user_id: str, agent_id: Optional[str] = None) -> Optional[Dict]:
         conn = self.get_connection()
         try:
             with conn.cursor() as cur:
-                query = """
-                    SELECT prompt_id, s3_url, agent_id, prompt_hash, content_preview, metadata, parent_version_id
-                    FROM prompt_versions
-                    WHERE name = %s
-                    AND version_number = %s
-                """
-                cur.execute(
-                    query,
-                    (name, version_number,)
+                agent_clause = ""
+                params: List[Any] = [name, version_number, user_id]
+                if agent_id is not None:
+                    self.assert_user_owns_agent(user_id, agent_id)
+                    agent_clause = " AND pv.agent_id = %s"
+                    params.append(agent_id)
+
+                query = (
+                    """
+                    SELECT
+                        pv.prompt_id,
+                        pv.s3_url,
+                        pv.agent_id,
+                        pv.prompt_hash,
+                        pv.content_preview,
+                        pv.metadata,
+                        pv.parent_version_id
+                    FROM prompt_versions pv
+                    LEFT JOIN agents a ON pv.agent_id = a.agent_id
+                    WHERE
+                        pv.name = %s
+                        AND pv.version_number = %s
+                        AND (
+                            pv.agent_id IS NULL
+                            OR a.user_id = %s
+                        )
+                    """
+                    + agent_clause
                 )
+                cur.execute(query, tuple(params))
                 row = cur.fetchone()
 
             if not row:
@@ -1075,22 +1163,45 @@ class SupabaseDB:
             }
 
         except Exception as e:
-            raise Exception(f"Failed to get prompt version")
+            raise Exception(f"Failed to get prompt version: {e}")
         finally:
             self.return_connection(conn)
 
-    def get_prompt_by_semantic_version(self, name: str, semantic_version: str) -> Dict:
+    def get_prompt_by_semantic_version(self, name: str, semantic_version: str, user_id: str, agent_id: Optional[str] = None) -> Optional[Dict]:
         """Get a specific prompt version by semantic version (e.g., '1.2')"""
         conn = self.get_connection()
         try:
             with conn.cursor() as cur:
-                query = """
-                    SELECT prompt_id, s3_url, agent_id, prompt_hash, content_preview, metadata, parent_version_id
-                    FROM prompt_versions
-                    WHERE name = %s
-                    AND semantic_version = %s
-                """
-                cur.execute(query, (name, semantic_version))
+                agent_clause = ""
+                params: List[Any] = [name, semantic_version, user_id]
+                if agent_id is not None:
+                    self.assert_user_owns_agent(user_id, agent_id)
+                    agent_clause = " AND pv.agent_id = %s"
+                    params.append(agent_id)
+
+                query = (
+                    """
+                    SELECT
+                        pv.prompt_id,
+                        pv.s3_url,
+                        pv.agent_id,
+                        pv.prompt_hash,
+                        pv.content_preview,
+                        pv.metadata,
+                        pv.parent_version_id
+                    FROM prompt_versions pv
+                    LEFT JOIN agents a ON pv.agent_id = a.agent_id
+                    WHERE
+                        pv.name = %s
+                        AND pv.semantic_version = %s
+                        AND (
+                            pv.agent_id IS NULL
+                            OR a.user_id = %s
+                        )
+                    """
+                    + agent_clause
+                )
+                cur.execute(query, tuple(params))
                 row = cur.fetchone()
 
             if not row:
@@ -1131,18 +1242,33 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
 
-    def deactivate_version_by_semantic(self, name: str, semantic_version: str) -> str:
+    def deactivate_version_by_semantic(self, name: str, semantic_version: str, user_id: str, agent_id: Optional[str] = None) -> str:
         """Deactivate a prompt version by semantic version"""
         conn = self.get_connection()
         try:
             with conn.cursor() as cur:
-                query = """
-                    UPDATE prompt_versions
+                agent_clause = ""
+                params: List[Any] = [name, semantic_version, user_id]
+                if agent_id is not None:
+                    self.assert_user_owns_agent(user_id, agent_id)
+                    agent_clause = " AND pv.agent_id = %s"
+                    params.append(agent_id)
+
+                # Only allow deactivating versions tied to agents owned by the user.
+                query = (
+                    """
+                    UPDATE prompt_versions pv
                     SET is_active = False
-                    WHERE name = %s
-                    AND semantic_version = %s
-                """
-                cur.execute(query, (name, semantic_version))
+                    FROM agents a
+                    WHERE
+                        pv.name = %s
+                        AND pv.semantic_version = %s
+                        AND pv.agent_id = a.agent_id
+                        AND a.user_id = %s
+                    """
+                    + agent_clause
+                )
+                cur.execute(query, tuple(params))
             return "sucessful"
         except Exception as e:
             raise Exception(
@@ -1150,7 +1276,7 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
 
-    def get_prompt_analytics(self, prompt_name: str) -> List[Dict[str, Any]]:
+    def get_prompt_analytics(self, prompt_name: str, user_id: str, agent_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         Get consolidated analytics for all versions of a prompt family.
         Returns trace count, avg cost, avg latency, and error rate per version.
@@ -1158,7 +1284,15 @@ class SupabaseDB:
         conn = self.get_connection()
         try:
             with conn.cursor() as cur:
-                query = """
+                agent_clause = ""
+                params: List[Any] = [prompt_name, user_id]
+                if agent_id is not None:
+                    self.assert_user_owns_agent(user_id, agent_id)
+                    agent_clause = " AND pv.agent_id = %s"
+                    params.append(agent_id)
+
+                query = (
+                    """
                     SELECT
                         pv.prompt_id,
                         pv.name,
@@ -1173,11 +1307,17 @@ class SupabaseDB:
                         ) AS error_rate_pct
                     FROM prompt_versions pv
                     LEFT JOIN spans s ON s.prompt_id = pv.prompt_id
+                    LEFT JOIN traces t ON t.trace_id = s.trace_id
                     WHERE pv.name = %s
+                    AND t.user_id = %s
+                    """
+                    + agent_clause
+                    + """
                     GROUP BY pv.prompt_id, pv.name, pv.semantic_version
                     ORDER BY pv.semantic_version DESC;
-                """
-                cur.execute(query, (prompt_name,))
+                    """
+                )
+                cur.execute(query, tuple(params))
                 rows = cur.fetchall()
 
                 # Convert rows to dicts using cursor description
@@ -1207,7 +1347,7 @@ class SupabaseDB:
             self.return_connection(conn)
 
     # gets analytics for two versions of a prompt
-    def get_prompt_analytics_for_prompt_ids(self, prompt_id1: str, prompt_id2: str) -> List[Dict[str, Any]]:
+    def get_prompt_analytics_for_prompt_ids(self, prompt_id1: str, prompt_id2: str, user_id: str) -> List[Dict[str, Any]]:
         conn = self.get_connection()
         try:
             with conn.cursor() as cur:
@@ -1226,11 +1366,18 @@ class SupabaseDB:
                         ) AS error_rate_pct
                     FROM prompt_versions pv
                     LEFT JOIN spans s ON s.prompt_id = pv.prompt_id
+                    LEFT JOIN traces t ON t.trace_id = s.trace_id
+                    LEFT JOIN agents a ON pv.agent_id = a.agent_id
                     WHERE pv.prompt_id IN (%s, %s)
+                    AND t.user_id = %s
+                    AND (
+                        pv.agent_id IS NULL
+                        OR a.user_id = %s
+                    )
                     GROUP BY pv.prompt_id, pv.name, pv.semantic_version
                     ORDER BY pv.semantic_version DESC;
                 """
-                cur.execute(query, (prompt_id1, prompt_id2))
+                cur.execute(query, (prompt_id1, prompt_id2, user_id, user_id))
                 rows = cur.fetchall()
 
             # Convert rows to dicts using cursor description
@@ -1241,19 +1388,21 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
 
-    def get_output_preview(self, prompt_id: str, limit: int = 5) -> List[Dict[str, Any]]:
+    def get_output_preview(self, prompt_id: str, user_id: str, limit: int = 5) -> List[Dict[str, Any]]:
         conn = self.get_connection()
         try:
             with conn.cursor() as cur:
                 query = """
                     SELECT output_preview, output_blob_url, cost, duration, error_message
-                    FROM spans
-                    WHERE prompt_id = %s
+                    FROM spans s
+                    JOIN traces t ON t.trace_id = s.trace_id
+                    WHERE s.prompt_id = %s
+                    AND t.user_id = %s
                     AND output_preview IS NOT NULL
                     ORDER BY start_time DESC
                     LIMIT %s
                 """
-                cur.execute(query, (prompt_id, limit))
+                cur.execute(query, (prompt_id, user_id, limit))
                 rows = cur.fetchall()
 
             col_names = [desc[0] for desc in cur.description]
@@ -1380,7 +1529,7 @@ class SupabaseDB:
                     COALESCE(SUM(s.cost), 0)::numeric(18,6) AS total_cost,
                     COUNT(s.span_id) AS call_count
                 FROM traces t
-                LEFT JOIN agents a ON t.agent_id = a.agent_id
+                LEFT JOIN agents a ON t.agent_id = a.agent_id AND a.user_id = t.user_id
                 LEFT JOIN spans s ON t.trace_id = s.trace_id
                 WHERE t.user_id = %s
                 AND t.start_time >= %s
@@ -1632,7 +1781,7 @@ class SupabaseDB:
                     'cost', s.cost
                 ) ORDER BY s.start_time) FILTER (WHERE s.llm_model is NOT NULL) as llm_spans
             FROM traces t
-            LEFT JOIN agents a ON t.agent_id = a.agent_id
+            LEFT JOIN agents a ON t.agent_id = a.agent_id AND a.user_id = t.user_id
             LEFT JOIN spans s ON s.trace_id = t.trace_id
             WHERE t.user_id = %s
                 AND t.start_time >= %s
@@ -1695,7 +1844,7 @@ class SupabaseDB:
                 END as output_input_ratio,
                 SUM(s.cost) as total_cost
             FROM traces t
-            LEFT JOIN agents a ON t.agent_id = a.agent_id
+            LEFT JOIN agents a ON t.agent_id = a.agent_id AND a.user_id = t.user_id
             JOIN spans s ON s.trace_id = t.trace_id
             WHERE t.user_id = %s
             AND t.start_time >= %s
@@ -1869,7 +2018,7 @@ class SupabaseDB:
                 s.cost,
                 s.input_preview
             FROM traces t
-            LEFT JOIN agents a ON t.agent_id = a.agent_id
+            LEFT JOIN agents a ON t.agent_id = a.agent_id AND a.user_id = t.user_id
             JOIN spans s ON s.trace_id = t.trace_id
             WHERE t.user_id = %s
             AND t.start_time >= %s

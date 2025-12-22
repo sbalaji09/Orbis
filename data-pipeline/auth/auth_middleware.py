@@ -1,6 +1,7 @@
 import os
 import sys
 import bcrypt
+import json
 from fastapi import HTTPException, Request
 from queues.redis_queue import queue
 from auth.secure_cache import hash_api_key_for_cache
@@ -28,7 +29,18 @@ def check_api_key(request: Request):
     cache_key = f"api_key_cache:{hash_api_key_for_cache(api_key)}"
 
     # Fast path: check Redis cache first
-    user_id = queue.redis_client.get(cache_key)
+    cached = queue.redis_client.get(cache_key)
+    user_id = None
+    agent_id = None
+
+    if cached:
+        # Backward compatible: old cache stored just user_id as a raw UUID string.
+        try:
+            payload = json.loads(cached)
+            user_id = payload.get("user_id")
+            agent_id = payload.get("agent_id")
+        except Exception:
+            user_id = cached
 
     if not user_id:
         # Slow path: verify against hashed keys in database
@@ -38,9 +50,14 @@ def check_api_key(request: Request):
         for agent in agents:
             if verify_api_key_against_hash(api_key, agent['api_key']):
                 user_id = str(agent['user_id'])
+                agent_id = str(agent.get('agent_id')) if agent.get('agent_id') else None
 
                 # Cache in Redis for future requests
-                queue.redis_client.setex(cache_key, API_KEY_CACHE_TTL, user_id)
+                queue.redis_client.setex(
+                    cache_key,
+                    API_KEY_CACHE_TTL,
+                    json.dumps({"user_id": user_id, "agent_id": agent_id}),
+                )
                 break
 
         if not user_id:
@@ -50,6 +67,7 @@ def check_api_key(request: Request):
             )
 
     request.state.user_id = user_id
+    request.state.agent_id = agent_id
     return True
 
 

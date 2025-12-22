@@ -7,7 +7,7 @@ import jwt
 import os
 import requests
 from typing import Optional, Dict, Any
-from fastapi import HTTPException, Security
+from fastapi import HTTPException, Security, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from functools import lru_cache
 from dotenv import load_dotenv
@@ -249,6 +249,117 @@ def get_user_id_from_token(
         )
 
     return user_id
+
+
+def _get_redis_client():
+    try:
+        import redis  # type: ignore
+    except Exception:
+        return None
+
+    return redis.Redis(
+        host=os.getenv("REDIS_HOST", "localhost"),
+        port=int(os.getenv("REDIS_PORT", 6379)),
+        db=int(os.getenv("REDIS_DB", 0)),
+        password=os.getenv("REDIS_PASSWORD", None),
+        decode_responses=True,
+        socket_timeout=1,
+        socket_connect_timeout=1,
+    )
+
+
+def _verify_api_key(api_key: str) -> Dict[str, str]:
+    """
+    Verify an agent API key and return {user_id, agent_id?}.
+    Uses Redis fast-path if available, falls back to DB bcrypt verification.
+    """
+    if not api_key:
+        raise HTTPException(status_code=401, detail="Missing API Key. Include X-API-Key header.")
+
+    # Fast path: Redis mappings written by backend/profile_api.py
+    redis_client = _get_redis_client()
+    if redis_client is not None:
+        try:
+            user_id = redis_client.get(f"api_key:{api_key}")
+            agent_id = redis_client.get(f"api_key_agent:{api_key}")
+            if user_id:
+                ctx = {"user_id": str(user_id)}
+                if agent_id:
+                    ctx["agent_id"] = str(agent_id)
+                return ctx
+        except Exception:
+            # Redis not reachable; fall back to DB
+            pass
+
+    # Slow path: bcrypt-check against stored hashes
+    try:
+        import bcrypt  # type: ignore
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"bcrypt not available: {e}")
+
+    try:
+        # Local import to avoid import-time DB work in module init
+        from db_connection import db  # type: ignore
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database not available for API key auth: {e}")
+
+    agents = db.get_all_agents_for_auth()
+    for agent in agents:
+        hashed = agent.get("api_key")
+        if not hashed:
+            continue
+        try:
+            if bcrypt.checkpw(api_key.encode("utf-8"), hashed.encode("utf-8")):
+                ctx = {"user_id": str(agent.get("user_id"))}
+                if agent.get("agent_id"):
+                    ctx["agent_id"] = str(agent.get("agent_id"))
+
+                # Best-effort: populate Redis for next time
+                if redis_client is not None:
+                    try:
+                        redis_client.set(f"api_key:{api_key}", ctx["user_id"])
+                        if ctx.get("agent_id"):
+                            redis_client.set(f"api_key_agent:{api_key}", ctx["agent_id"])
+                    except Exception:
+                        pass
+
+                return ctx
+        except Exception:
+            continue
+
+    raise HTTPException(status_code=401, detail="Invalid API Key")
+
+
+def get_auth_context(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Security(security),
+) -> Dict[str, str]:
+    """
+    Unified auth dependency:
+    - Prefer Authorization: Bearer <JWT> (Supabase)
+    - Fallback to X-API-Key (agent API key)
+    Returns: {"user_id": "...", "auth_type": "jwt"|"api_key", "agent_id"?: "..."}
+    """
+    if credentials is not None:
+        token = credentials.credentials
+        payload = verify_jwt_token(token)
+        user_id = payload.get("sub")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Token does not contain user information")
+        return {"user_id": str(user_id), "auth_type": "jwt"}
+
+    api_key = request.headers.get("X-API-Key")
+    ctx = _verify_api_key(api_key or "")
+    ctx["auth_type"] = "api_key"
+    return ctx
+
+
+def get_user_id_from_auth(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Security(security),
+) -> str:
+    """Convenience dependency for routes that only need user_id."""
+    return get_auth_context(request, credentials)["user_id"]
 
 
 def get_user_from_token(

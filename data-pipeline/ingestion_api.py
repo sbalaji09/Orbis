@@ -170,7 +170,10 @@ async def post_span(request: Request, span: SpanIn):
     check_rate_limit(request.state.user_id)
 
     # first checks if the span is not valid and if it is not, we return an Exception
-    if not validate_span(span):
+    effective_user_id = getattr(request.state, "user_id", None)
+    effective_agent_id = getattr(request.state, "agent_id", None)
+
+    if not validate_span(span, effective_user_id=effective_user_id, effective_agent_id=effective_agent_id):
         # Log which validation failed for debugging
         import logging
         logger = logging.getLogger(__name__)
@@ -182,6 +185,34 @@ async def post_span(request: Request, span: SpanIn):
         )
 
     span_dict = span.model_dump()
+
+    # Normalize optional fields
+    if span_dict.get("tags") is None:
+        span_dict["tags"] = []
+
+    # Enforce tenant identity from API key middleware (do not trust client-provided user_id/agent_id)
+    if effective_user_id:
+        if span_dict.get("user_id") and span_dict.get("user_id") != effective_user_id:
+            print(
+                f"[SECURITY] Overriding mismatched span.user_id: payload={span_dict.get('user_id')} auth={effective_user_id}"
+            )
+        span_dict["user_id"] = effective_user_id
+
+    # Prefer agent_id derived from API key (if available).
+    if effective_agent_id:
+        span_dict["agent_id"] = effective_agent_id
+    else:
+        # Otherwise, ensure agent_id (if provided) belongs to the authenticated user.
+        if span_dict.get("agent_id") and effective_user_id:
+            try:
+                if not db.user_owns_agent(effective_user_id, span_dict["agent_id"]):
+                    print(
+                        f"[SECURITY] Dropping foreign agent_id on span: user_id={effective_user_id} agent_id={span_dict['agent_id']}"
+                    )
+                    span_dict["agent_id"] = None
+            except Exception:
+                # Fail closed: if we can't verify ownership, drop agent_id.
+                span_dict["agent_id"] = None
 
     if isinstance(span_dict.get('start_time'), datetime):
         span_dict['start_time'] = span_dict['start_time'].isoformat()
@@ -350,15 +381,21 @@ def is_valid_uuid(val: str) -> bool:
         return False
 
 # function to validate the span
-def validate_span(span: SpanIn) -> bool:
+def validate_span(span: SpanIn, effective_user_id: str | None, effective_agent_id: str | None) -> bool:
     import logging
     logger = logging.getLogger(__name__)
 
     try:
         validate_trace_id(span.trace_id)
         validate_span_id(span.span_id)
-        validate_user_id(span.user_id)
-        if span.agent_id:
+        if not effective_user_id:
+            logger.error("Missing authenticated user_id (API key middleware)")
+            return False
+        validate_user_id(effective_user_id)
+        if effective_agent_id:
+            validate_agent_id(effective_agent_id)
+        elif span.agent_id:
+            # Allow payload agent_id format check, but ownership is enforced later.
             validate_agent_id(span.agent_id)
     except Exception as e:
         logger.error(f"UUID validation failed: {e}")
@@ -368,7 +405,7 @@ def validate_span(span: SpanIn) -> bool:
         attr_value = getattr(span, attr_name)
 
         # These fields can be None or empty
-        if attr_name in ('error_message', 'agent_id', 'model', 'input_data', 'output_data'):
+        if attr_name in ('error_message', 'agent_id', 'model', 'input_data', 'output_data', 'tags'):
             continue
 
         # Numeric fields can be 0
