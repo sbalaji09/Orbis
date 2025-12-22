@@ -152,6 +152,38 @@ export interface PromptLengthAnalysis {
   summary: PromptAnalysisSummary;
 }
 
+export interface CostAnomaly {
+  anomaly_type: 'daily_spike' | 'trace_spike' | 'runaway_loop' | 'high_token_response';
+  severity: 'info' | 'warning' | 'critical';
+  actual_value: number;
+  expected_value?: number;
+  threshold_value: number;
+  deviation_percent?: number;
+  trace_id?: string;
+  title: string;
+  description: string;
+  agent_name?: string;
+  model?: string;
+}
+
+export interface AnomalyResponse {
+  anomalies: CostAnomaly[];
+  summary: {
+    total_anomalies: number;
+    critical_count: number;
+    warning_count: number;
+  };
+  settings: AlertSettings;
+}
+
+export interface AlertSettings {
+  daily_cost_threshold: number;
+  daily_spike_multiplier: number;
+  trace_cost_threshold: number;
+  loop_count_threshold: number;
+}
+
+
 function getHeaders(token: string | null): HeadersInit {
   const headers: HeadersInit = {
     "Content-Type": "application/json",
