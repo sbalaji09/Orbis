@@ -29,6 +29,7 @@ load_dotenv()
 # Cost anomaly detection thresholds (can be overridden via env vars)
 TRACE_COST_ALERT_THRESHOLD = float(os.getenv('TRACE_COST_ALERT_THRESHOLD', '1.0'))  # Alert for traces > $1
 HIGH_TOKEN_ALERT_THRESHOLD = int(os.getenv('HIGH_TOKEN_ALERT_THRESHOLD', '50000'))  # Alert for traces > 50k tokens
+TTL_SECONDS = 3600
 
 # this class represents a worker that processes span tasks from the Redis queue
 # it continuously pulls task from the queue and processes them and is separate from the API
@@ -182,15 +183,16 @@ class SpanWorker:
             # Accumulate token/cost/duration in Redis for trace-level aggregation
             # These will be read when the SDK calls /trace/end
             self.queue.redis_client.incrbyfloat(f"trace:{trace_id}:total_tokens", span.get('input_tokens', 0) + span.get('output_tokens', 0))
+            self.queue.redis_client.expire(f"trace:{trace_id}:total_tokens", TTL_SECONDS)
             self.queue.redis_client.incrbyfloat(f"trace:{trace_id}:total_cost", span.get('total_cost', 0))
+            self.queue.redis_client.expire(f"trace:{trace_id}:total_cost", TTL_SECONDS)
             self.queue.redis_client.incrbyfloat(f"trace:{trace_id}:total_duration", span.get('duration', 0))
+            self.queue.redis_client.expire(f"trace:{trace_id}:total_duration", TTL_SECONDS)
 
-            # Check if trace exists, if not create it
-            # This handles SDK sending spans out of order or without explicit start span
+            # check if trace exists, if not create it
             existing_trace = db.get_trace_by_id(trace_id)
 
             if not existing_trace:
-                # Auto-create trace if it doesn't exist
                 trace = {
                     "start_time": str(span.get('start_time')),
                     "end_time": "",
