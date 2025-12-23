@@ -8,6 +8,7 @@ from psycopg2.extras import RealDictCursor, execute_values
 from psycopg2.pool import SimpleConnectionPool
 from dotenv import load_dotenv
 from typing import Dict, List, Optional, Any
+import uuid
 from uuid import UUID
 from psycopg2.extras import execute_values
 
@@ -2599,6 +2600,66 @@ class SupabaseDB:
                 """, (user_id,))
                 conn.commit()
                 return cur.rowcount
+        finally:
+            self.return_connection(conn)
+
+    # update or insert daily cost aggregates for a user
+    def update_daily_aggregates(self, total_cost: float, total_tokens: float, by_model: dict, user_id: str):
+        conn = self.get_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                today = datetime.now(timezone.utc).date()
+
+                # check if aggregate exists for today
+                cur.execute("""
+                    SELECT aggregate_id, total_cost, total_tokens, by_model
+                    FROM daily_cost_aggregates
+                    WHERE user_id = %s AND DATE(date) = %s
+                """, (user_id, today))
+
+                existing = cur.fetchone()
+
+                if existing:
+                    existing_by_model = existing['by_model'] or {}
+
+                    for model, cost in (by_model or {}).items():
+                        if model in existing_by_model:
+                            existing_by_model[model] = float(existing_by_model[model]) + float(cost)
+                        else:
+                            existing_by_model[model] = float(cost)
+
+                    cur.execute("""
+                        UPDATE daily_cost_aggregates
+                        SET total_cost = total_cost + %s,
+                            total_tokens = total_tokens + %s,
+                            by_model = %s
+                        WHERE aggregate_id = %s
+                    """, (
+                        total_cost,
+                        total_tokens,
+                        json.dumps(existing_by_model),
+                        existing['aggregate_id']
+                    ))
+                else:
+                    # insert new aggregates for today
+                    cur.execute("""
+                        INSERT INTO daily_cost_aggregates
+                        (aggregate_id, user_id, date, total_cost, total_tokens, by_model)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    """, (
+                        str(uuid.uuid4()),
+                        user_id,
+                        today,
+                        total_cost,
+                        total_tokens,
+                        json.dumps(by_model or {})
+                    ))
+
+                conn.commit()
+        except Exception as e:
+            conn.rollback()
+            print(f"Error updating daily aggregates: {e}")
+            raise
         finally:
             self.return_connection(conn)
 
