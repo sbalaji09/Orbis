@@ -169,9 +169,11 @@ class OpenAIInstrumentor:
         full_content = ""
         chunk_count = 0
         start_time = time.time()
+        last_chunk = None
 
         try:
             for chunk in stream_response:
+                last_chunk = chunk
                 if first_chunk_time is None:
                     first_chunk_time = time.time()
                     span.time_to_first_token = (first_chunk_time - start_time) * 1000
@@ -199,9 +201,17 @@ class OpenAIInstrumentor:
 
             # Try to extract token usage from last chunk (if available)
             # Note: OpenAI's latest streaming API may include usage in final chunk
-            if hasattr(chunk, 'usage') and chunk.usage:
-                span.input_tokens = chunk.usage.prompt_tokens
-                span.output_tokens = chunk.usage.completion_tokens
+            usage = getattr(last_chunk, "usage", None)
+            if usage:
+                prompt_tokens = getattr(usage, "prompt_tokens", None)
+                completion_tokens = getattr(usage, "completion_tokens", None)
+                if prompt_tokens is None and isinstance(usage, dict):
+                    prompt_tokens = usage.get("prompt_tokens")
+                if completion_tokens is None and isinstance(usage, dict):
+                    completion_tokens = usage.get("completion_tokens")
+
+                span.input_tokens = prompt_tokens
+                span.output_tokens = completion_tokens
                 span.total_cost = calculate_openai_cost(
                     span.model or "unknown",
                     span.input_tokens or 0,
@@ -232,6 +242,12 @@ class OpenAIInstrumentor:
         model = kwargs.get("model", "unknown")
         messages = kwargs.get("messages", [])
         is_streaming = kwargs.get("stream", False)
+        if is_streaming:
+            stream_options = kwargs.get("stream_options")
+            if stream_options is None:
+                kwargs["stream_options"] = {"include_usage": True}
+            elif isinstance(stream_options, dict) and stream_options.get("include_usage") is not True:
+                kwargs["stream_options"] = {**stream_options, "include_usage": True}
 
         # get parent context
         parent_span = get_current_span()

@@ -1393,13 +1393,18 @@ class SupabaseDB:
         try:
             with conn.cursor() as cur:
                 query = """
-                    SELECT output_preview, output_blob_url, cost, duration, error_message
+                    SELECT
+                        s.output_preview,
+                        s.output_blob_url,
+                        s.cost,
+                        s.duration,
+                        s.error_message
                     FROM spans s
                     JOIN traces t ON t.trace_id = s.trace_id
                     WHERE s.prompt_id = %s
                     AND t.user_id = %s
-                    AND output_preview IS NOT NULL
-                    ORDER BY start_time DESC
+                    AND s.output_preview IS NOT NULL
+                    ORDER BY s.start_time DESC
                     LIMIT %s
                 """
                 cur.execute(query, (prompt_id, user_id, limit))

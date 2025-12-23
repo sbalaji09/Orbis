@@ -396,6 +396,18 @@ async def compare_prompt_analytics(
     user_id: str = Depends(get_user_id_from_auth),
 ):
     try:
+        # Validate UUIDs early so DB errors don't surface as 500s
+        import uuid
+
+        try:
+            prompt_id1 = str(uuid.UUID(str(prompt_id1)))
+            prompt_id2 = str(uuid.UUID(str(prompt_id2)))
+        except Exception:
+            raise HTTPException(
+                status_code=400,
+                detail="prompt_id1 and prompt_id2 must be valid UUIDs",
+            )
+
         # Get prompt records with both s3_url and content_preview
         conn = db.get_connection()
         try:
@@ -403,11 +415,15 @@ async def compare_prompt_analytics(
                 query = """
                     SELECT pv.prompt_id, pv.s3_url, pv.content_preview
                     FROM prompt_versions pv
-                    LEFT JOIN agents a ON pv.agent_id = a.agent_id
                     WHERE pv.prompt_id IN (%s, %s)
                     AND (
                         pv.agent_id IS NULL
-                        OR a.user_id = %s
+                        OR EXISTS (
+                            SELECT 1
+                            FROM agents a
+                            WHERE a.agent_id = pv.agent_id
+                            AND a.user_id = %s
+                        )
                     )
                 """
                 cur.execute(query, (prompt_id1, prompt_id2, user_id))
