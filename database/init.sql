@@ -81,6 +81,15 @@ CREATE TABLE evaluations (
     score INT
 );
 
+CREATE TABLE daily_cost_aggregates (
+    aggregate_id UUID PRIMARY KEY,
+    user_id UUID,
+    date TIMESTAMP,
+    total_cost FLOAT,
+    total_tokens FLOAT,
+    by_model JSONB
+)
+
 -- Create indexes
 CREATE INDEX idx_traces_user_id ON traces(user_id);
 CREATE INDEX idx_traces_agent_id ON traces(agent_id);
