@@ -111,13 +111,13 @@ export default function NavMenu() {
   return (
     <nav className="flex items-center justify-between w-full">
       {/* Logo */}
-      <Link href="/dashboard" className="flex items-center group">
+      <Link href="/dashboard" className="flex items-center gap-2 group">
         {/* <div className="w-8 h-8 bg-mustard border-2 border-black flex items-center justify-center group-hover:shadow-[2px_2px_0_rgba(0,0,0,0.2)] transition-all">
           <span className="text-white font-bold text-lg">O</span>
         </div> */}
-        <OrbisLogo className="w-12 h-12" />
+        <OrbisLogo className="w-16 h-16" />
         <div className="flex flex-col gap-0">
-          <span className="text-base font-semibold tracking-tight leading-none">
+          <span className="text-xl font-semibold tracking-tight leading-none">
             orbis
           </span>
         </div>
