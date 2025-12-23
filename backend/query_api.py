@@ -1,3 +1,4 @@
+from pydantic import BaseModel, Field
 from prompt_api import router as prompt_router
 from db_connection import db
 from fastapi import FastAPI, HTTPException, Query, Header, Request
@@ -591,16 +592,6 @@ async def get_prompt_length_analysis(
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/cost/anomalies")
-async def get_anomalies_last_day(hours: int, user_id: str = Depends(get_user_id_from_token)):
-    try:
-        result = await asyncio.get_event_loop().run_in_executor(
-            None, lambda: db.get_all_anomalies(user_id, hours)
-        )
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
     
 @app.get("/cost/anomalies?hours=24")
 async def get_anomalies_last_day(user_id: str = Depends(get_user_id_from_token)):
@@ -612,8 +603,12 @@ async def get_anomalies_last_day(user_id: str = Depends(get_user_id_from_token))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/cost/anomalies/history?days=7&include_acknowledged=false")
-async def get_anomalies_last_week_persisted(user_id: str = Depends(get_user_id_from_token)):
+@app.get("/cost/anomalies/history")
+async def get_anomaly_history(
+    days: int = 7,
+    include_acknowledged: bool = False,
+    user_id: str = Depends(get_user_id_from_token)
+):
     try:
         result = await asyncio.get_event_loop().run_in_executor(
             None, lambda: db.get_anomaly_history(user_id)
@@ -632,15 +627,18 @@ async def get_alert_settings(user_id: str = Depends(get_user_id_from_token)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
-@app.post("/cost/settings")
+class AlertSettingsUpdate(BaseModel):
+    daily_cost_threshold: float = Field(..., gt=0)
+    daily_spike_multiplier: float = Field(..., gt=1)
+    
+@app.put("/cost/settings")
 async def update_alert_settings(
-    daily_cost_threshold: float,
-    daily_spike_multiplier: float, 
+    body: AlertSettingsUpdate,
     user_id: str = Depends(get_user_id_from_token)):
 
     try:
         result = await asyncio.get_event_loop().run_in_executor(
-            None, lambda: db.update_user_alert_settings(user_id, {daily_cost_threshold, daily_spike_multiplier})
+            None, lambda: db.update_user_alert_settings(user_id, {"daily_cost_threshold": daily_cost_threshold,"daily_spike_multiplier": daily_spike_multiplier})
         )
         return result
     except Exception as e:

@@ -488,25 +488,38 @@ export async function fetchAlertSettings(
 export async function updateAlertSettings(
   settings: Partial<AlertSettings>,
   token: string
-): Promise<AlertSettings | null>{
+): Promise<AlertSettings | null> {
   try {
+    if (
+      settings.daily_cost_threshold == null ||
+      settings.daily_spike_multiplier == null
+    ) {
+      throw new Error("daily_cost_threshold and daily_spike_multiplier are required");
+    }
+
     const url = new URL(`${API_BASE_URL}/cost/settings`);
-    url.searchParams.set("daily_cost_threshold", String(settings.daily_cost_threshold));
-    url.searchParams.set("daily_spike_multiplier", String(settings.daily_spike_multiplier));
 
     const response = await fetch(url.toString(), {
-      headers: getHeaders(token),
+      method: "PUT",
+      headers: {
+        ...getHeaders(token),
+        "Content-Type": "application/json",
+      },
       cache: "no-store",
+      body: JSON.stringify({
+        daily_cost_threshold: settings.daily_cost_threshold,
+        daily_spike_multiplier: settings.daily_spike_multiplier,
+      }),
     });
 
     if (!response.ok) {
-      console.error(`Failed to fetch cost anomalies: ${response.status} ${response.statusText}`);
+      console.error(`Failed to update alert settings: ${response.status} ${response.statusText}`);
       return null;
     }
 
     return (await response.json()) as AlertSettings;
   } catch (error) {
-    console.error("Error fetching cost anomalies:", error);
+    console.error("Error updating alert settings:", error);
     return null;
   }
 }
@@ -520,6 +533,7 @@ export async function acknowledgeAnomaly(
     url.searchParams.set("anomaly_id", anomalyId);
 
     const response = await fetch(url.toString(), {
+      method: "POST",
       headers: getHeaders(token),
       cache: "no-store",
     });
