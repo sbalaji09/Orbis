@@ -439,15 +439,17 @@ async def get_traces_by_agent(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+CACHE_TTL = 300  # 5 minutes
+
 @app.get("/cost/summary")
 async def get_cost_summary(period: str, user_id: str = Depends(get_user_id_from_token)):
     try:
         validate_user_id(user_id)
-        cache_key = f"cache:cost_summary:{user_id}:300"
+        cache_key = f"cache:cost_summary:{user_id}:{period}"
         cached = redis_client.get(cache_key)
         if cached:
             return json.loads(cached)
-        
+
         loop = asyncio.get_running_loop()
 
         # run this method in a thread so we don't block the event loop
@@ -455,7 +457,7 @@ async def get_cost_summary(period: str, user_id: str = Depends(get_user_id_from_
             None,
             lambda: db.get_cost_summary_by_user(user_id, period)
         )
-        redis_client.set(cache_key, json.dumps(cost_summary), ex=300)
+        redis_client.set(cache_key, json.dumps(cost_summary), ex=CACHE_TTL)
         return cost_summary
     except HTTPException:
         raise
@@ -467,7 +469,7 @@ async def get_cost_by_agent(start_date: str, end_date: str, user_id: str = Depen
     try:
         validate_user_id(user_id)
 
-        cache_key = f"cache:cost_by_agent:{user_id}:300"
+        cache_key = f"cache:cost_by_agent:{user_id}:{start_date}:{end_date}"
         cached = redis_client.get(cache_key)
         if cached:
             return json.loads(cached)
@@ -479,7 +481,7 @@ async def get_cost_by_agent(start_date: str, end_date: str, user_id: str = Depen
             lambda: db.get_cost_by_agent_by_user(user_id, start_date, end_date)
         )
 
-        redis_client.set(cache_key, json.dumps(cost_by_agent), ex=300)
+        redis_client.set(cache_key, json.dumps(cost_by_agent), ex=CACHE_TTL)
 
         return cost_by_agent
     except HTTPException:
@@ -491,15 +493,22 @@ async def get_cost_by_agent(start_date: str, end_date: str, user_id: str = Depen
 async def get_cost_by_model(start_date: str, end_date: str, user_id: str = Depends(get_user_id_from_token)):
     try:
         validate_user_id(user_id)
-        
+
+        cache_key = f"cache:cost_by_model:{user_id}:{start_date}:{end_date}"
+        cached = redis_client.get(cache_key)
+        if cached:
+            return json.loads(cached)
+
         loop = asyncio.get_running_loop()
 
-        cost_by_agent = await loop.run_in_executor(
+        cost_by_model = await loop.run_in_executor(
             None,
             lambda: db.get_cost_by_model(user_id, start_date, end_date)
         )
 
-        return cost_by_agent
+        redis_client.set(cache_key, json.dumps(cost_by_model), ex=CACHE_TTL)
+
+        return cost_by_model
     except HTTPException:
         raise
     except Exception as e:
@@ -509,19 +518,19 @@ async def get_cost_by_model(start_date: str, end_date: str, user_id: str = Depen
 async def get_cost_trends(days: int, user_id: str = Depends(get_user_id_from_token)):
     try:
         validate_user_id(user_id)
-        cache_key = f"cache:cost_trends:{user_id}:300"
+        cache_key = f"cache:cost_trends:{user_id}:{days}"
         cached = redis_client.get(cache_key)
         if cached:
             return json.loads(cached)
-        
+
         loop = asyncio.get_running_loop()
 
         cost_trends = await loop.run_in_executor(
             None,
             lambda: db.get_cost_trends(user_id, days)
         )
-        
-        redis_client.set(cache_key, json.dumps(cost_trends), ex=300)
+
+        redis_client.set(cache_key, json.dumps(cost_trends), ex=CACHE_TTL)
         return cost_trends
     except HTTPException:
         raise
@@ -533,12 +542,19 @@ async def get_token_breakdown(days: int, user_id: str = Depends(get_user_id_from
     try:
         validate_user_id(user_id)
 
+        cache_key = f"cache:token_breakdown:{user_id}:{days}"
+        cached = redis_client.get(cache_key)
+        if cached:
+            return json.loads(cached)
+
         loop = asyncio.get_running_loop()
 
         token_breakdown = await loop.run_in_executor(
             None,
             lambda: db.get_token_breakdown(user_id, days)
         )
+
+        redis_client.set(cache_key, json.dumps(token_breakdown), ex=CACHE_TTL)
 
         return token_breakdown
     except HTTPException:

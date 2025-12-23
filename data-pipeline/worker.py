@@ -53,6 +53,38 @@ class SpanWorker:
         self.last_heartbeat_time = time.time()
         self.HEARTBEAT_INTERVAL = 30  # Send heartbeat every 30 seconds
 
+    def invalidate_cost_caches(self, user_ids: set):
+        """
+        Invalidate cached cost aggregation data when new spans arrive.
+        Uses pattern matching to delete all cache keys for affected users.
+        """
+        for user_id in user_ids:
+            if not user_id:
+                continue
+            try:
+                # Delete all cost-related cache keys for this user
+                patterns = [
+                    f"cache:cost_summary:{user_id}:*",
+                    f"cache:cost_by_agent:{user_id}:*",
+                    f"cache:cost_by_model:{user_id}:*",
+                    f"cache:cost_trends:{user_id}:*",
+                    f"cache:token_breakdown:{user_id}:*",
+                ]
+                for pattern in patterns:
+                    cursor = 0
+                    while True:
+                        cursor, keys = self.queue.redis_client.scan(
+                            cursor=cursor,
+                            match=pattern,
+                            count=100
+                        )
+                        if keys:
+                            self.queue.redis_client.delete(*keys)
+                        if cursor == 0:
+                            break
+            except Exception as e:
+                self.logger.warning(f"Failed to invalidate cost caches for user {user_id}: {e}")
+
     # this function processes a single span task
     # instead of having the backend infra do it automatically, we have this worker do it because it saves time
     # this function will upload data to our blob storage (S3) and also save the span to the Supabase db
@@ -445,6 +477,9 @@ class SpanWorker:
                 span_dicts = [s[1] for s in prepared_spans]
                 db.insert_spans_batch(span_dicts)
 
+                # Collect unique user_ids for cache invalidation
+                affected_user_ids = set()
+
                 for task, span_data in prepared_spans:
                     user_id = str(
                         task.get('user_id')
@@ -452,8 +487,14 @@ class SpanWorker:
                         or span_data.get('user_id')  # in case you add it later
                         or ""
                     )
+                    if user_id:
+                        affected_user_ids.add(user_id)
                     self.publish_span_to_redis(span_data, user_id=user_id or None)
-                    
+
+                # Invalidate cost caches for affected users
+                if affected_user_ids:
+                    self.invalidate_cost_caches(affected_user_ids)
+
                 self.tasks_processed += len(prepared_spans)
                 self.last_task_time = time.time()
             
