@@ -595,12 +595,12 @@ async def get_prompt_length_analysis(
     
 @app.get("/cost/anomalies")
 async def get_anomalies(
-    hours: int = 24,  # Default to 24 if not provided
+    hours: int = Query(default=24, ge=1, le=168, description="Hours to look back for anomalies"),
     user_id: str = Depends(get_user_id_from_token)
 ):
     try:
         result = await asyncio.get_event_loop().run_in_executor(
-            None, lambda: db.get_all_anomalies(user_id, 24)
+            None, lambda: db.get_all_anomalies(user_id, hours)
         )
         return result
     except Exception as e:

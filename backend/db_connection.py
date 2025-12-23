@@ -1958,7 +1958,7 @@ class SupabaseDB:
             return [{
                 "tag": row[0],
                 "trace_count": int(row[1]),
-                "call_count": int[row[2]],
+                "call_count": int(row[2]),
                 "total_cost": float(row[3] or 0),
                 "input_tokens": int(row[4] or 0),
                 "output_tokens": int(row[5] or 0)
