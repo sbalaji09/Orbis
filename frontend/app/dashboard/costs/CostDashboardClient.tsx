@@ -74,8 +74,12 @@ interface CostDashboardClientProps {
   initialByModel: CostByModel[];
 }
 
-// Reference palette (blue / orange / green / pink)
-const AGENT_COLORS = SERIES_COLORS;
+// Cost-by-agent palette (blue -> green -> orange)
+const AGENT_COLORS = [
+  CHART_PALETTE.blue,
+  CHART_PALETTE.green,
+  CHART_PALETTE.orange,
+];
 const MODEL_COLORS = SERIES_COLORS;
 
 const PERIOD_OPTIONS = [
@@ -93,20 +97,6 @@ function shortModelName(modelName: string): string {
   const parts = s.split(/[-_]/);
   const prefix = parts.slice(0, 3).join("-");
   return prefix.length <= 16 ? `${prefix}…` : `${s.slice(0, 15)}…`;
-}
-
-function hashString(input: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < input.length; i++) {
-    h ^= input.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
-
-function getAgentColor(agentName: string): string {
-  const idx = hashString(agentName) % AGENT_COLORS.length;
-  return AGENT_COLORS[idx] ?? CHART_PALETTE.blue;
 }
 
 function getModelColor(modelName: string, index: number): string {
@@ -403,7 +393,7 @@ export default function CostDashboardClient({
           data: values.map((v, i) => ({
             value: v,
             itemStyle: {
-              color: getAgentColor(categories[i] ?? String(i)),
+              color: AGENT_COLORS[i % AGENT_COLORS.length] ?? CHART_PALETTE.blue,
               borderRadius: 0,
             },
           })),
