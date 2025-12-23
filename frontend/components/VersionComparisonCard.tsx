@@ -50,11 +50,11 @@ export default function VersionComparisonCard({
   if (Math.abs(costDiffPercent) > 10) {
     if (costDiff < 0) {
       insights.push(
-        `💰 ${Math.abs(costDiffPercent).toFixed(1)}% cheaper than ${v1Label}`
+        `${Math.abs(costDiffPercent).toFixed(1)}% cheaper than ${v1Label}`
       );
     } else {
       insights.push(
-        `⚠️ ${costDiffPercent.toFixed(1)}% more expensive than ${v1Label}`
+        `${costDiffPercent.toFixed(1)}% more expensive than ${v1Label}`
       );
     }
   }
@@ -62,37 +62,37 @@ export default function VersionComparisonCard({
   if (Math.abs(latencyDiffPercent) > 15) {
     if (latencyDiff < 0) {
       insights.push(
-        `⚡ ${Math.abs(latencyDiffPercent).toFixed(1)}% faster than ${v1Label}`
+        `${Math.abs(latencyDiffPercent).toFixed(1)}% faster than ${v1Label}`
       );
     } else {
       insights.push(
-        `🐌 ${latencyDiffPercent.toFixed(1)}% slower than ${v1Label}`
+        `${latencyDiffPercent.toFixed(1)}% slower than ${v1Label}`
       );
     }
   }
 
   if (errorDiff < -1) {
-    insights.push(`✅ ${Math.abs(errorDiff).toFixed(1)}% fewer errors`);
+    insights.push(`${Math.abs(errorDiff).toFixed(1)}% fewer errors`);
   } else if (errorDiff > 1) {
-    insights.push(`❌ ${errorDiff.toFixed(1)}% more errors`);
+    insights.push(`${errorDiff.toFixed(1)}% more errors`);
   }
 
   if (v2.trace_count > v1.trace_count * 2) {
     insights.push(
-      `📈 ${v2.trace_count - v1.trace_count} more traces collected`
+      `${v2.trace_count - v1.trace_count} more traces collected`
     );
   }
 
   // Recommendation
   let recommendation = "";
   if (costDiff < 0 && errorDiff <= 0) {
-    recommendation = `✨ ${v2Label} is recommended: Lower cost with same or better quality`;
+    recommendation = `${v2Label} is recommended: Lower cost with same or better quality`;
   } else if (costDiff < 0 && errorDiff > 2) {
-    recommendation = `⚖️ Trade-off: ${v2Label} is cheaper but has more errors`;
+    recommendation = `Trade-off: ${v2Label} is cheaper but has more errors`;
   } else if (errorDiff < -2) {
-    recommendation = `✅ ${v2Label} is recommended: Significantly fewer errors`;
+    recommendation = `${v2Label} is recommended: Significantly fewer errors`;
   } else if (costDiff > 0 && errorDiff <= 0) {
-    recommendation = `💸 ${v1Label} may be better: Similar quality at lower cost`;
+    recommendation = `${v1Label} may be better: Similar quality at lower cost`;
   }
 
   return (
