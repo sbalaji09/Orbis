@@ -36,6 +36,17 @@ function extractOutputText(raw: string): string {
 
 async function fetchBlobText(url: string): Promise<string | null> {
   if (!url) return null;
+
+  // Handle inline:// URLs - decode base64 content directly
+  if (url.startsWith("inline://")) {
+    try {
+      const encodedContent = url.slice(9); // Remove 'inline://' prefix
+      return Buffer.from(encodedContent, "base64").toString("utf-8");
+    } catch {
+      return null;
+    }
+  }
+
   if (!url.startsWith("http://") && !url.startsWith("https://")) return null;
   try {
     const res = await fetch(url);
