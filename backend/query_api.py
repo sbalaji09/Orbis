@@ -593,8 +593,11 @@ async def get_prompt_length_analysis(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
-@app.get("/cost/anomalies?hours=24")
-async def get_anomalies_last_day(user_id: str = Depends(get_user_id_from_token)):
+@app.get("/cost/anomalies")
+async def get_anomalies(
+    hours: int = 24,  # Default to 24 if not provided
+    user_id: str = Depends(get_user_id_from_token)
+):
     try:
         result = await asyncio.get_event_loop().run_in_executor(
             None, lambda: db.get_all_anomalies(user_id, 24)
@@ -611,7 +614,7 @@ async def get_anomaly_history(
 ):
     try:
         result = await asyncio.get_event_loop().run_in_executor(
-            None, lambda: db.get_anomaly_history(user_id)
+            None, lambda: db.get_anomaly_history(user_id, days, include_acknowledged)
         )
         return result
     except Exception as e:
@@ -638,7 +641,7 @@ async def update_alert_settings(
 
     try:
         result = await asyncio.get_event_loop().run_in_executor(
-            None, lambda: db.update_user_alert_settings(user_id, {"daily_cost_threshold": daily_cost_threshold,"daily_spike_multiplier": daily_spike_multiplier})
+            None, lambda: db.update_user_alert_settings(user_id, {"daily_cost_threshold": body.daily_cost_threshold,"daily_spike_multiplier": body.daily_spike_multiplier})
         )
         return result
     except Exception as e:
