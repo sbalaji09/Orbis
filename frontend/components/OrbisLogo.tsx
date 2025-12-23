@@ -8,127 +8,27 @@ export function OrbisLogo({ className }: { className?: string }) {
       xmlns="http://www.w3.org/2000/svg"
       className={className}
     >
-      {/* Outer circle - positioned in a circular pattern */}
+      {/* Circular connecting path - smooth round with no edges */}
       <circle
         cx="32"
-        cy="14"
-        r="3"
-        fill="#f97316"
-        fillOpacity="0.8"
-        stroke="#000000"
-        strokeWidth="0.5"
-      />
-      <circle
-        cx="45"
-        cy="19"
-        r="3"
-        fill="#84cc16" //f97316
-        fillOpacity="0.8"
-        stroke="#000000"
-        strokeWidth="0.5"
-      />
-      <circle
-        cx="50"
         cy="32"
-        r="3"
-        fill="#f97316"
-        fillOpacity="0.8"
+        r="20"
         stroke="#000000"
         strokeWidth="0.5"
-      />
-      <circle
-        cx="45"
-        cy="45"
-        r="3"
-        fill="#ec4899"
-        fillOpacity="0.8"
-        stroke="#000000"
-        strokeWidth="0.5"
-      />
-      <circle
-        cx="32"
-        cy="50"
-        r="3"
-        fill="#f97316"
-        fillOpacity="0.8"
-        stroke="#000000"
-        strokeWidth="0.5"
-      />
-      <circle
-        cx="19"
-        cy="45"
-        r="3"
-        fill="#3b82f6"
-        fillOpacity="0.8"
-        stroke="#000000"
-        strokeWidth="0.5"
-      />
-      <circle
-        cx="14"
-        cy="32"
-        r="3"
-        fill="#f97316"
-        fillOpacity="0.8"
-        stroke="#000000"
-        strokeWidth="0.5"
-      />
-      <circle
-        cx="19"
-        cy="19"
-        r="3"
-        fill="#FFD600"
-        fillOpacity="0.8"
-        stroke="#000000"
-        strokeWidth="0.5"
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
 
-      {/* Mid circle */}
-      <circle
-        cx="24"
-        cy="24"
-        r="3"
-        fill="#FFD600"
-        fillOpacity="0.8"
-        stroke="#000000"
-        strokeWidth="0.5"
-      />
-      <circle
-        cx="40"
-        cy="24"
-        r="3"
-        fill="#84cc16"
-        fillOpacity="0.8"
-        stroke="#000000"
-        strokeWidth="0.5"
-      />
-      <circle
-        cx="40"
-        cy="40"
-        r="3"
-        fill="#ec4899"
-        fillOpacity="0.8"
-        stroke="#000000"
-        strokeWidth="0.5"
-      />
-      <circle
-        cx="24"
-        cy="40"
-        r="3"
-        fill="#3b82f6"
-        fillOpacity="0.8"
-        stroke="#000000"
-        strokeWidth="0.5"
-      />
-
-      {/* Center - single focal point */}
-      <circle
-        cx="32"
-        cy="32"
-        r="4"
-        fill="#3b82f6"
-        stroke="#000000"
-        strokeWidth="0.5"
-      />
+      {/* Nodes */}
+      <circle cx="32" cy="12" r="3.5" fill="#3b82f6" stroke="#000000" strokeWidth="0.5" />
+      <circle cx="46" cy="18" r="3.5" fill="#f97316" stroke="#000000" strokeWidth="0.5" />
+      <circle cx="52" cy="32" r="3.5" fill="#84cc16" stroke="#000000" strokeWidth="0.5" />
+      <circle cx="46" cy="46" r="3.5" fill="#ec4899" stroke="#000000" strokeWidth="0.5" />
+      <circle cx="32" cy="52" r="3.5" fill="#3b82f6" stroke="#000000" strokeWidth="0.5" />
+      <circle cx="18" cy="46" r="3.5" fill="#f97316" stroke="#000000" strokeWidth="0.5" />
+      <circle cx="12" cy="32" r="3.5" fill="#84cc16" stroke="#000000" strokeWidth="0.5" />
+      <circle cx="18" cy="18" r="3.5" fill="#ec4899" stroke="#000000" strokeWidth="0.5" />
     </svg>
   );
 }

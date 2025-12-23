@@ -24,9 +24,11 @@ export default function Home() {
       <nav className="border-b border-black/10 bg-background/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-12">
-            <div className="flex items-center">
-              <OrbisLogo className="w-12 h-12" />
-              <span className="tracking-tight font-semibold">orbis</span>
+            <div className="flex items-center gap-2">
+              <OrbisLogo className="w-16 h-16" />
+              <span className="tracking-tight font-semibold text-xl leading-none">
+                orbis
+              </span>
             </div>
             <div className="hidden md:flex items-center gap-8">
               <a

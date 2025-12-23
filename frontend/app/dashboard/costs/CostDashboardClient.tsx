@@ -12,9 +12,13 @@ import {
   type CostTrend,
   type CostByAgent,
   type CostByModel,
+  acknowledgeAllAnomalies,
 } from "@/lib/cost-api-client";
 import ECharts from "@/components/ECharts";
 import type { EChartsOption } from "echarts";
+import CostAnomalyBanner from "@/components/CostAnomalyBanner";
+import AlertSettingsModal from "@/components/AlertSettingsModal";
+import { fetchCostAnomalies, acknowledgeAnomaly, type CostAnomaly } from "@/lib/cost-api-client";
 
 // Lazy load tab components to reduce initial bundle size
 const OverviewTab = dynamic(() => import("./OverviewTab"), {
@@ -121,6 +125,8 @@ export default function CostDashboardClient({
   const [isLoading, setIsLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const hasFetchedRef = useRef(false);
+  const [anomalies, setAnomalies] = useState<CostAnomaly[]>([]);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<
     "overview" | "features" | "tokens" | "prompts" | "savings"
   >("overview");
@@ -161,7 +167,7 @@ export default function CostDashboardClient({
       setIsLoading(true);
       try {
         const { startDate, endDate } = getDateRange(selectedPeriod);
-
+        
         const [trendsData, agentData, modelData] = await Promise.all([
           fetchCostTrends(selectedPeriod, token),
           fetchCostByAgent(startDate, endDate, token),
@@ -181,6 +187,14 @@ export default function CostDashboardClient({
     hasFetchedRef.current = true;
     fetchData();
   }, [selectedPeriod, token, getDateRange, authLoading]);
+
+  useEffect(() => {
+    if (!token) return;
+    
+    fetchCostAnomalies(24, token).then(data => {
+      if (data) setAnomalies(data.anomalies);
+    });
+  }, [token]);
 
   // Handle period selection
   const handlePeriodSelect = (value: number) => {
@@ -224,6 +238,16 @@ export default function CostDashboardClient({
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  };
+
+  const handleAcknowledgeAnomaly = async (anomalyId: string) => {
+    if (!token) return;
+    await acknowledgeAnomaly(anomalyId, token);
+  };
+
+  const handleAcknowledgeAll = async () => {
+    if (!token) return;
+    await acknowledgeAllAnomalies(token);
   };
 
   // Calculate summary metrics
@@ -704,7 +728,7 @@ export default function CostDashboardClient({
             </div>
           )}
         </div>
-
+        
         {/* Tab Navigation */}
         <div className="flex gap-2 mb-6 border-b-2 border-black">
           {[
@@ -728,6 +752,29 @@ export default function CostDashboardClient({
           ))}
         </div>
 
+        {anomalies.length > 0 && (
+          <CostAnomalyBanner
+            anomalies={anomalies}
+            onAcknowledge={handleAcknowledgeAnomaly}
+            onAcknowledgeAll={handleAcknowledgeAll}
+            onOpenSettings={() => setIsSettingsModalOpen(true)}
+          />
+        )}
+
+        <AlertSettingsModal
+          isOpen={isSettingsModalOpen}
+          onClose={() => setIsSettingsModalOpen(false)}
+          token={token || ""}
+          onSettingsUpdated={() => {
+            // Refetch anomalies after settings change
+            if (token) {
+              fetchCostAnomalies(24, token).then(data => {
+                if (data) setAnomalies(data.anomalies);
+              });
+            }
+          }}
+        />
+        
         {/* Tab Content - Lazy loaded based on active tab */}
         {activeTab === "overview" && (
           <>

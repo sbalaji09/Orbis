@@ -25,6 +25,10 @@ from application_logging.logger_config import setup_logger
 # load environment variables
 load_dotenv()
 
+# Cost anomaly detection thresholds (can be overridden via env vars)
+TRACE_COST_ALERT_THRESHOLD = float(os.getenv('TRACE_COST_ALERT_THRESHOLD', '1.0'))  # Alert for traces > $1
+HIGH_TOKEN_ALERT_THRESHOLD = int(os.getenv('HIGH_TOKEN_ALERT_THRESHOLD', '50000'))  # Alert for traces > 50k tokens
+
 # this class represents a worker that processes span tasks from the Redis queue
 # it continuously pulls task from the queue and processes them and is separate from the API
 class SpanWorker:
@@ -162,7 +166,8 @@ class SpanWorker:
                     "total_tokens": 0,
                     "status": "running",
                     "user_id": str(span.get('user_id')),  # Keep as UUID string
-                    "trace_hash_id": generate_hash_key(str(span.get('user_id')), str(span.get('agent_id')))
+                    "trace_hash_id": generate_hash_key(str(span.get('user_id')), str(span.get('agent_id'))),
+                    "tags": span.get('tags', [])
                 }
                 trace["trace_id"] = trace_id
 
@@ -608,6 +613,36 @@ class SpanWorker:
                 'total_cost': total_cost,
                 'worker_id': self.worker_id
             }})
+
+            # Check for cost anomalies and publish alerts
+            user_id = trace.get('user_id')
+            final_cost = float(total_cost or 0)
+            final_tokens = int(float(total_tokens or 0))
+
+            if final_cost >= TRACE_COST_ALERT_THRESHOLD:
+                self.publish_anomaly_alert(
+                    trace_id=trace_id,
+                    user_id=user_id,
+                    anomaly_type='trace_spike',
+                    severity='critical' if final_cost >= TRACE_COST_ALERT_THRESHOLD * 5 else 'warning',
+                    actual_value=final_cost,
+                    threshold_value=TRACE_COST_ALERT_THRESHOLD,
+                    title=f"High-cost trace: ${final_cost:.2f}",
+                    description=f"Trace {trace_id[:8]} cost ${final_cost:.2f}, exceeding threshold of ${TRACE_COST_ALERT_THRESHOLD:.2f}"
+                )
+
+            if final_tokens >= HIGH_TOKEN_ALERT_THRESHOLD:
+                self.publish_anomaly_alert(
+                    trace_id=trace_id,
+                    user_id=user_id,
+                    anomaly_type='high_token_response',
+                    severity='warning',
+                    actual_value=final_tokens,
+                    threshold_value=HIGH_TOKEN_ALERT_THRESHOLD,
+                    title=f"High token usage: {final_tokens:,} tokens",
+                    description=f"Trace {trace_id[:8]} used {final_tokens:,} tokens, exceeding threshold of {HIGH_TOKEN_ALERT_THRESHOLD:,}"
+                )
+
         except Exception as e:
             self.logger.error(f"Failed to finalize trace {trace_id}: {e}")
     
@@ -729,8 +764,98 @@ class SpanWorker:
                 exc_info=True,
             )
 
+    def publish_anomaly_alert(
+        self,
+        trace_id: str,
+        user_id: str,
+        anomaly_type: str,
+        severity: str,
+        actual_value: float,
+        threshold_value: float,
+        title: str,
+        description: str
+    ) -> None:
+        """
+        Publish a cost anomaly alert via Redis pub/sub for real-time notifications.
+        Also saves the anomaly to the database for historical tracking.
+        """
+        try:
+            # Save anomaly to database
+            anomaly_data = {
+                'anomaly_type': anomaly_type,
+                'severity': severity,
+                'actual_value': actual_value,
+                'threshold_value': threshold_value,
+                'trace_id': trace_id,
+                'title': title,
+                'description': description
+            }
 
-        
+            try:
+                db.save_anomaly(user_id, anomaly_data)
+            except Exception as e:
+                self.logger.warning(f"Failed to save anomaly to database: {e}")
+
+            # Publish real-time alert via Redis pub/sub
+            message = {
+                "event": "cost_anomaly",
+                "anomaly_type": anomaly_type,
+                "severity": severity,
+                "trace_id": trace_id,
+                "user_id": user_id,
+                "actual_value": actual_value,
+                "threshold_value": threshold_value,
+                "title": title,
+                "description": description,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+
+            json_message = json.dumps(message)
+
+            try:
+                # Publish to user-specific anomaly channel
+                if user_id:
+                    self.queue.redis_client.publish(f"user:{user_id}:anomalies", json_message)
+
+                # Also publish to trace channel for trace-specific listeners
+                self.queue.redis_client.publish(f"trace:{trace_id}", json_message)
+
+            except (redis.ConnectionError, redis.TimeoutError) as e:
+                self.logger.warning(
+                    "Redis pub/sub unavailable for anomaly alert",
+                    extra={"extra_data": {"error": str(e), "trace_id": trace_id}}
+                )
+
+            self.logger.warning(
+                f"Cost anomaly detected: {title}",
+                extra={
+                    "extra_data": {
+                        "anomaly_type": anomaly_type,
+                        "severity": severity,
+                        "trace_id": trace_id,
+                        "user_id": user_id,
+                        "actual_value": actual_value,
+                        "threshold_value": threshold_value,
+                        "worker_id": self.worker_id
+                    }
+                }
+            )
+
+        except Exception as e:
+            self.logger.error(
+                "Failed to publish anomaly alert",
+                extra={
+                    "extra_data": {
+                        "trace_id": trace_id,
+                        "user_id": user_id,
+                        "error": str(e),
+                        "worker_id": self.worker_id
+                    }
+                },
+                exc_info=True
+            )
+
+
 def generate_hash_key(user_id: str, agent_id: str) -> str:
     # Combine user_id and agent_id into one string
     combined_str = f"{user_id}:{agent_id}"

@@ -1958,7 +1958,7 @@ class SupabaseDB:
             return [{
                 "tag": row[0],
                 "trace_count": int(row[1]),
-                "call_count": int[row[2]],
+                "call_count": int(row[2]),
                 "total_cost": float(row[3] or 0),
                 "input_tokens": int(row[4] or 0),
                 "output_tokens": int(row[5] or 0)
@@ -2156,7 +2156,452 @@ class SupabaseDB:
             }
         finally:
             self.return_connection(conn)
-            
+
+    # get or create alert settings for a user
+    def get_user_alert_settings(self, user_id: str) -> Dict[str, Any]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("""
+                    INSERT INTO cost_alert_settings (user_id)
+                    VALUES (%s)
+                    ON CONFLICT (user_id) DO NOTHING
+                """, (user_id,))
+                conn.commit()
+
+                cur.execute("""
+                    SELECT * FROM cost_alert_settings WHERE user_id = %s
+                """, (user_id,))
+                result = cur.fetchone()
+                return dict(result) if result else {}
+        finally:
+            self.return_connection(conn)
+
+    # update user alert settings
+    def update_user_alert_settings(self, user_id: str, settings: Dict[str, Any]) -> Dict[str, Any]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                allowed_fields = [
+                    'daily_cost_threshold', 'daily_spike_multiplier',
+                    'trace_cost_threshold', 'trace_token_threshold',
+                    'high_token_response_threshold', 'loop_detection_enabled',
+                    'loop_similarity_threshold', 'loop_count_threshold',
+                    'email_alerts_enabled', 'webhook_url', 'alert_cooldown_minutes'
+                ]
+
+                set_clauses = []
+                values = []
+                for field in allowed_fields:
+                    if field in settings:
+                        set_clauses.append(f"{field} = %s")
+                        values.append(settings[field])
+
+                if not set_clauses:
+                    return self.get_user_alert_settings(user_id)
+
+                values.append(user_id)
+                cur.execute(f"""
+                    UPDATE cost_alert_settings
+                    SET {', '.join(set_clauses)}, updated_at = NOW()
+                    WHERE user_id = %s
+                    RETURNING *
+                """, values)
+                conn.commit()
+                result = cur.fetchone()
+                return dict(result) if result else {}
+        finally:
+            self.return_connection(conn)
+
+    # detect if today's cost is significantly higher than the daily average
+    def detect_daily_cost_spike(self, user_id: str) -> Optional[Dict[str, Any]]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                settings = self.get_user_alert_settings(user_id)
+                multiplier = settings.get('daily_spike_multiplier', 3.0)
+                threshold = settings.get('daily_cost_threshold', 10.0)
+
+                # get today's cost and historical average (last 14 days w/o today)
+                cur.execute("""
+                    WITH today_cost AS (
+                        SELECT COALESCE(SUM(s.cost), 0) as cost
+                        FROM traces t
+                        JOIN spans s ON t.trace_id = s.trace_id
+                        WHERE t.user_id = %s
+                        AND DATE(t.start_time AT TIME ZONE 'UTC') = CURRENT_DATE
+                    ),
+                    historical AS (
+                        SELECT
+                            COALESCE(AVG(daily_cost), 0) as avg_daily_cost,
+                            COALESCE(STDDEV(daily_cost), 0) as stddev_daily_cost
+                        FROM (
+                            SELECT DATE(t.start_time) as day, SUM(s.cost) as daily_cost
+                            FROM traces t
+                            JOIN spans s ON t.trace_id = s.trace_id
+                            WHERE t.user_id = %s
+                            AND DATE(t.start_time AT TIME ZONE 'UTC') < CURRENT_DATE
+                            AND DATE(t.start_time AT TIME ZONE 'UTC') >= CURRENT_DATE - INTERVAL '14 days'
+                            GROUP BY DATE(t.start_time)
+                        ) daily_costs
+                    )
+                    SELECT
+                        tc.cost as today_cost,
+                        h.avg_daily_cost,
+                        h.stddev_daily_cost,
+                        CASE WHEN h.avg_daily_cost > 0
+                            THEN (tc.cost / h.avg_daily_cost)
+                            ELSE 0
+                        END as multiplier_actual
+                    FROM today_cost tc, historical h
+                """, (user_id, user_id))
+
+                result = cur.fetchone()
+                if not result:
+                    return None
+
+                today_cost = float(result['today_cost'] or 0)
+                avg_cost = float(result['avg_daily_cost'] or 0)
+                actual_multiplier = float(result['multiplier_actual'] or 0)
+
+                # check if anomaly condition is met
+                is_spike = (
+                    today_cost > threshold and
+                    avg_cost > 0 and
+                    actual_multiplier >= multiplier
+                )
+
+                if not is_spike:
+                    return None
+
+                return {
+                    'anomaly_type': 'daily_spike',
+                    'severity': 'critical' if actual_multiplier >= multiplier * 2 else 'warning',
+                    'actual_value': today_cost,
+                    'expected_value': avg_cost,
+                    'threshold_value': avg_cost * multiplier,
+                    'deviation_percent': round((actual_multiplier - 1) * 100, 1),
+                    'title': f"Daily cost spike: ${today_cost:.2f} ({actual_multiplier:.1f}x average)",
+                    'description': f"Today's cost of ${today_cost:.2f} is {actual_multiplier:.1f}x your daily average of ${avg_cost:.2f}."
+                }
+        finally:
+            self.return_connection(conn)
+
+    # find traces with unusually high costs in the last N hours
+    def detect_high_cost_traces(self, user_id: str, hours: int = 24) -> List[Dict[str, Any]]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                settings = self.get_user_alert_settings(user_id)
+                trace_threshold = settings.get('trace_cost_threshold', 1.0)
+
+                cur.execute("""
+                    SELECT
+                        t.trace_id,
+                        t.trace_hash_id,
+                        t.total_cost,
+                        t.total_tokens,
+                        t.start_time,
+                        t.status,
+                        a.agent_name,
+                        COUNT(s.span_id) as span_count,
+                        MAX(s.cost) as max_span_cost,
+                        MAX(s.llm_model) as primary_model
+                    FROM traces t
+                    LEFT JOIN agents a ON t.agent_id = a.agent_id
+                    LEFT JOIN spans s ON t.trace_id = s.trace_id
+                    WHERE t.user_id = %s
+                    AND t.start_time >= NOW() - INTERVAL '%s hours'
+                    AND t.total_cost >= %s
+                    GROUP BY t.trace_id, t.trace_hash_id, t.total_cost, t.total_tokens,
+                             t.start_time, t.status, a.agent_name
+                    ORDER BY t.total_cost DESC
+                    LIMIT 10
+                """, (user_id, hours, trace_threshold))
+
+                rows = cur.fetchall()
+
+                anomalies = []
+                for row in rows:
+                    anomalies.append({
+                        'anomaly_type': 'trace_spike',
+                        'severity': 'critical' if row['total_cost'] >= trace_threshold * 5 else 'warning',
+                        'actual_value': float(row['total_cost']),
+                        'threshold_value': trace_threshold,
+                        'trace_id': str(row['trace_id']),
+                        'title': f"High-cost trace: ${row['total_cost']:.2f}",
+                        'description': f"Trace '{row['trace_hash_id'] or row['trace_id'][:8]}' cost ${row['total_cost']:.2f} with {row['span_count']} spans using {row['primary_model'] or 'unknown model'}.",
+                        'agent_name': row['agent_name'],
+                        'model': row['primary_model'],
+                        'span_count': row['span_count'],
+                        'total_tokens': row['total_tokens'],
+                        'start_time': row['start_time'].isoformat() if row['start_time'] else None
+                    })
+
+                return anomalies
+        finally:
+            self.return_connection(conn)
+
+    # detect potential runaway loops by finding repeated similar calls
+    # traces with many spans that have similar input patterns
+    def detect_runaway_loops(self, user_id: str, hours: int = 24) -> List[Dict[str, Any]]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                settings = self.get_user_alert_settings(user_id)
+                if not settings.get('loop_detection_enabled', True):
+                    return []
+
+                loop_count_threshold = settings.get('loop_count_threshold', 10)
+
+                # traces with similar spans (loops)
+                cur.execute("""
+                    WITH span_patterns AS (
+                        SELECT
+                            t.trace_id,
+                            t.trace_hash_id,
+                            s.input_preview,
+                            s.llm_model,
+                            COUNT(*) as repetition_count,
+                            SUM(s.cost) as pattern_cost,
+                            SUM(s.prompt_tokens + s.completion_tokens) as pattern_tokens
+                        FROM traces t
+                        JOIN spans s ON t.trace_id = s.trace_id
+                        WHERE t.user_id = %s
+                        AND t.start_time >= NOW() - INTERVAL '%s hours'
+                        AND s.input_preview IS NOT NULL
+                        GROUP BY t.trace_id, t.trace_hash_id, s.input_preview, s.llm_model
+                        HAVING COUNT(*) >= %s
+                    )
+                    SELECT
+                        sp.trace_id,
+                        sp.trace_hash_id,
+                        sp.input_preview,
+                        sp.llm_model,
+                        sp.repetition_count,
+                        sp.pattern_cost,
+                        sp.pattern_tokens,
+                        a.agent_name
+                    FROM span_patterns sp
+                    JOIN traces t ON sp.trace_id = t.trace_id
+                    LEFT JOIN agents a ON t.agent_id = a.agent_id
+                    ORDER BY sp.repetition_count DESC
+                    LIMIT 5
+                """, (user_id, hours, loop_count_threshold))
+
+                rows = cur.fetchall()
+
+                anomalies = []
+                for row in rows:
+                    anomalies.append({
+                        'anomaly_type': 'runaway_loop',
+                        'severity': 'critical',
+                        'actual_value': row['repetition_count'],
+                        'threshold_value': loop_count_threshold,
+                        'trace_id': str(row['trace_id']),
+                        'title': f"Potential runaway loop: {row['repetition_count']} similar calls",
+                        'description': f"Detected {row['repetition_count']} similar LLM calls in trace '{row['trace_hash_id'] or row['trace_id'][:8]}', costing ${float(row['pattern_cost'] or 0):.2f}. Pattern: \"{(row['input_preview'] or '')[:50]}...\"",
+                        'agent_name': row['agent_name'],
+                        'model': row['llm_model'],
+                        'pattern_cost': float(row['pattern_cost'] or 0),
+                        'pattern_tokens': int(row['pattern_tokens'] or 0),
+                        'input_preview': row['input_preview']
+                    })
+
+                return anomalies
+        finally:
+            self.return_connection(conn)
+
+    # find individual spans with unusually high token counts
+    def detect_high_token_responses(self, user_id: str, hours: int = 24) -> List[Dict[str, Any]]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                settings = self.get_user_alert_settings(user_id)
+                token_threshold = settings.get('high_token_response_threshold', 10000)
+
+                cur.execute("""
+                    SELECT
+                        s.span_id,
+                        s.trace_id,
+                        t.trace_hash_id,
+                        s.name as span_name,
+                        s.llm_model,
+                        s.prompt_tokens,
+                        s.completion_tokens,
+                        (s.prompt_tokens + s.completion_tokens) as total_tokens,
+                        s.cost,
+                        s.input_preview,
+                        s.output_preview,
+                        a.agent_name
+                    FROM spans s
+                    JOIN traces t ON s.trace_id = t.trace_id
+                    LEFT JOIN agents a ON t.agent_id = a.agent_id
+                    WHERE t.user_id = %s
+                    AND t.start_time >= NOW() - INTERVAL '%s hours'
+                    AND (s.prompt_tokens + s.completion_tokens) >= %s
+                    ORDER BY (s.prompt_tokens + s.completion_tokens) DESC
+                    LIMIT 10
+                """, (user_id, hours, token_threshold))
+
+                rows = cur.fetchall()
+
+                anomalies = []
+                for row in rows:
+                    total_tokens = int(row['total_tokens'] or 0)
+                    anomalies.append({
+                        'anomaly_type': 'high_token_response',
+                        'severity': 'warning' if total_tokens < token_threshold * 2 else 'critical',
+                        'actual_value': total_tokens,
+                        'threshold_value': token_threshold,
+                        'trace_id': str(row['trace_id']),
+                        'title': f"High token usage: {total_tokens:,} tokens",
+                        'description': f"Span '{row['span_name']}' used {total_tokens:,} tokens ({row['prompt_tokens']:,} in, {row['completion_tokens']:,} out) costing ${float(row['cost'] or 0):.4f}.",
+                        'agent_name': row['agent_name'],
+                        'model': row['llm_model'],
+                        'prompt_tokens': row['prompt_tokens'],
+                        'completion_tokens': row['completion_tokens'],
+                        'cost': float(row['cost'] or 0)
+                    })
+
+                return anomalies
+        finally:
+            self.return_connection(conn)
+
+    # run all anomaly detection checks and return combined results
+    def get_all_anomalies(self, user_id: str, hours: int = 24) -> Dict[str, Any]:
+        anomalies = []
+
+        # daily spike detection
+        daily_spike = self.detect_daily_cost_spike(user_id)
+        if daily_spike:
+            anomalies.append(daily_spike)
+
+        # high cost traces
+        high_cost_traces = self.detect_high_cost_traces(user_id, hours)
+        anomalies.extend(high_cost_traces)
+
+        # runaway loops
+        runaway_loops = self.detect_runaway_loops(user_id, hours)
+        anomalies.extend(runaway_loops)
+
+        # high token responses
+        high_token = self.detect_high_token_responses(user_id, hours)
+        anomalies.extend(high_token)
+
+        # sort by severity
+        severity_order = {'critical': 0, 'warning': 1, 'info': 2}
+        anomalies.sort(key=lambda x: severity_order.get(x.get('severity', 'info'), 2))
+
+        summary = {
+            'total_anomalies': len(anomalies),
+            'critical_count': sum(1 for a in anomalies if a.get('severity') == 'critical'),
+            'warning_count': sum(1 for a in anomalies if a.get('severity') == 'warning'),
+            'by_type': {}
+        }
+
+        for a in anomalies:
+            atype = a.get('anomaly_type', 'unknown')
+            summary['by_type'][atype] = summary['by_type'].get(atype, 0) + 1
+
+        return {
+            'anomalies': anomalies,
+            'summary': summary,
+            'settings': self.get_user_alert_settings(user_id)
+        }
+
+    # save a detected anomaly to the database
+    def save_anomaly(self, user_id: str, anomaly: Dict[str, Any]) -> str:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO cost_anomalies (
+                        user_id, anomaly_type, severity, detected_at,
+                        actual_value, expected_value, threshold_value, deviation_percent,
+                        trace_id, agent_id, model, title, description
+                    ) VALUES (
+                        %s, %s, %s, NOW(),
+                        %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s
+                    )
+                    RETURNING anomaly_id
+                """, (
+                    user_id,
+                    anomaly.get('anomaly_type'),
+                    anomaly.get('severity', 'warning'),
+                    anomaly.get('actual_value'),
+                    anomaly.get('expected_value'),
+                    anomaly.get('threshold_value'),
+                    anomaly.get('deviation_percent'),
+                    anomaly.get('trace_id'),
+                    anomaly.get('agent_id'),
+                    anomaly.get('model'),
+                    anomaly.get('title'),
+                    anomaly.get('description')
+                ))
+                result = cur.fetchone()
+                conn.commit()
+                return str(result[0])
+        finally:
+            self.return_connection(conn)
+
+    # get historical anomalies for a user
+    def get_anomaly_history(self, user_id: str, days: int = 7, include_acknowledged: bool = False) -> List[Dict[str, Any]]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                ack_filter = "" if include_acknowledged else "AND is_acknowledged = FALSE"
+
+                cur.execute(f"""
+                    SELECT
+                        anomaly_id, anomaly_type, severity, detected_at,
+                        actual_value, expected_value, threshold_value, deviation_percent,
+                        trace_id, agent_id, model, title, description,
+                        is_acknowledged, acknowledged_at
+                    FROM cost_anomalies
+                    WHERE user_id = %s
+                    AND detected_at >= NOW() - INTERVAL '%s days'
+                    {ack_filter}
+                    ORDER BY detected_at DESC
+                    LIMIT 50
+                """, (user_id, days))
+
+                rows = cur.fetchall()
+                return [dict(row) for row in rows]
+        finally:
+            self.return_connection(conn)
+
+    # mark an anomaly as acknowledged
+    def acknowledge_anomaly(self, user_id: str, anomaly_id: str) -> bool:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE cost_anomalies
+                    SET is_acknowledged = TRUE, acknowledged_at = NOW()
+                    WHERE anomaly_id = %s AND user_id = %s
+                """, (anomaly_id, user_id))
+                conn.commit()
+                return cur.rowcount > 0
+        finally:
+            self.return_connection(conn)
+
+    # mark all anomalies as acknowledged for a user
+    def acknowledge_all_anomalies(self, user_id: str) -> int:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE cost_anomalies
+                    SET is_acknowledged = TRUE, acknowledged_at = NOW()
+                    WHERE user_id = %s AND is_acknowledged = FALSE
+                """, (user_id,))
+                conn.commit()
+                return cur.rowcount
+        finally:
+            self.return_connection(conn)
+
     # closes all the connections in the pool
     def close(self):
         self.pool.closeall()
