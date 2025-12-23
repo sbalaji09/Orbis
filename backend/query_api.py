@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field
+import redis
 from prompt_api import router as prompt_router
 from db_connection import db
 from fastapi import FastAPI, HTTPException, Query, Header, Request
@@ -64,9 +65,14 @@ print("[QUERY_API] Profile router included successfully")
 # CORS - allows your frontend to call this API
 app.add_middleware(CORSMiddleware, **get_cors_config())
 
+redis_client = redis.Redis(
+    host=os.getenv("REDIS_HOST", "localhost"),
+    port=int(os.getenv("REDIS_PORT", 6379)),
+    db=0,
+    decode_responses=True,  # returns str instead of bytes
+)
+
 # health check endpoint
-
-
 @app.get("/health")
 async def health_check(request: Request):
     check_health_rate_limit(request)
