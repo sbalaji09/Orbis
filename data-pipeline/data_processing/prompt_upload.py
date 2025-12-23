@@ -45,9 +45,11 @@ class S3Uploader:
                 return f"inline://{encoded}"
             
             hash_value = hashlib.sha256(content.encode()).hexdigest()
+            cache_key = f"s3:hash:{hash_value}"
 
-            if redis_client.get("s3:hash:{hash_value}"):
-                return redis_client.get("s3:hash:{hash_value}")
+            cached_url = redis_client.get(cache_key)
+            if cached_url:
+                return cached_url
             
             timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
             key = f"prompts/{user_id}/{trace_id}/{content_type}/{span_id}_{timestamp}.txt"
@@ -83,7 +85,7 @@ class S3Uploader:
             self.s3_client.put_object(**put_args)
 
             s3_url = f"s3://{self.bucket_name}/{key}"
-            redis_client.set("s3:hash:{hash}", "hash_value")
+            redis_client.set(cache_key, s3_url)
             return s3_url
         
         except ClientError as e:
