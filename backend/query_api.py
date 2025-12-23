@@ -592,7 +592,7 @@ async def get_prompt_length_analysis(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/cost/anomalies?hours={hours}")
+@app.get("/cost/anomalies")
 async def get_anomalies_last_day(hours: int, user_id: str = Depends(get_user_id_from_token)):
     try:
         result = await asyncio.get_event_loop().run_in_executor(
@@ -646,7 +646,7 @@ async def update_alert_settings(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/cost/anomalies/{anomaly_id}/acknowledge")
+@app.post("/cost/anomalies/acknowledge")
 async def acknowledge_anomaly(anomaly_id: str, user_id: str = Depends(get_user_id_from_token)):
     try:
         result = await asyncio.get_event_loop().run_in_executor(

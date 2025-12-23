@@ -438,12 +438,12 @@ export async function fetchPromptLengthAnalysis(
 }
 
 export async function fetchCostAnomalies(
-  hours: number, 
+  hours: number,
   token: string
-): Promise<AnomalyResponse> | null {
+): Promise<AnomalyResponse | null> {
   try {
-    const url = new URL(`${API_BASE_URL}/cost/prompt-analysis`);
-    url.searchParams.set("days", String(days));
+    const url = new URL(`${API_BASE_URL}/cost/anomalies`);
+    url.searchParams.set("hours", String(hours));
 
     const response = await fetch(url.toString(), {
       headers: getHeaders(token),
@@ -451,13 +451,87 @@ export async function fetchCostAnomalies(
     });
 
     if (!response.ok) {
-      console.error(`Failed to fetch prompt analysis: ${response.statusText}`);
+      console.error(`Failed to fetch cost anomalies: ${response.status} ${response.statusText}`);
       return null;
     }
 
-    return await response.json();
+    return (await response.json()) as AnomalyResponse;
   } catch (error) {
-    console.error("Error fetching prompt analysis:", error);
+    console.error("Error fetching cost anomalies:", error);
+    return null;
+  }
+}
+
+export async function fetchAlertSettings(
+  token: string
+): Promise<AlertSettings | null>{
+  try {
+    const url = new URL(`${API_BASE_URL}/cost/settings`);
+
+    const response = await fetch(url.toString(), {
+      headers: getHeaders(token),
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      console.error(`Failed to fetch cost anomalies: ${response.status} ${response.statusText}`);
+      return null;
+    }
+
+    return (await response.json()) as AlertSettings;
+  } catch (error) {
+    console.error("Error fetching cost anomalies:", error);
+    return null;
+  }
+}
+
+export async function updateAlertSettings(
+  settings: Partial<AlertSettings>,
+  token: string
+): Promise<AlertSettings | null>{
+  try {
+    const url = new URL(`${API_BASE_URL}/cost/settings`);
+    url.searchParams.set("daily_cost_threshold", String(settings.daily_cost_threshold));
+    url.searchParams.set("daily_spike_multiplier", String(settings.daily_spike_multiplier));
+
+    const response = await fetch(url.toString(), {
+      headers: getHeaders(token),
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      console.error(`Failed to fetch cost anomalies: ${response.status} ${response.statusText}`);
+      return null;
+    }
+
+    return (await response.json()) as AlertSettings;
+  } catch (error) {
+    console.error("Error fetching cost anomalies:", error);
+    return null;
+  }
+}
+
+export async function acknowledgeAnomaly(
+  anomalyId: string, 
+  token: string
+): Promise<void | null>{
+  try {
+    const url = new URL(`${API_BASE_URL}/cost/anomalies/acknowledge`);
+    url.searchParams.set("anomaly_id", anomalyId);
+
+    const response = await fetch(url.toString(), {
+      headers: getHeaders(token),
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      console.error(`Failed to fetch cost anomalies: ${response.status} ${response.statusText}`);
+      return null;
+    }
+
+    return (await response.json()) as Promise<void>;
+  } catch (error) {
+    console.error("Error fetching cost anomalies:", error);
     return null;
   }
 }
