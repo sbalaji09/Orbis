@@ -8,33 +8,33 @@ export const spanTypeConfig: Record<SpanType, {
 }> = {
   llm: {
     label: "LLM",
-    color: "bg-[#5B5FFF]",
+    color: "bg-[#3b82f6]",
     textColor: "text-white",
-    borderColor: "border-[#5B5FFF]",
+    borderColor: "border-[#3b82f6]",
   },
   http: {
     label: "HTTP",
-    color: "bg-[#10B981]",
+    color: "bg-[#f97316]",
     textColor: "text-white",
-    borderColor: "border-[#10B981]",
+    borderColor: "border-[#f97316]",
   },
   cli: {
     label: "CLI",
-    color: "bg-[#8b5cf6]",
+    color: "bg-[#f97316]",
     textColor: "text-white",
-    borderColor: "border-[#8b5cf6]",
+    borderColor: "border-[#f97316]",
   },
   tool: {
     label: "Tool",
-    color: "bg-[#e8c302]",
+    color: "bg-[#84cc16]",
     textColor: "text-black",
-    borderColor: "border-[#e8c302]",
+    borderColor: "border-[#84cc16]",
   },
   function: {
     label: "Function",
-    color: "bg-[#D1437C]",
+    color: "bg-[#ec4899]",
     textColor: "text-white",
-    borderColor: "border-[#D1437C]",
+    borderColor: "border-[#ec4899]",
   },
 };
 

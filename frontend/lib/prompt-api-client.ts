@@ -199,13 +199,14 @@ export async function comparePrompts(
   token: string | null
 ): Promise<PromptComparisonResult> {
   try {
-    const response = await fetch(
-      `${API_BASE_URL}/prompts/compare?prompt_id1=${promptId1}&prompt_id2=${promptId2}`,
-      {
-        headers: getHeaders(token),
-        cache: "no-store",
-      }
-    );
+    const url = new URL(`${API_BASE_URL}/prompts/compare`);
+    url.searchParams.set("prompt_id1", promptId1);
+    url.searchParams.set("prompt_id2", promptId2);
+
+    const response = await fetch(url.toString(), {
+      headers: getHeaders(token),
+      cache: "no-store",
+    });
     if (!response.ok) {
       console.error(`Failed to compare prompts: ${response.statusText}`);
       throw new Error("Failed to compare prompts");

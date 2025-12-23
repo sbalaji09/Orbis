@@ -180,15 +180,16 @@ export async function comparePrompts(
 ): Promise<PromptComparisonResult> {
   try {
     const authHeaders = await getAuthHeaders();
-    const response = await fetch(
-      `${API_BASE_URL}/prompts/compare?prompt_id1=${promptId1}&prompt_id2=${promptId2}`,
-      {
-        headers: {
-          ...authHeaders,
-        },
-        cache: "no-store",
-      }
-    );
+    const url = new URL(`${API_BASE_URL}/prompts/compare`);
+    url.searchParams.set("prompt_id1", promptId1);
+    url.searchParams.set("prompt_id2", promptId2);
+
+    const response = await fetch(url.toString(), {
+      headers: {
+        ...authHeaders,
+      },
+      cache: "no-store",
+    });
     if (!response.ok) {
       console.error(`Failed to compare prompts: ${response.statusText}`);
       throw new Error("Failed to compare prompts");
