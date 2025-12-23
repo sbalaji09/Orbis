@@ -6,12 +6,20 @@ import boto3
 from datetime import datetime, timezone
 from botocore.exceptions import ClientError
 from dotenv import load_dotenv
+import redis
 
 load_dotenv()
 
 # Thresholds for cost optimization
 MIN_SIZE_FOR_S3_UPLOAD = int(os.getenv('MIN_SIZE_FOR_S3_UPLOAD', 1024))  # 1KB default
 COMPRESSION_THRESHOLD = int(os.getenv('COMPRESSION_THRESHOLD', 5120))    # 5KB default
+
+redis_client = redis.Redis(
+    host=os.getenv("REDIS_HOST", "localhost"),
+    port=int(os.getenv("REDIS_PORT", 6379)),
+    db=0,
+    decode_responses=True,  # returns str instead of bytes
+)
 
 # S3Uploader class that allows for us to upload prompts to the S3 Buckets for prompts
 class S3Uploader:
@@ -35,6 +43,11 @@ class S3Uploader:
             if len(content) < MIN_SIZE_FOR_S3_UPLOAD:
                 encoded = base64.b64encode(content.encode('utf-8')).decode('utf-8')
                 return f"inline://{encoded}"
+            
+            hash_value = hashlib.sha256(content.encode()).hexdigest()
+
+            if redis_client.get("s3:hash:{hash_value}"):
+                return redis_client.get("s3:hash:{hash_value}")
             
             timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
             key = f"prompts/{user_id}/{trace_id}/{content_type}/{span_id}_{timestamp}.txt"
@@ -70,7 +83,7 @@ class S3Uploader:
             self.s3_client.put_object(**put_args)
 
             s3_url = f"s3://{self.bucket_name}/{key}"
-
+            redis_client.set("s3:hash:{hash}", "hash_value")
             return s3_url
         
         except ClientError as e:
