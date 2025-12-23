@@ -7,6 +7,7 @@ import time
 from datetime import datetime, timezone
 import uuid
 
+import msgpack
 import redis
 from queues.redis_queue import RedisQueue
 from dotenv import load_dotenv
@@ -385,7 +386,7 @@ class SpanWorker:
         self.queue.redis_client.hset(
             "workers:active",
             self.worker_id,
-            json.dumps({"started": time.time(), "pid": os.getpid()})
+            msgpack.packb({"started": time.time(), "pid": os.getpid()})
         )
 
         self.logger.info("Worker started - waiting for tasks from queue")
@@ -706,7 +707,7 @@ class SpanWorker:
             self.logger.error(f"Failed to finalize trace {trace_id}: {e}")
     
     def publish_event(self, channel: str, event: dict):
-        self.queue.redis_client.publish(channel, json.dumps(event))
+        self.queue.redis_client.publish(channel, msgpack.packb(event))
     
     def publish_span_to_redis(self, span_data: dict, user_id: str | None = None) -> None:
         if os.getenv("REALTIME_UPDATES_ENABLED", "true").lower() == "false":
@@ -729,7 +730,7 @@ class SpanWorker:
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             }
 
-            payload = json.dumps(message)
+            payload = msgpack.packb(message)
 
             # specific channel for the traces
             try:
@@ -783,7 +784,7 @@ class SpanWorker:
                 "timestamp": datetime.now(timezone.utc).isoformat()
             }
 
-            json_message = json.dumps(message_dict)
+            json_message = msgpack.packb(message_dict)
 
             try:
                 self.queue.redis_client.publish(f"trace:{trace_id}", json_message)
@@ -869,7 +870,7 @@ class SpanWorker:
                 "timestamp": datetime.now(timezone.utc).isoformat()
             }
 
-            json_message = json.dumps(message)
+            json_message = msgpack.packb(message)
 
             try:
                 # Publish to user-specific anomaly channel

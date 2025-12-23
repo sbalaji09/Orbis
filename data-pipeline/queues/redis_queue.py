@@ -1,3 +1,4 @@
+import msgpack
 import redis
 import json
 import os
@@ -50,7 +51,7 @@ class RedisQueue:
     def enqueue(self, task_data: Dict[Any, Any]) -> bool:
         try:
             # convert the dictionary into a JSON string
-            task_json = json.dumps(task_data)
+            task_json = msgpack.packb(task_data)
 
             # the lpush function adds to the left of the linked list
             self.redis_client.lpush(self.queue_name, task_json)
@@ -72,7 +73,7 @@ class RedisQueue:
             # if there is something to be popped from the end of the list, then parse the result into a python object
             if result:
                 queue_name, task_json = result
-                task_data = json.loads(task_json)
+                task_data = msgpack.unpackb(task_json)
                 print(f"✓ Task dequeued from '{self.queue_name}'")
                 return task_data
             else:
@@ -114,7 +115,7 @@ class RedisQueue:
                 'original_queue': self.queue_name
             }
 
-            task_json = json.dumps(dlq_task) # converts a Python object to a JSON string
+            task_json = msgpack.packb(dlq_task) # converts a Python object to a JSON string
             self.redis_client.lpush(dlq_name, task_json)
 
             print(f"✓ Task moved to DLQ: {dlq_name}")
