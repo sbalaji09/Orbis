@@ -5,7 +5,7 @@ from db_connection import db
 from fastapi import FastAPI, HTTPException, Query, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
-from typing import Optional
+from typing import Optional, Set
 from datetime import datetime
 import sys
 import os
@@ -440,6 +440,80 @@ async def get_traces_by_agent(
         raise HTTPException(status_code=500, detail=str(e))
 
 CACHE_TTL = 300  # 5 minutes
+ALLOWED_METRICS = {"summary", "by_agent", "by_model", "trends"}
+
+@app.get("/cost/dashboard")
+async def get_cost_dashboard(
+    metrics: str = Query("summary,by_agent,by_model,trends"),
+    # pass-through params for endpoints that need them
+    period: str = Query("all"),               # for summary
+    days: int = Query(7, ge=1),               # for trends
+    start_date: Optional[str] = Query(None),  # for by_agent/by_model (YYYY-MM-DD)
+    end_date: Optional[str] = Query(None),    # for by_agent/by_model (YYYY-MM-DD)
+    user_id: str = Depends(get_user_id_from_token),
+):
+    requested: Set[str] = {m.strip().lower() for m in metrics.split(",") if m.strip()}
+    invalid = requested - ALLOWED_METRICS
+    if invalid:
+        raise HTTPException(status_code=400, detail=f"Invalid metrics: {sorted(invalid)}")
+    
+    conn = db.get_connection()
+    lock = asyncio.Lock()  # ensures only one query uses conn at a time
+
+    # runs a sync db function that expects an explicit conn as first arg
+    def _run_with_conn(fn, *args, **kwargs):
+        return fn(conn, *args, **kwargs)
+
+    # serialize access to the shared conn
+    async def run_db(fn, *args, **kwargs):
+        async with lock:
+            loop = asyncio.get_running_loop()
+            return await loop.run_in_executor(None, lambda: _run_with_conn(fn, *args, **kwargs))
+
+    async def get_summary():
+        return await run_db(db.get_cost_summary_by_user, user_id, period)
+
+    async def get_trends():
+        return await run_db(db.get_cost_trends, user_id, days)
+
+    async def get_by_agent():
+        if not start_date or not end_date:
+            raise HTTPException(status_code=400, detail="start_date and end_date are required for by_agent")
+        return await run_db(db.get_cost_by_agent, user_id, start_date, end_date)
+
+    async def get_by_model():
+        if not start_date or not end_date:
+            raise HTTPException(status_code=400, detail="start_date and end_date are required for by_model")
+        return await run_db(db.get_cost_by_model, user_id, start_date, end_date)
+
+    tasks = []
+    keys = []
+
+    if "summary" in requested:
+        keys.append("summary")
+        tasks.append(get_summary())
+
+    if "trends" in requested:
+        keys.append("trends")
+        tasks.append(get_trends())
+
+    if "by_agent" in requested:
+        keys.append("by_agent")
+        tasks.append(get_by_agent())
+
+    if "by_model" in requested:
+        keys.append("by_model")
+        tasks.append(get_by_model())
+
+    try:
+        results = await asyncio.gather(*tasks)
+        return {k: v for k, v in zip(keys, results)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.return_connection(conn)
 
 @app.get("/cost/summary")
 async def get_cost_summary(period: str, user_id: str = Depends(get_user_id_from_token)):
