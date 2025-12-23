@@ -307,7 +307,7 @@ async def stream_span(
 
             # Check user access via trace
             trace = db.get_trace_by_id(initial_span['trace_id'])
-            if not trace or trace.get('user_id') != effective_user_id:
+            if not trace or trace.get('user_id') != user_id:
                 yield f"event: error\ndata: {json.dumps({'error': 'Access denied'})}\n\n"
                 return
 
