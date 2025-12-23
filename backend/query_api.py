@@ -443,7 +443,11 @@ async def get_traces_by_agent(
 async def get_cost_summary(period: str, user_id: str = Depends(get_user_id_from_token)):
     try:
         validate_user_id(user_id)
-
+        cache_key = f"cache:cost_summary:{user_id}:300"
+        cached = redis_client.get(cache_key)
+        if cached:
+            return json.loads(cached)
+        
         loop = asyncio.get_running_loop()
 
         # run this method in a thread so we don't block the event loop
@@ -451,7 +455,7 @@ async def get_cost_summary(period: str, user_id: str = Depends(get_user_id_from_
             None,
             lambda: db.get_cost_summary_by_user(user_id, period)
         )
-
+        redis_client.set(cache_key, json.dumps(cost_summary), ex=300)
         return cost_summary
     except HTTPException:
         raise
@@ -463,12 +467,19 @@ async def get_cost_by_agent(start_date: str, end_date: str, user_id: str = Depen
     try:
         validate_user_id(user_id)
 
+        cache_key = f"cache:cost_by_agent:{user_id}:300"
+        cached = redis_client.get(cache_key)
+        if cached:
+            return json.loads(cached)
+
         loop = asyncio.get_running_loop()
 
         cost_by_agent = await loop.run_in_executor(
             None,
             lambda: db.get_cost_by_agent_by_user(user_id, start_date, end_date)
         )
+
+        redis_client.set(cache_key, json.dumps(cost_by_agent), ex=300)
 
         return cost_by_agent
     except HTTPException:
@@ -480,7 +491,7 @@ async def get_cost_by_agent(start_date: str, end_date: str, user_id: str = Depen
 async def get_cost_by_model(start_date: str, end_date: str, user_id: str = Depends(get_user_id_from_token)):
     try:
         validate_user_id(user_id)
-
+        
         loop = asyncio.get_running_loop()
 
         cost_by_agent = await loop.run_in_executor(
@@ -498,14 +509,19 @@ async def get_cost_by_model(start_date: str, end_date: str, user_id: str = Depen
 async def get_cost_trends(days: int, user_id: str = Depends(get_user_id_from_token)):
     try:
         validate_user_id(user_id)
-
+        cache_key = f"cache:cost_trends:{user_id}:300"
+        cached = redis_client.get(cache_key)
+        if cached:
+            return json.loads(cached)
+        
         loop = asyncio.get_running_loop()
 
         cost_trends = await loop.run_in_executor(
             None,
             lambda: db.get_cost_trends(user_id, days)
         )
-
+        
+        redis_client.set(cache_key, json.dumps(cost_trends), ex=300)
         return cost_trends
     except HTTPException:
         raise
