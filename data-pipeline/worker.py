@@ -625,7 +625,25 @@ class SpanWorker:
                 "total_cost": float(total_cost or 0)
             }
             db.update_trace(trace_id, update_data)
-            db.update_daily_aggregates(float(total_cost or 0), int(float(total_tokens or 0)), update_data["mode"], user_id)
+
+            # Update daily aggregates with cost breakdown by model
+            user_id = trace.get('user_id')
+            if user_id and spans:
+                by_model = {}
+                for span in spans:
+                    model = span.get('llm_model') or 'unknown'
+                    cost = float(span.get('cost') or 0)
+                    if model in by_model:
+                        by_model[model] += cost
+                    else:
+                        by_model[model] = cost
+                db.update_daily_aggregates(
+                    total_cost=float(total_cost or 0),
+                    total_tokens=int(float(total_tokens or 0)),
+                    by_model=by_model,
+                    user_id=user_id
+                )
+
             self.publish_trace_completed(trace_id, trace.get('user_id'), update_data)
             
             event = {
@@ -657,7 +675,6 @@ class SpanWorker:
             }})
 
             # Check for cost anomalies and publish alerts
-            user_id = trace.get('user_id')
             final_cost = float(total_cost or 0)
             final_tokens = int(float(total_tokens or 0))
 

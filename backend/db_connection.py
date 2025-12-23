@@ -1625,6 +1625,11 @@ class SupabaseDB:
             self.return_connection(conn)
 
     def get_cost_trends(self, user_id: str, days: int) -> List[Dict[str, Any]]:
+        """
+        Get cost trends for a user over the specified number of days.
+        Uses the pre-aggregated daily_cost_aggregates table for performance.
+        Falls back to span aggregation if no aggregated data exists.
+        """
         if days is None or not isinstance(days, int) or days < 1:
             raise ValueError("`days` must be an integer >= 1")
 
@@ -1634,20 +1639,63 @@ class SupabaseDB:
 
             start_dt = (now - timedelta(days=days - 1)
                         ).replace(hour=0, minute=0, second=0, microsecond=0)
-            # today's date at 00:00
             end_dt = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
             start_date_str = start_dt.date().isoformat()
             end_date_str = end_dt.date().isoformat()
 
+            # Try to read from pre-aggregated daily_cost_aggregates table first
             query = """
                 WITH days AS (
                     SELECT generate_series(%s::date, %s::date, INTERVAL '1 day') AS day
                 )
                 SELECT
                     d.day::date AS day,
+                    COALESCE(dca.total_cost, 0)::numeric(18,6) AS total_cost,
+                    COALESCE(dca.total_tokens, 0) AS total_tokens,
+                    dca.by_model
+                FROM days d
+                LEFT JOIN daily_cost_aggregates dca
+                ON dca.user_id = %s
+                AND DATE(dca.date) = d.day::date
+                ORDER BY d.day ASC
+            """
+            params = [start_date_str, end_date_str, user_id]
+
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(query, params)
+                rows = cur.fetchall()
+
+                # Check if we have any aggregated data
+                has_aggregated_data = any(row['total_cost'] > 0 for row in rows)
+
+                if has_aggregated_data:
+                    # Use aggregated data
+                    results: List[Dict[str, Any]] = []
+                    for row in rows:
+                        day_val = row.get("day")
+                        try:
+                            day_str = day_val.isoformat()
+                        except Exception:
+                            day_str = str(day_val)
+
+                        results.append({
+                            "date": day_str,
+                            "total_cost": float(row.get("total_cost") or 0),
+                            "total_tokens": int(row.get("total_tokens") or 0),
+                            "by_model": row.get("by_model") or {},
+                        })
+                    return results
+
+            # Fallback: aggregate from spans (for historical data before aggregation was enabled)
+            fallback_query = """
+                WITH days AS (
+                    SELECT generate_series(%s::date, %s::date, INTERVAL '1 day') AS day
+                )
+                SELECT
+                    d.day::date AS day,
                     COALESCE(SUM(s.cost), 0)::numeric(18,6) AS total_cost,
-                    COALESCE(COUNT(s.*), 0) AS call_count
+                    COALESCE(SUM(s.prompt_tokens + s.completion_tokens), 0) AS total_tokens
                 FROM days d
                 LEFT JOIN traces t
                 ON t.user_id = %s
@@ -1657,32 +1705,24 @@ class SupabaseDB:
                 GROUP BY d.day
                 ORDER BY d.day ASC
             """
-            params = [start_date_str, end_date_str, user_id]
 
-            with conn.cursor() as cur:
-                cur.execute(query, params)
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(fallback_query, params)
                 rows = cur.fetchall()
-
-                columns = [col.name for col in cur.description] if hasattr(
-                    cur, "description") else ["day", "total_cost", "call_count"]
 
                 results: List[Dict[str, Any]] = []
                 for row in rows:
-                    row_dict = dict(zip(columns, row))
-                    day_val = row_dict.get("day")
-
+                    day_val = row.get("day")
                     try:
                         day_str = day_val.isoformat()
                     except Exception:
                         day_str = str(day_val)
 
-                    total_cost = row_dict.get("total_cost")
-                    call_count = row_dict.get("call_count")
-
                     results.append({
                         "date": day_str,
-                        "total_cost": float(total_cost) if total_cost is not None else 0.0,
-                        "call_count": int(call_count or 0),
+                        "total_cost": float(row.get("total_cost") or 0),
+                        "total_tokens": int(row.get("total_tokens") or 0),
+                        "by_model": {},
                     })
 
             return results
@@ -2603,57 +2643,45 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
 
-    # update or insert daily cost aggregates for a user
     def update_daily_aggregates(self, total_cost: float, total_tokens: float, by_model: dict, user_id: str):
+        """
+        Update or insert daily cost aggregates for a user.
+        Uses upsert (ON CONFLICT) for atomic, race-condition-safe updates.
+        The by_model JSONB is merged using jsonb concatenation.
+        """
         conn = self.get_connection()
         try:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            with conn.cursor() as cur:
                 today = datetime.now(timezone.utc).date()
 
-                # check if aggregate exists for today
+                # Use upsert with ON CONFLICT for atomic operation
+                # For by_model, we merge the new model costs with existing ones
                 cur.execute("""
-                    SELECT aggregate_id, total_cost, total_tokens, by_model
-                    FROM daily_cost_aggregates
-                    WHERE user_id = %s AND DATE(date) = %s
-                """, (user_id, today))
-
-                existing = cur.fetchone()
-
-                if existing:
-                    existing_by_model = existing['by_model'] or {}
-
-                    for model, cost in (by_model or {}).items():
-                        if model in existing_by_model:
-                            existing_by_model[model] = float(existing_by_model[model]) + float(cost)
-                        else:
-                            existing_by_model[model] = float(cost)
-
-                    cur.execute("""
-                        UPDATE daily_cost_aggregates
-                        SET total_cost = total_cost + %s,
-                            total_tokens = total_tokens + %s,
-                            by_model = %s
-                        WHERE aggregate_id = %s
-                    """, (
-                        total_cost,
-                        total_tokens,
-                        json.dumps(existing_by_model),
-                        existing['aggregate_id']
-                    ))
-                else:
-                    # insert new aggregates for today
-                    cur.execute("""
-                        INSERT INTO daily_cost_aggregates
-                        (aggregate_id, user_id, date, total_cost, total_tokens, by_model)
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                    """, (
-                        str(uuid.uuid4()),
-                        user_id,
-                        today,
-                        total_cost,
-                        total_tokens,
-                        json.dumps(by_model or {})
-                    ))
+                    INSERT INTO daily_cost_aggregates
+                    (aggregate_id, user_id, date, total_cost, total_tokens, by_model)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (user_id, date) DO UPDATE SET
+                        total_cost = daily_cost_aggregates.total_cost + EXCLUDED.total_cost,
+                        total_tokens = daily_cost_aggregates.total_tokens + EXCLUDED.total_tokens,
+                        by_model = (
+                            SELECT jsonb_object_agg(
+                                key,
+                                COALESCE((daily_cost_aggregates.by_model->key)::numeric, 0) +
+                                COALESCE((EXCLUDED.by_model->key)::numeric, 0)
+                            )
+                            FROM jsonb_object_keys(
+                                COALESCE(daily_cost_aggregates.by_model, '{}'::jsonb) ||
+                                COALESCE(EXCLUDED.by_model, '{}'::jsonb)
+                            ) AS key
+                        )
+                """, (
+                    str(uuid.uuid4()),
+                    user_id,
+                    today,
+                    total_cost,
+                    total_tokens,
+                    json.dumps(by_model or {})
+                ))
 
                 conn.commit()
         except Exception as e:

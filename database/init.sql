@@ -87,12 +87,14 @@ CREATE TABLE daily_cost_aggregates (
     date TIMESTAMP,
     total_cost FLOAT,
     total_tokens FLOAT,
-    by_model JSONB
+    by_model JSONB,
+    UNIQUE(user_id, date)
 )
 
 -- Create indexes
 CREATE INDEX idx_traces_user_id ON traces(user_id);
 CREATE INDEX idx_traces_agent_id ON traces(agent_id);
+CREATE INDEX idx_daily_cost_aggregates_user_date ON daily_cost_aggregates(user_id, date DESC);
 CREATE INDEX idx_spans_trace_id ON spans(trace_id);
 CREATE INDEX idx_spans_status ON spans(status);
 CREATE INDEX idx_prompt_versions_version_number ON prompt_versions(version_number);
