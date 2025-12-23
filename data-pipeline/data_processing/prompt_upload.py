@@ -32,28 +32,44 @@ class S3Uploader:
     # upload the prompt to the s3 bucket and return the url link for the prompt
     def upload_prompt(self, user_id: str, trace_id: str, span_id: str, content: str, content_type: str = 'input') -> str:
         try:
-            timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
-            key = f"prompts/{user_id}/{trace_id}/{content_type}/{span_id}_{timestamp}.txt"
             if len(content) < MIN_SIZE_FOR_S3_UPLOAD:
                 encoded = base64.b64encode(content.encode('utf-8')).decode('utf-8')
                 return f"inline://{encoded}"
+            
+            timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
+            key = f"prompts/{user_id}/{trace_id}/{content_type}/{span_id}_{timestamp}.txt"
+
+            raw_bytes = content.encode("utf-8")
+            body = raw_bytes
+
+            s3_content_type = "text/plain; charset=utf-8"
+            content_encoding = None
+
+            if len(content) > COMPRESSION_THRESHOLD:
+                body = gzip.compress(raw_bytes)
+                key = key[0:-4] + ".txt.gz"
+                content_encoding = "gzip"
 
             # puts the specific object with user_id, trace_id, span_id, and content_type into the s3 bucket
-            self.s3_client.put_object(
+            put_args = dict(
                 Bucket=self.bucket_name,
                 Key=key,
-                Body=content.encode('utf-8'),
-                ContentType='text/plain',
+                Body=body,
+                ContentType=s3_content_type,
                 Metadata={
-                    'user_id': user_id,
-                    'trace_id': trace_id,
-                    'span_id': span_id,
-                    'content_type': content_type
-                }
+                    "user_id": str(user_id),
+                    "trace_id": str(trace_id),
+                    "span_id": str(span_id),
+                    "logical_content_type": str(content_type),  # preserve your path semantics
+                },
             )
 
+            if content_encoding:
+                put_args["ContentEncoding"] = content_encoding
+
+            self.s3_client.put_object(**put_args)
+
             s3_url = f"s3://{self.bucket_name}/{key}"
-            print(f"✓ Uploaded {content_type} to {s3_url}")
 
             return s3_url
         
