@@ -36,7 +36,7 @@ export const spanTypeConfig: Record<
     color: "bg-[#84cc16]",
     textColor: "text-black",
     borderColor: "border-[#84cc16]",
-    hexColor: "#84cc16",
+    hexColor: "#76B900",
   },
   function: {
     label: "Function",

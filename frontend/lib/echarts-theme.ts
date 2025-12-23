@@ -1,7 +1,7 @@
 export const CHART_PALETTE = {
   blue: "#3b82f6",
   orange: "#f97316",
-  green: "#84cc16",
+  green: "#76B900",
   pink: "#ec4899",
   slate: "#64748b",
   grid: "#e5e7eb",
