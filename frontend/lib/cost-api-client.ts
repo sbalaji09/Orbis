@@ -549,3 +549,27 @@ export async function acknowledgeAnomaly(
     return null;
   }
 }
+
+export async function acknowledgeAllAnomalies(
+  token: string
+): Promise<void | null>{
+  try {
+    const url = new URL(`${API_BASE_URL}/cost/anomalies/acknowledge-all`);
+
+    const response = await fetch(url.toString(), {
+      method: "POST",
+      headers: getHeaders(token),
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      console.error(`Failed to fetch cost anomalies: ${response.status} ${response.statusText}`);
+      return null;
+    }
+
+    return (await response.json()) as Promise<void>;
+  } catch (error) {
+    console.error("Error fetching cost anomalies:", error);
+    return null;
+  }
+}
