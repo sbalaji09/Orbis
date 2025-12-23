@@ -17,6 +17,7 @@ import {
 import ECharts from "@/components/ECharts";
 import type { EChartsOption } from "echarts";
 import CostAnomalyBanner from "@/components/CostAnomalyBanner";
+import AlertSettingsModal from "@/components/AlertSettingsModal";
 import { fetchCostAnomalies, acknowledgeAnomaly, type CostAnomaly } from "@/lib/cost-api-client";
 
 // Lazy load tab components to reduce initial bundle size
@@ -135,6 +136,7 @@ export default function CostDashboardClient({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const hasFetchedRef = useRef(false);
   const [anomalies, setAnomalies] = useState<CostAnomaly[]>([]);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<
     "overview" | "features" | "tokens" | "prompts" | "savings"
   >("overview");
@@ -765,8 +767,23 @@ export default function CostDashboardClient({
             anomalies={anomalies}
             onAcknowledge={handleAcknowledgeAnomaly}
             onAcknowledgeAll={handleAcknowledgeAll}
+            onOpenSettings={() => setIsSettingsModalOpen(true)}
           />
         )}
+
+        <AlertSettingsModal
+          isOpen={isSettingsModalOpen}
+          onClose={() => setIsSettingsModalOpen(false)}
+          token={token || ""}
+          onSettingsUpdated={() => {
+            // Refetch anomalies after settings change
+            if (token) {
+              fetchCostAnomalies(24, token).then(data => {
+                if (data) setAnomalies(data.anomalies);
+              });
+            }
+          }}
+        />
         
         {/* Tab Content - Lazy loaded based on active tab */}
         {activeTab === "overview" && (
