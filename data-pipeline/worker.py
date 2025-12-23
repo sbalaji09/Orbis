@@ -518,9 +518,11 @@ class SpanWorker:
                 )
                 total_cost = sum(s.get('cost') or 0 for s in trace_spans)
                 
-                # Use existing Redis accumulation
+                # Use existing Redis accumulation with TTL
                 self.queue.redis_client.incrbyfloat(f"trace:{trace_id}:total_tokens", total_tokens)
+                self.queue.redis_client.expire(f"trace:{trace_id}:total_tokens", TTL_SECONDS)
                 self.queue.redis_client.incrbyfloat(f"trace:{trace_id}:total_cost", total_cost)
+                self.queue.redis_client.expire(f"trace:{trace_id}:total_cost", TTL_SECONDS)
 
                 # add a last activity timestamp to Redis to track the last active span
                 self.queue.redis_client.set(
