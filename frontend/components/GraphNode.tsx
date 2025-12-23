@@ -6,6 +6,7 @@ import useSWRSubscription from "swr/subscription";
 import { Span } from "@/lib/types";
 import PromptBadge from "./PromptBadge";
 import { getSpanTypeConfig } from "@/lib/span-type-config";
+import { getStatusConfig } from "@/lib/status-config";
 import { useAuth } from "@/hooks/useAuth";
 
 interface GraphNodeProps {
@@ -108,21 +109,8 @@ export default function GraphNode({
   // Use streamed data if available, otherwise use prop
   const currentSpan = streamData || span;
 
-  const statusConfig = {
-    success: { bg: "bg-emerald-50", text: "text-success", dot: "bg-success" },
-    error: { bg: "bg-red-50", text: "text-error", dot: "bg-error" },
-    running: { bg: "bg-sky-50", text: "text-babyblue", dot: "bg-babyblue" },
-    pending: { bg: "bg-amber-50", text: "text-warning", dot: "bg-warning" },
-    cancelled: { bg: "bg-gray-50", text: "text-muted", dot: "bg-muted" },
-  };
-
-  const status = statusConfig[
-    currentSpan.status as keyof typeof statusConfig
-  ] || {
-    bg: "bg-gray-50",
-    text: "text-muted",
-    dot: "bg-muted",
-  };
+  // Get status configuration
+  const statusInfo = getStatusConfig(currentSpan.status);
 
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     // If no onDrag (React Flow handles dragging), just open modal on click
@@ -225,16 +213,11 @@ export default function GraphNode({
                 {currentSpan.name}
               </h3>
               <div
-                className={`flex items-center gap-1 px-1.5 py-0.5 border ${
-                  status.bg
-                } ${status.dot.replace(
-                  "bg-",
-                  "border-"
-                )} shrink-0 transition-transform duration-200`}
+                className={`flex items-center gap-1 px-1.5 py-0.5 border ${statusInfo.bg} ${statusInfo.border} shrink-0 transition-transform duration-200`}
               >
-                <div className={`w-1 h-1 ${status.dot}`} />
+                <div className={`w-1 h-1 ${statusInfo.dot}`} />
                 <span
-                  className={`text-[8px] font-bold uppercase tracking-wide ${status.text}`}
+                  className={`text-[8px] font-bold uppercase tracking-wide ${statusInfo.text}`}
                 >
                   {currentSpan.status}
                 </span>

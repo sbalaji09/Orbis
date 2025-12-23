@@ -19,6 +19,7 @@ import "reactflow/dist/style.css";
 import { Span } from "@/lib/types";
 import GraphNode from "@/components/GraphNode";
 import { useAuth } from "@/hooks/useAuth";
+import { getSpanTypeHexColor } from "@/lib/span-type-config";
 
 interface NodePosition {
   x: number;
@@ -284,12 +285,12 @@ export default function TraceGraphClient({
           style={{
             border: "2px solid #000000",
             boxShadow: "4px 4px 0 rgba(0,0,0,0.2)",
+            width: 150,
+            height: 100,
           }}
           nodeColor={(node) => {
             const span = node.data.span as Span;
-            if (span.status === "failed") return "#ef4444";
-            if (span.status === "success") return "#10b981";
-            return "#5B5FFF";
+            return getSpanTypeHexColor(span.span_type);
           }}
           maskColor="rgba(0, 0, 0, 0.05)"
         />
