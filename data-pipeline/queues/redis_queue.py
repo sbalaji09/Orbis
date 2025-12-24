@@ -9,6 +9,8 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+QUEUE_WAKEUP_CHANNEL = "queue:wakeup"
+
 # this queue is Redis-based and uses Redis Lists (linked lists of string values)
 class RedisQueue:
     # initalize the redis queue with the queue name and all the dependencies in order to create the Redis queue
@@ -57,6 +59,14 @@ class RedisQueue:
             if queue_length == 0:   
                 self.redis_client.set('queue:last_non_empty_timestamp', datetime.now(timezone.utc).timestamp())
             
+            self.redis_client.publish(
+                QUEUE_WAKEUP_CHANNEL,
+                msgpack.packb({
+                    "queue": self.queue_name,
+                    "timestamp": datetime.now(timezone.utc).timestamp(),
+                    "event": "work_available"
+                })
+            )
             # the lpush function adds to the left of the linked list
             self.redis_client.lpush(self.queue_name, task_json)
 
