@@ -2716,12 +2716,44 @@ class SupabaseDB:
         try:
             with conn.cursor() as cur:
                 cur.execute("""
-                    SELECT s.*
-                    FROM archived_spans s
-                    JOIN traces t ON t.id = s.trace_id
-                    JOIN agents a ON a.id = t.agent_id
-                    WHERE a.user_id = %s
+                    WITH deleted AS (
+                    DELETE FROM archived_spans s
+                    USING traces t, agents a
+                    WHERE t.id = s.trace_id
+                        AND a.id = t.agent_id
+                        AND a.user_id = %s
                         AND s.start_time < (now() - (a.archive_retention_days || ' days')::interval)
+                    RETURNING 1
+                    )
+                    SELECT count(*) FROM deleted;
+                """, 
+                (user_id,)
+                )
+                rows = cur.fetchall()
+
+                return rows
+        except Exception as e:
+            conn.rollback()
+            print(f"Error updating daily aggregates: {e}")
+            raise
+        finally:
+            self.return_connection(conn)
+    
+    def query_archived_traces_older_threshold(self, user_id: str):
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(                
+                """
+                    WITH deleted AS (
+                        DELETE FROM archived_traces at
+                        USING agents a
+                        WHERE a.id = at.agent_id
+                        AND a.user_id = %s
+                        AND at.created_at < (now() - (a.archive_retention_days || ' days')::interval)
+                        RETURNING 1
+                    )
+                    SELECT count(*) FROM deleted;
                 """, 
                 (user_id,)
                 )
