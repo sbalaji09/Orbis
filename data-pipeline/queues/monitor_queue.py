@@ -8,10 +8,11 @@ from redis_queue import RedisQueue
 # Configuration for auto-scaling
 SCALE_UP_THRESHOLD = 100      # Queue depth to trigger scale up
 SCALE_DOWN_THRESHOLD = 10     # Queue depth to trigger scale down
-MIN_WORKERS = 1               # Minimum number of workers
+MIN_WORKERS = 0               # Minimum number of workers
 MAX_WORKERS = 10              # Maximum number of workers
 HEARTBEAT_TIMEOUT = 60        # Seconds before considering a worker dead
 CHECK_INTERVAL = 5            # How often to check (seconds)
+IDLE_THRESHOLD_SECONDS = 300
 
 class WorkerPoolMonitor:
     def __init__(self):
@@ -138,10 +139,18 @@ class WorkerPoolMonitor:
 
         # Scale down
         elif queue_depth < SCALE_DOWN_THRESHOLD and active_count > MIN_WORKERS:
+            idle_duration_seconds = self.queue.get_idle_duration_seconds()
             workers_to_remove = min(
                 active_count - MIN_WORKERS,
-                1  # Remove one at a time
+                1
             )
+
+            if idle_duration_seconds > IDLE_THRESHOLD_SECONDS:
+                workers_to_remove = active_count
+            
+            if active_count == 1 and self.queue.get_queue_length() == 0 and idle_duration_seconds < IDLE_THRESHOLD_SECONDS:
+                workers_to_remove = active_count - 1
+            
             for _ in range(workers_to_remove):
                 self.terminate_worker()
             return f"Scaled DOWN: removed {workers_to_remove} workers"
