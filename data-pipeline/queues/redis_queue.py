@@ -3,7 +3,7 @@ import redis
 import json
 import os
 from typing import Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -53,6 +53,10 @@ class RedisQueue:
             # convert the dictionary into a JSON string
             task_json = msgpack.packb(task_data)
 
+            queue_length = self.redis_client.llen(self.queue_name)
+            if queue_length == 0:   
+                self.redis_client.set('queue:last_non_empty_timestamp', datetime.now(timezone.utc).timestamp())
+            
             # the lpush function adds to the left of the linked list
             self.redis_client.lpush(self.queue_name, task_json)
 
@@ -125,7 +129,9 @@ class RedisQueue:
             print(f"✗ Failed to move task to DLQ: {e}")
             return False
 
-
+    def get_idle_duration_seconds(self):
+        return datetime.now(timezone.utc).timestamp() - self.redis_client.get("queue:last_non_empty_timestamp")
+    
 # single instance of the Redis queue to be used throughout the system
 queue = RedisQueue()
 
