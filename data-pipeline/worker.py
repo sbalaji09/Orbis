@@ -31,6 +31,8 @@ TRACE_COST_ALERT_THRESHOLD = float(os.getenv('TRACE_COST_ALERT_THRESHOLD', '1.0'
 HIGH_TOKEN_ALERT_THRESHOLD = int(os.getenv('HIGH_TOKEN_ALERT_THRESHOLD', '50000'))  # Alert for traces > 50k tokens
 TTL_SECONDS = 3600
 
+DRAIN_TIMEOUT = 30
+
 # this class represents a worker that processes span tasks from the Redis queue
 # it continuously pulls task from the queue and processes them and is separate from the API
 class SpanWorker:
@@ -54,6 +56,8 @@ class SpanWorker:
         self.tasks_processed = 0
         self.last_heartbeat_time = time.time()
         self.HEARTBEAT_INTERVAL = 30  # Send heartbeat every 30 seconds
+
+        self.drain_start_time = None
 
     def invalidate_cost_caches(self, user_ids: set):
         """
@@ -394,8 +398,21 @@ class SpanWorker:
         self.logger.info("Worker started - waiting for tasks from queue")
         
         def handle_shutdown(signum, frame):
+            signal_name = "SIGTERM" if signum == signal.SIGTERM else "SIGINT"
+            self.logger.info(
+                f"Received {signal_name}, initiating graceful shutdown",
+                extra={'extra_data': {
+                    'worker_id': self.worker_id,
+                    'pending_spans': len(self.pending_spans),
+                    'signal': signal_name
+                }}
+            )
+
+            self.drain_start_time = time.time()
+
             self.queue.redis_client.hdel("workers:active", self.worker_id)
             self.queue.redis_client.hdel("workers:heartbeat", self.worker_id)
+
             self.shutdown_requested = True
         
         signal.signal(signal.SIGTERM, handle_shutdown)
@@ -404,6 +421,26 @@ class SpanWorker:
 
         try:
             while not self.shutdown_requested:
+                # if we are in drain mode and timeout has elapsed, force exit
+                if self.drain_start_time:
+                    elapsed = time.time() - self.drain_start_time
+                    if elapsed > DRAIN_TIMEOUT:
+                        self.logger.error(
+                            f"Drain timeout exceeded ({DRAIN_TIMEOUT}s), forcing exit",
+                            extra={'extra_data': {
+                                'worker_id': self.worker_id,
+                                'pending_spans_lost': len(self.pending_spans),
+                                'elapsed_seconds': elapsed
+                            }}
+                        )
+
+                        # re-queue pending spans before force exit
+                        for task in self.pending_spans:
+                            self.queue.enqueue(task)
+                        
+                        self.pending_spans = []
+                        break
+
                 # Send heartbeat periodically
                 if time.time() - self.last_heartbeat_time >= self.HEARTBEAT_INTERVAL:
                     self.queue.redis_client.hset(
@@ -446,9 +483,36 @@ class SpanWorker:
                 self._last_dlq_process = time.time()
             
             if self.pending_spans:
-                self.logger.info(f"Flushing {len(self.pending_spans)} remaining spans before shutdown")
-                self.flush_batch()
+                self.logger.info(
+                    f"Draining {len(self.pending_spans)} pending spans before shutdown",
+                    extra={'extra_data': {
+                        'worker_id': self.worker_id,
+                        'pending_count': len(self.pending_spans)
+                    }}
+                )                
+                try:
+                    self.flush_batch()
 
+                    self.logger.info(
+                        "Drain completed successfully",
+                        extra={'extra_data': {'worker_id': self.worker_id}}
+                    )
+                except Exception as e:
+                    self.logger.error(
+                        f"Drain flush failed, re-queuing spans: {e}",
+                        extra={'extra_data': {
+                            'worker_id': self.worker_id,
+                            'pending_count': len(self.pending_spans)
+                        }}
+                    )
+
+                    for task in self.pending_spans:
+                        self.queue.enqueue(task)
+            else:
+                self.logger.info(
+                    "No pending spans to drain",
+                    extra={'extra_data': {'worker_id': self.worker_id}}
+                )
 
         except KeyboardInterrupt:
             self.logger.info("Worker received shutdown signal (Ctrl+C)")
