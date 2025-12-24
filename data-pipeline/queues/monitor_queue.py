@@ -13,6 +13,7 @@ MAX_WORKERS = 10              # Maximum number of workers
 HEARTBEAT_TIMEOUT = 60        # Seconds before considering a worker dead
 CHECK_INTERVAL = 5            # How often to check (seconds)
 IDLE_THRESHOLD_SECONDS = 300
+COLD_START_WORKERS = 1
 
 class WorkerPoolMonitor:
     def __init__(self):
@@ -127,6 +128,10 @@ class WorkerPoolMonitor:
         stats = self.get_worker_stats()
         active_count = stats['active_count']
 
+        if active_count == 0 and queue_depth > 0:
+            self.spawn_worker()
+            return
+        
         # Scale up
         if queue_depth > SCALE_UP_THRESHOLD and active_count < MAX_WORKERS:
             workers_to_add = min(
