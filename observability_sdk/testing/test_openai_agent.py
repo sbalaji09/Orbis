@@ -120,10 +120,13 @@ def _read_streamed_content(stream) -> str:
     return content
 
 def _stream_chat(*, model: str, messages: list[dict], max_tokens: int = 300, temperature: float = 0.2) -> str:
+    from openai.types.chat import ChatCompletionMessageParam
     client = get_openai_client()
+    # Ensure messages are typed as List[ChatCompletionMessageParam]
+    typed_messages: list[ChatCompletionMessageParam] = [m for m in messages]  # type: ignore
     stream = client.chat.completions.create(
         model=model,
-        messages=messages,
+        messages=typed_messages,
         max_tokens=max_tokens,
         temperature=temperature,
         stream=True,

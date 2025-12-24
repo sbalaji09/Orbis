@@ -17,14 +17,9 @@
   --warning: #f59e0b;
   --accent-purple: #8b5cf6;
   --accent-teal: #14b8a6;
-  --green: #10b981;
+  --green: #76B900;
   --sage: #8a9a7b;
   --pink: #e91e8c;
-  --model-grok: #e91e8c;
-  --model-openai: #5b5fff;
-  --model-groq: #e8c302;
-  --model-mistral: #ff7b54;
-  --model-anthropic: #ff6b00;
 }
 
 @theme inline {
