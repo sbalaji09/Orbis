@@ -33,6 +33,9 @@ TTL_SECONDS = 3600
 
 DRAIN_TIMEOUT = 30
 
+WORKER_IDLE_TIMEOUT = 300
+DEQUEUE_TIMEOUT = 5
+
 # this class represents a worker that processes span tasks from the Redis queue
 # it continuously pulls task from the queue and processes them and is separate from the API
 class SpanWorker:
@@ -453,9 +456,11 @@ class SpanWorker:
                     self.finalize_stale_traces()
 
                 # dequeues a task and waits 5 seconds before checking the queue again
-                task = self.queue.dequeue(timeout=5)
+                task = self.queue.dequeue(timeout=DEQUEUE_TIMEOUT)
 
                 if task:
+                    self.consecutive_empty_polls = 0
+
                     # add the task to the pending spans
                     self.pending_spans.append(task)
                     if not self.batch_start_time:
@@ -466,8 +471,36 @@ class SpanWorker:
                         self.flush_batch()
 
                 else:
-                    if self.pending_spans and time.time() - self.batch_start_time >= self.FLUSH_INTERVAL:
-                        self.flush_batch()
+                    self.consecutive_empty_polls += 1
+
+                    # log every 12 polls (1 minute) to show we are still alive
+                    if self.consecutive_empty_polls % 12 == 0:
+                        minutes_idle = (self.consecutive_empty_polls * DEQUEUE_TIMEOUT) / 60
+                        self.logger.info(
+                            f"Worker idle for {minutes_idle:.1f} minutes",
+                            extra={'extra_data': {
+                                'worker_id': self.worker_id,
+                                'consecutive_empty_polls': self.consecutive_empty_polls,
+                                'max_before_termination': self.max_empty_polls
+                            }}
+                        )
+                    
+                    # check for self termination
+                    if self.consecutive_empty_polls >= self.max_empty_polls:
+                        self.logger.info(
+                            f"No work for {WORKER_IDLE_TIMEOUT} seconds, self-terminating",
+                            extra={'extra_data': {
+                                'worker_id': self.worker_id,
+                                'idle_seconds': self.consecutive_empty_polls * DEQUEUE_TIMEOUT,
+                                'reason': 'prolonged_idle'
+                            }}
+                        )
+
+                        # clean up redis registrations
+                        self.queue.redis_client.hdel("workers:active", self.worker_id)
+                        self.queue.redis_client.hdel("workers:heartbeat", self.worker_id)
+
+                        break
             
             # process the DLQ every 5 minutes
             if not hasattr(self, '_last_dlq_process'):
