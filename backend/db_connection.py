@@ -2773,6 +2773,58 @@ class SupabaseDB:
             raise
         finally:
             self.return_connection(conn)
+    
+    def move_archive_traces(self, user_id: str):
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                """
+                WITH candidates AS (
+                    SELECT t.id
+                    FROM traces t
+                    JOIN agents a ON a.id = t.agent_id
+                    WHERE a.user_id = %s
+                    -- no hot spans left
+                    AND NOT EXISTS (
+                        SELECT 1
+                        FROM spans s
+                        WHERE s.trace_id = t.id
+                    )
+                    -- safety: must have archived spans
+                    AND EXISTS (
+                        SELECT 1
+                        FROM spans_archive sa
+                        WHERE sa.trace_id = t.id
+                    )
+                    ORDER BY t.id
+                    LIMIT %s
+                ),
+                moved AS (
+                    DELETE FROM traces t
+                    USING candidates c
+                    WHERE t.id = c.id
+                    RETURNING t.*
+                )
+                INSERT INTO traces_archive
+                SELECT
+                    moved.*,
+                    now() AS archive_time
+                FROM moved
+                ON CONFLICT (id) DO NOTHING
+                RETURNING id;
+                """, 
+                (user_id,)
+                )
+                rows = cur.fetchall()
+
+                return rows
+        except Exception as e:
+            conn.rollback()
+            print(f"Error updating daily aggregates: {e}")
+            raise
+        finally:
+            self.return_connection(conn)
     # closes all the connections in the pool
     def close(self):
         self.pool.closeall()
