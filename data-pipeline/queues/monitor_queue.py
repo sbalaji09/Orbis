@@ -268,6 +268,26 @@ class WorkerPoolMonitor:
                 pubsub.close()
                 pubsub_client.close()
 
+        # start the listener in a daemon thread
+        self._pubsub_thread = threading.Thread(
+            target=listener_loop,
+            name="QueueWakeupListener",
+            daemon=True
+        )
+        self._pubsub_thread.start()
+
+    # check if a wake-up signal was received and spawn workers if needed
+    def check_wakeup_and_scale(self):
+        if self.wakeup_event.is_set():
+            self.wakeup_event.clear()
+
+            queue_depth = self.get_queue_depth()
+            stats = self.get_worker_stats()
+
+            if queue_depth > 0 and stats['active_count'] == 0:
+                for _ in range(COLD_START_WORKERS):
+                    self.spawn_worker()
+
 # Legacy function for backwards compatibility
 def monitor_queue():
     monitor = WorkerPoolMonitor()
