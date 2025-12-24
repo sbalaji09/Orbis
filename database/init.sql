@@ -92,7 +92,7 @@ CREATE TABLE spans (
 
 CREATE TABLE spans_archive (
     span_archive_id UUID PRIMARY KEY,
-    trace_id UUID REFERENCES traces(trace_id),
+    trace_id UUID,  -- No FK constraint: traces may be in traces or traces_archive
     parent_span_ids UUID[],
     name VARCHAR(100),
     start_time TIMESTAMP,
@@ -111,7 +111,7 @@ CREATE TABLE spans_archive (
     is_streaming BOOLEAN DEFAULT FALSE,
     time_to_first_token FLOAT,
     tokens_per_second FLOAT,
-    prompt_id UUID REFERENCES prompt_versions(prompt_id),
+    prompt_id UUID,  -- No FK: prompt_versions may be deleted
     prompt_name VARCHAR(50),
     prompt_version TEXT,
     prompt_hash TEXT,
@@ -151,3 +151,9 @@ CREATE INDEX prompts_per_agent ON prompt_versions(agent_id, name);
 CREATE INDEX prompt_analytics ON spans(prompt_id, prompt_version);
 CREATE INDEX created_at ON spans(start_time);
 CREATE INDEX archival_query ON spans(start_time, trace_id);
+
+-- Archive table indexes
+CREATE INDEX idx_spans_archive_trace_id ON spans_archive(trace_id);
+CREATE INDEX idx_spans_archive_start_time ON spans_archive(start_time);
+CREATE INDEX idx_traces_archive_agent_id ON traces_archive(agent_id);
+CREATE INDEX idx_traces_archive_start_time ON traces_archive(start_time);
