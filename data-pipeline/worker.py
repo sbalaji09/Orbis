@@ -486,6 +486,17 @@ class SpanWorker:
                 else:
                     self.consecutive_empty_polls += 1
 
+                    # Flush pending spans even if no new work arrives.
+                    # Otherwise a small batch can sit in-memory indefinitely.
+                    if (
+                        self.pending_spans
+                        and self.batch_start_time
+                        and time.time() - self.batch_start_time >= self.FLUSH_INTERVAL
+                    ):
+                        self.flush_batch()
+                        self.consecutive_empty_polls = 0
+                        continue
+
                     # log every 12 polls (1 minute) to show we are still alive
                     if self.consecutive_empty_polls % 12 == 0:
                         minutes_idle = (self.consecutive_empty_polls * DEQUEUE_TIMEOUT) / 60

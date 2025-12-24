@@ -32,12 +32,23 @@ class RedisQueue:
         password = password or os.getenv('REDIS_PASSWORD', None)
 
         # create the Redis connection using the defined variables for the queue_nam
+        # Text client for keys/values that are UTF-8 strings (caches, simple metrics, etc.)
         self.redis_client = redis.Redis(
             host=host,
             port=port,
             db=db,
             password=password if password else None,
             decode_responses=True
+        )
+
+        # Binary-safe client for queue payloads stored as msgpack bytes.
+        # decode_responses=True breaks BRPOP/LPUSH when values are non-UTF8 bytes.
+        self.redis_client_bytes = redis.Redis(
+            host=host,
+            port=port,
+            db=db,
+            password=password if password else None,
+            decode_responses=False,
         )
 
         # test the Redis connection at the specified host and port
@@ -52,10 +63,10 @@ class RedisQueue:
     # the dict is formatted like this: {'span_id': '123', 'data': {...}}
     def enqueue(self, task_data: Dict[Any, Any]) -> bool:
         try:
-            # convert the dictionary into a JSON string
-            task_json = msgpack.packb(task_data)
+            # convert the dictionary into msgpack bytes
+            task_json = msgpack.packb(task_data, use_bin_type=True)
 
-            queue_length = self.redis_client.llen(self.queue_name)
+            queue_length = self.redis_client_bytes.llen(self.queue_name)
             if queue_length == 0:   
                 self.redis_client.set('queue:last_non_empty_timestamp', datetime.now(timezone.utc).timestamp())
             
@@ -68,7 +79,7 @@ class RedisQueue:
                 })
             )
             # the lpush function adds to the left of the linked list
-            self.redis_client.lpush(self.queue_name, task_json)
+            self.redis_client_bytes.lpush(self.queue_name, task_json)
 
             print(f"✓ Task enqueued to '{self.queue_name}'")
             return True
@@ -82,12 +93,12 @@ class RedisQueue:
     def dequeue(self, timeout: int = 0) -> Optional[Dict[Any, Any]]:
         try:
             # the brpop removes from the right of list and returns a tuple (queue_name, task_json) or None if timeout
-            result = self.redis_client.brpop(self.queue_name, timeout=timeout)
+            result = self.redis_client_bytes.brpop(self.queue_name, timeout=timeout)
 
             # if there is something to be popped from the end of the list, then parse the result into a python object
             if result:
                 queue_name, task_json = result
-                task_data = msgpack.unpackb(task_json)
+                task_data = msgpack.unpackb(task_json, raw=False)
                 print(f"✓ Task dequeued from '{self.queue_name}'")
                 return task_data
             else:
@@ -100,7 +111,7 @@ class RedisQueue:
     # gets the current number of tasks in the queue to be processed using the llen() function
     def get_queue_length(self) -> int:
         try:
-            return self.redis_client.llen(self.queue_name)
+            return self.redis_client_bytes.llen(self.queue_name)
         except Exception as e:
             print(f"✗ Failed to get queue length: {e}")
             return 0
@@ -108,7 +119,7 @@ class RedisQueue:
     # clears all tasks from the queue using the delete() function
     def clear_queue(self) -> bool:
         try:
-            self.redis_client.delete(self.queue_name)
+            self.redis_client_bytes.delete(self.queue_name)
             print(f"✓ Queue '{self.queue_name}' cleared")
             return True
         except Exception as e:
@@ -129,8 +140,8 @@ class RedisQueue:
                 'original_queue': self.queue_name
             }
 
-            task_json = msgpack.packb(dlq_task) # converts a Python object to a JSON string
-            self.redis_client.lpush(dlq_name, task_json)
+            task_json = msgpack.packb(dlq_task, use_bin_type=True) # converts a Python object to msgpack bytes
+            self.redis_client_bytes.lpush(dlq_name, task_json)
 
             print(f"✓ Task moved to DLQ: {dlq_name}")
             return True

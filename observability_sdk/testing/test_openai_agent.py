@@ -59,11 +59,10 @@ _openai_client: openai.OpenAI | None = None
 
 def setup_orbis() -> None:
     configure(
-        api_key="T1BFTkFJLWFnZW50XtwEl6DdxdgXYn8BsklwIA==",
-        project_id="d823b86f-f6c5-47ab-b40b-35b53f9ac803",
+        api_key="VGVzdCBUcmFjZSAMlhbKlbc_MKUVQ-Kb1c95",
+        project_id="aca167c7-6c08-4fe2-a7af-21ec298e1d68",
         user_id="fbd31533-fe77-427f-9d2d-a1c4c69e9a6d",
-        api_url="http://localhost:8080",
-        debug=True,
+        api_url="http://localhost:8080"
     )
     instrument_all()
     # Keep total span count low for this test file.
