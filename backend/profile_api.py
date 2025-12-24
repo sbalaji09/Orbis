@@ -128,5 +128,8 @@ async def delete_agent(agent_id: str, user_id: str = Depends(get_user_id_from_to
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
+@router.get("/agent/{agent_id}/retention")
+async def get_agent_retention(agent_id: str, user_id: str = Depends(get_user_id_from_token)):
+    try:
+        
 print("[PROFILE_API] Router created successfully!")

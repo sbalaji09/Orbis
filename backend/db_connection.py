@@ -2890,6 +2890,23 @@ class SupabaseDB:
             raise
         finally:
             self.return_connection(conn)
+    
+    def get_agent_retention(self, user_id: str, agent_id: str):
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                """
+                    SELECT retention_days, archive_retention_days, retention_enabld
+                    FROM agents
+                    WHERE agent_id = %s
+                    AND user_id = %s
+                """,
+                (agent_id, user_id,)
+                )
+        finally:
+            self.return_connection(conn)
+
     # closes all the connections in the pool
     def close(self):
         self.pool.closeall()
