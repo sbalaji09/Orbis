@@ -2733,7 +2733,46 @@ class SupabaseDB:
             print(f"Error updating daily aggregates: {e}")
             raise
         finally:
-            self.return_connection(conn) 
+            self.return_connection(conn)
+    
+    def insert_spans_archive(self, spans: List[Dict[str, Any]], user_id: str):
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                """
+                WITH moved AS (
+                    DELETE FROM spans s
+                    USING traces t, agents a
+                    WHERE s.trace_id = t.id
+                      AND t.agent_id = a.id
+                      AND a.user_id = %s
+                      AND s.start_time < (
+                          now() - (a.retention_days || ' days')::interval
+                      )
+                    ORDER BY s.start_time
+                    LIMIT %s
+                    RETURNING s.*
+                )
+                INSERT INTO spans_archive
+                SELECT
+                    moved.*,
+                    now() AS archive_time
+                FROM moved
+                ON CONFLICT (id) DO NOTHING
+                RETURNING id;
+                """, 
+                (user_id,)
+                )
+                rows = cur.fetchall()
+
+                return rows
+        except Exception as e:
+            conn.rollback()
+            print(f"Error updating daily aggregates: {e}")
+            raise
+        finally:
+            self.return_connection(conn)
     # closes all the connections in the pool
     def close(self):
         self.pool.closeall()
