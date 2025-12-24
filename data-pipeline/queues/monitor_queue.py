@@ -200,10 +200,17 @@ class WorkerPoolMonitor:
             print(f"  Scale up threshold: {SCALE_UP_THRESHOLD} tasks")
             print(f"  Scale down threshold: {SCALE_DOWN_THRESHOLD} tasks")
             print(f"  Min workers: {MIN_WORKERS}, Max workers: {MAX_WORKERS}")
+
+        if auto_scale_enabled:
+            self._startup_wakeup_listener()
+
         print("Press Ctrl+C to stop\n")
 
         try:
             while True:
+                if auto_scale_enabled:
+                    self._check_wakeup_and_scale()
+                    
                 # Cleanup dead workers
                 self.cleanup_dead_workers()
 
@@ -277,7 +284,7 @@ class WorkerPoolMonitor:
         self._pubsub_thread.start()
 
     # check if a wake-up signal was received and spawn workers if needed
-    def check_wakeup_and_scale(self):
+    def _check_wakeup_and_scale(self):
         if self.wakeup_event.is_set():
             self.wakeup_event.clear()
 
