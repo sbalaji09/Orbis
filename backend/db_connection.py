@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, time, timedelta, timezone
 import json
 import os
 import re
@@ -2643,12 +2643,8 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
 
+    # update or insert daily cost aggregates for a user
     def update_daily_aggregates(self, total_cost: float, total_tokens: float, by_model: dict, user_id: str):
-        """
-        Update or insert daily cost aggregates for a user.
-        Uses upsert (ON CONFLICT) for atomic, race-condition-safe updates.
-        The by_model JSONB is merged using jsonb concatenation.
-        """
         conn = self.get_connection()
         try:
             with conn.cursor() as cur:
@@ -2691,6 +2687,29 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
 
+    def query_spans_older_threshold(self, user_id: str):
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT s.*
+                    FROM spans s
+                    JOIN traces t ON t.id = s.trace_id
+                    JOIN agents a ON a.id = t.agent_id
+                    WHERE a.user_id = %s
+                        AND s.start_time < (now() - (a.retention_days || ' days')::interval)
+                """, 
+                (user_id,)
+                )
+                rows = cur.fetchall()
+
+                return rows
+        except Exception as e:
+            conn.rollback()
+            print(f"Error updating daily aggregates: {e}")
+            raise
+        finally:
+            self.return_connection(conn)
     # closes all the connections in the pool
     def close(self):
         self.pool.closeall()
