@@ -2904,9 +2904,34 @@ class SupabaseDB:
                 """,
                 (agent_id, user_id,)
                 )
+
+                rows = cur.fetchall()
+                return rows
         finally:
             self.return_connection(conn)
 
+    def update_agent_retention(self, user_id: str, retention_days: int, archive_retention_days: int, agent_id: str):
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                """
+                    UPDATE agents
+                    SET retention_days = %s
+                    AND archive_retention_days = %s
+                    AND retention_enabled = True
+                    WHERE agent_id = %s
+                    AND user_id = %s
+                    AND retention_days IS DISTINCT FROM %s;
+                """,
+                (retention_days, archive_retention_days, agent_id, user_id)
+                )
+                result = cur.fetchone()
+                conn.commit()
+                return str(result[0])
+        finally:
+            self.return_connection(conn)
+    
     # closes all the connections in the pool
     def close(self):
         self.pool.closeall()
