@@ -2710,6 +2710,30 @@ class SupabaseDB:
             raise
         finally:
             self.return_connection(conn)
+
+    def query_archived_spans_older_threshold(self, user_id: str):
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT s.*
+                    FROM archived_spans s
+                    JOIN traces t ON t.id = s.trace_id
+                    JOIN agents a ON a.id = t.agent_id
+                    WHERE a.user_id = %s
+                        AND s.start_time < (now() - (a.archive_retention_days || ' days')::interval)
+                """, 
+                (user_id,)
+                )
+                rows = cur.fetchall()
+
+                return rows
+        except Exception as e:
+            conn.rollback()
+            print(f"Error updating daily aggregates: {e}")
+            raise
+        finally:
+            self.return_connection(conn) 
     # closes all the connections in the pool
     def close(self):
         self.pool.closeall()
