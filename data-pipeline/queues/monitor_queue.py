@@ -4,6 +4,8 @@ import subprocess
 import os
 import signal
 from redis_queue import RedisQueue
+import threading
+import msgpack
 
 # Configuration for auto-scaling
 SCALE_UP_THRESHOLD = 100      # Queue depth to trigger scale up
@@ -15,10 +17,15 @@ CHECK_INTERVAL = 5            # How often to check (seconds)
 IDLE_THRESHOLD_SECONDS = 300
 COLD_START_WORKERS = 1
 
+QUEUE_WAKEUP_CHANNEL = "queue:wakeup"
+
 class WorkerPoolMonitor:
     def __init__(self):
         self.queue = RedisQueue()
         self.spawned_pids = []  # Track PIDs of workers we spawned
+
+        self._pubsub_thread = None
+        self._shutdown_requested = False
 
     # get the current queue depth
     def get_queue_depth(self) -> int:
@@ -226,6 +233,40 @@ class WorkerPoolMonitor:
 
             print()
 
+    # background thread that listens for queue wake-up signals
+    # spawns a daemon thread that subscribes to the Redis pub/sub channel, blocks waiting for messages, and sets the wakeup_event when a message arrives
+    def _startup_wakeup_listener(self):
+        def listener_loop():
+            import redis as redis_module
+
+            pubsub_client = redis_module.Redis(
+                host=os.getenv('REDIS_HOST', 'localhost'),
+                port=int(os.getenv('REDIS_PORT', 6379)),
+                db=int(os.getenv('REDIS_DB', 0)),
+                password=os.getenv('REDIS_PASSWORD', None) or None,
+                decode_responses=False
+            )
+
+            pubsub = pubsub_client.pubsub()
+            pubsub.subscribe(QUEUE_WAKEUP_CHANNEL)
+
+            try:
+                for message in pubsub.listen():
+                    if self._shutdown_requested:
+                        break
+
+                    if message['type'] == 'message':
+                        try:
+                            data = msgpack.unpackb(message['data'])
+
+                            self.wakeup_event.set()
+                        except Exception as e:
+                            self.wakeup_event.set()
+            except Exception as e:
+                print(f"Wake-up listener error: {e}")
+            finally:
+                pubsub.close()
+                pubsub_client.close()
 
 # Legacy function for backwards compatibility
 def monitor_queue():
