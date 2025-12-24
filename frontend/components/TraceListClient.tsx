@@ -164,7 +164,7 @@ export function TraceListClient({
                                       `/dashboard/trace/${trace.trace_id}`
                                     )
                                   }
-                                  className={`w-full py-2.5 px-3 text-left transition-all border-b border-black/10 last:border-b-0 group relative ${
+                                  className={`w-full py-2.5 px-3 text-left transition-all border-b border-black/10 last:border-b-0 group relative cursor-pointer ${
                                     isActive
                                       ? "bg-[#5B5FFF]/10 border-l-[3px] border-l-black shadow-[inset_3px_0_0_0_rgba(0,0,0,0.1)]"
                                       : "hover:bg-[#5B5FFF]/5 hover:border-l-4 hover:border-l-[#5B5FFF]"
@@ -261,7 +261,7 @@ export function TraceListClient({
                                         />
                                       </svg>
                                       <span className="font-mono font-bold">
-                                        {(trace.duration / 1000).toFixed(1)}s
+                                        {trace.duration.toFixed(2)}s
                                       </span>
                                     </div>
                                     <span className="text-black/20">•</span>
