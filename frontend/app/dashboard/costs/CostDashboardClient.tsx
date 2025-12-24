@@ -78,6 +78,39 @@ interface CostDashboardClientProps {
   initialByModel: CostByModel[];
 }
 
+function toFiniteNumber(value: unknown, fallback = 0): number {
+  const num = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(num) ? num : fallback;
+}
+
+function toCount(value: unknown): number {
+  return Math.max(0, Math.trunc(toFiniteNumber(value, 0)));
+}
+
+function normalizeCostTrend(row: CostTrend): CostTrend {
+  return {
+    ...row,
+    total_cost: toFiniteNumber((row as unknown as { total_cost?: unknown }).total_cost, 0),
+    call_count: toCount((row as unknown as { call_count?: unknown }).call_count),
+  };
+}
+
+function normalizeCostByAgent(row: CostByAgent): CostByAgent {
+  return {
+    ...row,
+    total_cost: toFiniteNumber((row as unknown as { total_cost?: unknown }).total_cost, 0),
+    call_count: toCount((row as unknown as { call_count?: unknown }).call_count),
+  };
+}
+
+function normalizeCostByModel(row: CostByModel): CostByModel {
+  return {
+    ...row,
+    total_cost: toFiniteNumber((row as unknown as { total_cost?: unknown }).total_cost, 0),
+    call_count: toCount((row as unknown as { call_count?: unknown }).call_count),
+  };
+}
+
 // Cost-by-agent palette (blue -> green -> orange)
 const AGENT_COLORS = [
   CHART_PALETTE.blue,
@@ -119,9 +152,15 @@ export default function CostDashboardClient({
   const [customDays, setCustomDays] = useState("");
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [trends, setTrends] = useState<CostTrend[]>(initialTrends);
-  const [byAgent, setByAgent] = useState<CostByAgent[]>(initialByAgent);
-  const [byModel, setByModel] = useState<CostByModel[]>(initialByModel);
+  const [trends, setTrends] = useState<CostTrend[]>(() =>
+    (initialTrends ?? []).map(normalizeCostTrend)
+  );
+  const [byAgent, setByAgent] = useState<CostByAgent[]>(() =>
+    (initialByAgent ?? []).map(normalizeCostByAgent)
+  );
+  const [byModel, setByModel] = useState<CostByModel[]>(() =>
+    (initialByModel ?? []).map(normalizeCostByModel)
+  );
   const [isLoading, setIsLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const hasFetchedRef = useRef(false);
@@ -174,9 +213,9 @@ export default function CostDashboardClient({
           fetchCostByModel(startDate, endDate, token),
         ]);
 
-        setTrends(trendsData);
-        setByAgent(agentData);
-        setByModel(modelData);
+        setTrends((trendsData ?? []).map(normalizeCostTrend));
+        setByAgent((agentData ?? []).map(normalizeCostByAgent));
+        setByModel((modelData ?? []).map(normalizeCostByModel));
       } catch (error) {
         console.error("Failed to fetch cost data:", error);
       } finally {

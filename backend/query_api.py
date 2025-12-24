@@ -592,7 +592,7 @@ async def get_cost_by_model(start_date: str, end_date: str, user_id: str = Depen
 async def get_cost_trends(days: int, user_id: str = Depends(get_user_id_from_token)):
     try:
         validate_user_id(user_id)
-        cache_key = f"cache:cost_trends:{user_id}:{days}"
+        cache_key = f"cache:cost_trends:v2:{user_id}:{days}"
         cached = redis_client.get(cache_key)
         if cached:
             return json.loads(cached)
@@ -790,4 +790,3 @@ if __name__ == "__main__":
     import uvicorn
     print("Starting Query API on http://localhost:8000")
     uvicorn.run(app, host="0.0.0.0", port=8000)
-

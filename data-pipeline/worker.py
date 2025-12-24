@@ -86,6 +86,7 @@ class SpanWorker:
                     f"cache:cost_by_agent:{user_id}:*",
                     f"cache:cost_by_model:{user_id}:*",
                     f"cache:cost_trends:{user_id}:*",
+                    f"cache:cost_trends:v2:{user_id}:*",
                     f"cache:token_breakdown:{user_id}:*",
                 ]
                 for pattern in patterns:

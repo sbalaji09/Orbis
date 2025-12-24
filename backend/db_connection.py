@@ -1644,26 +1644,44 @@ class SupabaseDB:
             start_date_str = start_dt.date().isoformat()
             end_date_str = end_dt.date().isoformat()
 
-            # Try to read from pre-aggregated daily_cost_aggregates table first
+            # Try to read from pre-aggregated daily_cost_aggregates table first.
+            # daily_cost_aggregates doesn't store call counts, so we join in call counts from spans.
             query = """
                 WITH days AS (
                     SELECT generate_series(%s::date, %s::date, INTERVAL '1 day') AS day
+                ),
+                call_counts AS (
+                    SELECT
+                        (t.start_time AT TIME ZONE 'UTC')::date AS day,
+                        COUNT(s.span_id) AS call_count
+                    FROM traces t
+                    JOIN spans s
+                    ON s.trace_id = t.trace_id
+                    AND COALESCE(s.span_type, 'llm') = 'llm'
+                    WHERE t.user_id = %s
+                    AND t.start_time >= %s
+                    AND t.start_time < %s
+                    GROUP BY (t.start_time AT TIME ZONE 'UTC')::date
                 )
                 SELECT
                     d.day::date AS day,
                     COALESCE(dca.total_cost, 0)::numeric(18,6) AS total_cost,
                     COALESCE(dca.total_tokens, 0) AS total_tokens,
-                    dca.by_model
+                    dca.by_model,
+                    COALESCE(cc.call_count, 0) AS call_count
                 FROM days d
                 LEFT JOIN daily_cost_aggregates dca
                 ON dca.user_id = %s
                 AND DATE(dca.date) = d.day::date
+                LEFT JOIN call_counts cc
+                ON cc.day = d.day::date
                 ORDER BY d.day ASC
             """
-            params = [start_date_str, end_date_str, user_id]
+            end_limit = now + timedelta(seconds=1)
+            agg_params = [start_date_str, end_date_str, user_id, start_dt, end_limit, user_id]
 
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute(query, params)
+                cur.execute(query, agg_params)
                 rows = cur.fetchall()
 
                 # Check if we have any aggregated data
@@ -1684,6 +1702,7 @@ class SupabaseDB:
                             "total_cost": float(row.get("total_cost") or 0),
                             "total_tokens": int(row.get("total_tokens") or 0),
                             "by_model": row.get("by_model") or {},
+                            "call_count": int(row.get("call_count") or 0),
                         })
                     return results
 
@@ -1695,19 +1714,22 @@ class SupabaseDB:
                 SELECT
                     d.day::date AS day,
                     COALESCE(SUM(s.cost), 0)::numeric(18,6) AS total_cost,
-                    COALESCE(SUM(s.prompt_tokens + s.completion_tokens), 0) AS total_tokens
+                    COALESCE(SUM(s.prompt_tokens + s.completion_tokens), 0) AS total_tokens,
+                    COUNT(s.span_id) AS call_count
                 FROM days d
                 LEFT JOIN traces t
                 ON t.user_id = %s
                 AND (t.start_time AT TIME ZONE 'UTC')::date = d.day::date
                 LEFT JOIN spans s
                 ON s.trace_id = t.trace_id
+                AND COALESCE(s.span_type, 'llm') = 'llm'
                 GROUP BY d.day
                 ORDER BY d.day ASC
             """
 
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute(fallback_query, params)
+                fallback_params = [start_date_str, end_date_str, user_id]
+                cur.execute(fallback_query, fallback_params)
                 rows = cur.fetchall()
 
                 results: List[Dict[str, Any]] = []
@@ -1723,6 +1745,7 @@ class SupabaseDB:
                         "total_cost": float(row.get("total_cost") or 0),
                         "total_tokens": int(row.get("total_tokens") or 0),
                         "by_model": {},
+                        "call_count": int(row.get("call_count") or 0),
                     })
 
             return results
