@@ -1,5 +1,20 @@
 import { Span } from "@/lib/types";
 
+function decodeInlineUrl(url: string | null): string | null {
+  if (!url) return null;
+  if (!url.startsWith("inline://")) return null;
+  try {
+    const encodedContent = url.slice(9);
+    return atob(encodedContent);
+  } catch {
+    return null;
+  }
+}
+
+function isInlineUrl(url: string | null): boolean {
+  return !!url && url.startsWith("inline://");
+}
+
 function Skeleton({
   width = "w-20",
   height = "h-4",
@@ -351,7 +366,7 @@ export default function SpanDetails({ span: currentSpan }: SpanDetailsProps) {
             <h4 className="text-xs font-semibold text-black/40 uppercase tracking-wide">
               {`/* Input */`}
             </h4>
-            {currentSpan.input_blob_url !== null && (
+            {currentSpan.input_blob_url !== null && !isInlineUrl(currentSpan.input_blob_url) && (
               <a
                 href={currentSpan.input_blob_url}
                 className="text-[10px] text-babyblue hover:text-black font-medium uppercase tracking-wide transition"
@@ -364,7 +379,7 @@ export default function SpanDetails({ span: currentSpan }: SpanDetailsProps) {
           </div>
           <div className="p-3 bg-white border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.1)]">
             <p className="text-xs text-black/80 leading-relaxed line-clamp-3 font-mono">
-              {currentSpan.input_preview}
+              {decodeInlineUrl(currentSpan.input_blob_url) || currentSpan.input_preview}
             </p>
           </div>
         </div>
@@ -377,7 +392,7 @@ export default function SpanDetails({ span: currentSpan }: SpanDetailsProps) {
             <h4 className="text-xs font-semibold text-black/40 uppercase tracking-wide">
               {`/* Output */`}
             </h4>
-            {currentSpan.output_blob_url !== null && (
+            {currentSpan.output_blob_url !== null && !isInlineUrl(currentSpan.output_blob_url) && (
               <a
                 href={currentSpan.output_blob_url}
                 className="text-[10px] text-babyblue hover:text-black font-medium uppercase tracking-wide transition"
@@ -390,7 +405,7 @@ export default function SpanDetails({ span: currentSpan }: SpanDetailsProps) {
           </div>
           <div className="p-3 bg-white border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,0.1)]">
             <p className="text-xs text-black/80 leading-relaxed line-clamp-3 font-mono">
-              {currentSpan.output_preview}
+              {decodeInlineUrl(currentSpan.output_blob_url) || currentSpan.output_preview}
             </p>
           </div>
         </div>

@@ -393,6 +393,7 @@ async def get_prompt_analytics(
 async def compare_prompt_analytics(
     prompt_id1: str,
     prompt_id2: str,
+    semantic_analysis: bool = Query(False, description="Enable LLM-powered semantic analysis (slower, uses API credits)"),
     user_id: str = Depends(get_user_id_from_auth),
 ):
     try:
@@ -478,23 +479,24 @@ async def compare_prompt_analytics(
         diff_result = prompt_diff(
             prompt1_content, prompt_id1, prompt2_content, prompt_id2)
 
-        # call LLM for analysis (optional - gracefully handle missing API key)
+        # LLM semantic analysis is optional (off by default to save cost/latency)
         llm_analysis = None
-        try:
-            if os.getenv("OPENAI_API_KEY"):
-                llm_analysis = get_llm_comparison_analysis(
-                    prompt1_content=prompt1_content,
-                    prompt2_content=prompt2_content,
-                    outputs1=output_texts1,
-                    outputs2=output_texts2,
-                    analytics1=analytics1,
-                    analytics2=analytics2
-                )
-            else:
-                llm_analysis = "LLM analysis not available (OPENAI_API_KEY not set)"
-        except Exception as llm_error:
-            print(f"LLM analysis failed (continuing without it): {llm_error}")
-            llm_analysis = f"LLM analysis failed: {str(llm_error)}"
+        if semantic_analysis:
+            try:
+                if os.getenv("OPENAI_API_KEY"):
+                    llm_analysis = get_llm_comparison_analysis(
+                        prompt1_content=prompt1_content,
+                        prompt2_content=prompt2_content,
+                        outputs1=output_texts1,
+                        outputs2=output_texts2,
+                        analytics1=analytics1,
+                        analytics2=analytics2
+                    )
+                else:
+                    llm_analysis = "LLM analysis not available (OPENAI_API_KEY not set)"
+            except Exception as llm_error:
+                print(f"LLM analysis failed (continuing without it): {llm_error}")
+                llm_analysis = f"LLM analysis failed: {str(llm_error)}"
 
         # return complete comparison
         return {

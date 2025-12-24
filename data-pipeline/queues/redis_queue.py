@@ -1,12 +1,15 @@
+import msgpack
 import redis
 import json
 import os
 from typing import Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
+
+QUEUE_WAKEUP_CHANNEL = "queue:wakeup"
 
 # this queue is Redis-based and uses Redis Lists (linked lists of string values)
 class RedisQueue:
@@ -50,8 +53,20 @@ class RedisQueue:
     def enqueue(self, task_data: Dict[Any, Any]) -> bool:
         try:
             # convert the dictionary into a JSON string
-            task_json = json.dumps(task_data)
+            task_json = msgpack.packb(task_data)
 
+            queue_length = self.redis_client.llen(self.queue_name)
+            if queue_length == 0:   
+                self.redis_client.set('queue:last_non_empty_timestamp', datetime.now(timezone.utc).timestamp())
+            
+            self.redis_client.publish(
+                QUEUE_WAKEUP_CHANNEL,
+                msgpack.packb({
+                    "queue": self.queue_name,
+                    "timestamp": datetime.now(timezone.utc).timestamp(),
+                    "event": "work_available"
+                })
+            )
             # the lpush function adds to the left of the linked list
             self.redis_client.lpush(self.queue_name, task_json)
 
@@ -72,7 +87,7 @@ class RedisQueue:
             # if there is something to be popped from the end of the list, then parse the result into a python object
             if result:
                 queue_name, task_json = result
-                task_data = json.loads(task_json)
+                task_data = msgpack.unpackb(task_json)
                 print(f"✓ Task dequeued from '{self.queue_name}'")
                 return task_data
             else:
@@ -114,7 +129,7 @@ class RedisQueue:
                 'original_queue': self.queue_name
             }
 
-            task_json = json.dumps(dlq_task) # converts a Python object to a JSON string
+            task_json = msgpack.packb(dlq_task) # converts a Python object to a JSON string
             self.redis_client.lpush(dlq_name, task_json)
 
             print(f"✓ Task moved to DLQ: {dlq_name}")
@@ -124,7 +139,9 @@ class RedisQueue:
             print(f"✗ Failed to move task to DLQ: {e}")
             return False
 
-
+    def get_idle_duration_seconds(self):
+        return datetime.now(timezone.utc).timestamp() - self.redis_client.get("queue:last_non_empty_timestamp")
+    
 # single instance of the Redis queue to be used throughout the system
 queue = RedisQueue()
 

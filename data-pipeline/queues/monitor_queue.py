@@ -4,19 +4,32 @@ import subprocess
 import os
 import signal
 from redis_queue import RedisQueue
+import threading
+import msgpack
 
 # Configuration for auto-scaling
 SCALE_UP_THRESHOLD = 100      # Queue depth to trigger scale up
 SCALE_DOWN_THRESHOLD = 10     # Queue depth to trigger scale down
-MIN_WORKERS = 1               # Minimum number of workers
+MIN_WORKERS = 0               # Minimum number of workers
 MAX_WORKERS = 10              # Maximum number of workers
 HEARTBEAT_TIMEOUT = 60        # Seconds before considering a worker dead
 CHECK_INTERVAL = 5            # How often to check (seconds)
+IDLE_THRESHOLD_SECONDS = 300
+COLD_START_WORKERS = 1
+
+QUEUE_WAKEUP_CHANNEL = "queue:wakeup"
 
 class WorkerPoolMonitor:
     def __init__(self):
         self.queue = RedisQueue()
         self.spawned_pids = []  # Track PIDs of workers we spawned
+
+        self._pubsub_thread = None
+        self._shutdown_requested = False
+
+        # Threading event for wake-up signals from pub/sub listener
+        # Set by listener thread when work arrives, checked by main loop
+        self.wakeup_event = threading.Event()
 
     # get the current queue depth
     def get_queue_depth(self) -> int:
@@ -126,6 +139,10 @@ class WorkerPoolMonitor:
         stats = self.get_worker_stats()
         active_count = stats['active_count']
 
+        if active_count == 0 and queue_depth > 0:
+            self.spawn_worker()
+            return
+        
         # Scale up
         if queue_depth > SCALE_UP_THRESHOLD and active_count < MAX_WORKERS:
             workers_to_add = min(
@@ -138,10 +155,18 @@ class WorkerPoolMonitor:
 
         # Scale down
         elif queue_depth < SCALE_DOWN_THRESHOLD and active_count > MIN_WORKERS:
+            idle_duration_seconds = self.queue.get_idle_duration_seconds()
             workers_to_remove = min(
                 active_count - MIN_WORKERS,
-                1  # Remove one at a time
+                1
             )
+
+            if idle_duration_seconds > IDLE_THRESHOLD_SECONDS:
+                workers_to_remove = active_count
+            
+            if active_count == 1 and self.queue.get_queue_length() == 0 and idle_duration_seconds < IDLE_THRESHOLD_SECONDS:
+                workers_to_remove = active_count - 1
+            
             for _ in range(workers_to_remove):
                 self.terminate_worker()
             return f"Scaled DOWN: removed {workers_to_remove} workers"
@@ -179,10 +204,17 @@ class WorkerPoolMonitor:
             print(f"  Scale up threshold: {SCALE_UP_THRESHOLD} tasks")
             print(f"  Scale down threshold: {SCALE_DOWN_THRESHOLD} tasks")
             print(f"  Min workers: {MIN_WORKERS}, Max workers: {MAX_WORKERS}")
+
+        if auto_scale_enabled:
+            self._startup_wakeup_listener()
+
         print("Press Ctrl+C to stop\n")
 
         try:
             while True:
+                if auto_scale_enabled:
+                    self._check_wakeup_and_scale()
+                    
                 # Cleanup dead workers
                 self.cleanup_dead_workers()
 
@@ -212,6 +244,60 @@ class WorkerPoolMonitor:
 
             print()
 
+    # background thread that listens for queue wake-up signals
+    # spawns a daemon thread that subscribes to the Redis pub/sub channel, blocks waiting for messages, and sets the wakeup_event when a message arrives
+    def _startup_wakeup_listener(self):
+        def listener_loop():
+            import redis as redis_module
+
+            pubsub_client = redis_module.Redis(
+                host=os.getenv('REDIS_HOST', 'localhost'),
+                port=int(os.getenv('REDIS_PORT', 6379)),
+                db=int(os.getenv('REDIS_DB', 0)),
+                password=os.getenv('REDIS_PASSWORD', None) or None,
+                decode_responses=False
+            )
+
+            pubsub = pubsub_client.pubsub()
+            pubsub.subscribe(QUEUE_WAKEUP_CHANNEL)
+
+            try:
+                for message in pubsub.listen():
+                    if self._shutdown_requested:
+                        break
+
+                    if message['type'] == 'message':
+                        try:
+                            data = msgpack.unpackb(message['data'])
+
+                            self.wakeup_event.set()
+                        except Exception as e:
+                            self.wakeup_event.set()
+            except Exception as e:
+                print(f"Wake-up listener error: {e}")
+            finally:
+                pubsub.close()
+                pubsub_client.close()
+
+        # start the listener in a daemon thread
+        self._pubsub_thread = threading.Thread(
+            target=listener_loop,
+            name="QueueWakeupListener",
+            daemon=True
+        )
+        self._pubsub_thread.start()
+
+    # check if a wake-up signal was received and spawn workers if needed
+    def _check_wakeup_and_scale(self):
+        if self.wakeup_event.is_set():
+            self.wakeup_event.clear()
+
+            queue_depth = self.get_queue_depth()
+            stats = self.get_worker_stats()
+
+            if queue_depth > 0 and stats['active_count'] == 0:
+                for _ in range(COLD_START_WORKERS):
+                    self.spawn_worker()
 
 # Legacy function for backwards compatibility
 def monitor_queue():

@@ -78,11 +78,19 @@ export async function GET(request: NextRequest) {
                 prompt_sample: prompt.substring(0, 50)
               });
 
-              // If there's a blob URL, fetch the full input (only if it's an HTTP URL)
+              // If there's a blob URL, fetch the full input
               if (spanWithInput.input_blob_url && !prompt) {
                 const blobUrl = spanWithInput.input_blob_url;
-                // Only fetch if it's a valid HTTP/HTTPS URL
-                if (blobUrl.startsWith('http://') || blobUrl.startsWith('https://')) {
+                // Handle inline:// URLs - decode base64 content directly
+                if (blobUrl.startsWith('inline://')) {
+                  try {
+                    const encodedContent = blobUrl.slice(9);
+                    prompt = Buffer.from(encodedContent, 'base64').toString('utf-8');
+                  } catch (e) {
+                    console.error("Error decoding inline blob data:", e);
+                  }
+                } else if (blobUrl.startsWith('http://') || blobUrl.startsWith('https://')) {
+                  // Fetch from HTTP/HTTPS URL
                   try {
                     const blobResponse = await fetch(blobUrl);
                     if (blobResponse.ok) {

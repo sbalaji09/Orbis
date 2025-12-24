@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, time, timedelta, timezone
 import json
 import os
 import re
@@ -8,6 +8,7 @@ from psycopg2.extras import RealDictCursor, execute_values
 from psycopg2.pool import SimpleConnectionPool
 from dotenv import load_dotenv
 from typing import Dict, List, Optional, Any
+import uuid
 from uuid import UUID
 from psycopg2.extras import execute_values
 
@@ -1624,6 +1625,11 @@ class SupabaseDB:
             self.return_connection(conn)
 
     def get_cost_trends(self, user_id: str, days: int) -> List[Dict[str, Any]]:
+        """
+        Get cost trends for a user over the specified number of days.
+        Uses the pre-aggregated daily_cost_aggregates table for performance.
+        Falls back to span aggregation if no aggregated data exists.
+        """
         if days is None or not isinstance(days, int) or days < 1:
             raise ValueError("`days` must be an integer >= 1")
 
@@ -1633,20 +1639,63 @@ class SupabaseDB:
 
             start_dt = (now - timedelta(days=days - 1)
                         ).replace(hour=0, minute=0, second=0, microsecond=0)
-            # today's date at 00:00
             end_dt = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
             start_date_str = start_dt.date().isoformat()
             end_date_str = end_dt.date().isoformat()
 
+            # Try to read from pre-aggregated daily_cost_aggregates table first
             query = """
                 WITH days AS (
                     SELECT generate_series(%s::date, %s::date, INTERVAL '1 day') AS day
                 )
                 SELECT
                     d.day::date AS day,
+                    COALESCE(dca.total_cost, 0)::numeric(18,6) AS total_cost,
+                    COALESCE(dca.total_tokens, 0) AS total_tokens,
+                    dca.by_model
+                FROM days d
+                LEFT JOIN daily_cost_aggregates dca
+                ON dca.user_id = %s
+                AND DATE(dca.date) = d.day::date
+                ORDER BY d.day ASC
+            """
+            params = [start_date_str, end_date_str, user_id]
+
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(query, params)
+                rows = cur.fetchall()
+
+                # Check if we have any aggregated data
+                has_aggregated_data = any(row['total_cost'] > 0 for row in rows)
+
+                if has_aggregated_data:
+                    # Use aggregated data
+                    results: List[Dict[str, Any]] = []
+                    for row in rows:
+                        day_val = row.get("day")
+                        try:
+                            day_str = day_val.isoformat()
+                        except Exception:
+                            day_str = str(day_val)
+
+                        results.append({
+                            "date": day_str,
+                            "total_cost": float(row.get("total_cost") or 0),
+                            "total_tokens": int(row.get("total_tokens") or 0),
+                            "by_model": row.get("by_model") or {},
+                        })
+                    return results
+
+            # Fallback: aggregate from spans (for historical data before aggregation was enabled)
+            fallback_query = """
+                WITH days AS (
+                    SELECT generate_series(%s::date, %s::date, INTERVAL '1 day') AS day
+                )
+                SELECT
+                    d.day::date AS day,
                     COALESCE(SUM(s.cost), 0)::numeric(18,6) AS total_cost,
-                    COALESCE(COUNT(s.*), 0) AS call_count
+                    COALESCE(SUM(s.prompt_tokens + s.completion_tokens), 0) AS total_tokens
                 FROM days d
                 LEFT JOIN traces t
                 ON t.user_id = %s
@@ -1656,32 +1705,24 @@ class SupabaseDB:
                 GROUP BY d.day
                 ORDER BY d.day ASC
             """
-            params = [start_date_str, end_date_str, user_id]
 
-            with conn.cursor() as cur:
-                cur.execute(query, params)
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(fallback_query, params)
                 rows = cur.fetchall()
-
-                columns = [col.name for col in cur.description] if hasattr(
-                    cur, "description") else ["day", "total_cost", "call_count"]
 
                 results: List[Dict[str, Any]] = []
                 for row in rows:
-                    row_dict = dict(zip(columns, row))
-                    day_val = row_dict.get("day")
-
+                    day_val = row.get("day")
                     try:
                         day_str = day_val.isoformat()
                     except Exception:
                         day_str = str(day_val)
 
-                    total_cost = row_dict.get("total_cost")
-                    call_count = row_dict.get("call_count")
-
                     results.append({
                         "date": day_str,
-                        "total_cost": float(total_cost) if total_cost is not None else 0.0,
-                        "call_count": int(call_count or 0),
+                        "total_cost": float(row.get("total_cost") or 0),
+                        "total_tokens": int(row.get("total_tokens") or 0),
+                        "by_model": {},
                     })
 
             return results
@@ -2602,6 +2643,318 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
 
+    # update or insert daily cost aggregates for a user
+    def update_daily_aggregates(self, total_cost: float, total_tokens: float, by_model: dict, user_id: str):
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                today = datetime.now(timezone.utc).date()
+
+                # Use upsert with ON CONFLICT for atomic operation
+                # For by_model, we merge the new model costs with existing ones
+                cur.execute("""
+                    INSERT INTO daily_cost_aggregates
+                    (aggregate_id, user_id, date, total_cost, total_tokens, by_model)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (user_id, date) DO UPDATE SET
+                        total_cost = daily_cost_aggregates.total_cost + EXCLUDED.total_cost,
+                        total_tokens = daily_cost_aggregates.total_tokens + EXCLUDED.total_tokens,
+                        by_model = (
+                            SELECT jsonb_object_agg(
+                                key,
+                                COALESCE((daily_cost_aggregates.by_model->key)::numeric, 0) +
+                                COALESCE((EXCLUDED.by_model->key)::numeric, 0)
+                            )
+                            FROM jsonb_object_keys(
+                                COALESCE(daily_cost_aggregates.by_model, '{}'::jsonb) ||
+                                COALESCE(EXCLUDED.by_model, '{}'::jsonb)
+                            ) AS key
+                        )
+                """, (
+                    str(uuid.uuid4()),
+                    user_id,
+                    today,
+                    total_cost,
+                    total_tokens,
+                    json.dumps(by_model or {})
+                ))
+
+                conn.commit()
+        except Exception as e:
+            conn.rollback()
+            print(f"Error updating daily aggregates: {e}")
+            raise
+        finally:
+            self.return_connection(conn)
+    
+    # query spans that are older than the agent's retention_days threshold
+    def query_spans_older_threshold(self, user_id: str):
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT s.*
+                    FROM spans s
+                    JOIN traces t ON t.trace_id = s.trace_id
+                    JOIN agents a ON a.agent_id = t.agent_id
+                    WHERE a.user_id = %s
+                        AND a.retention_enabled = true
+                        AND s.start_time < (now() - (a.retention_days || ' days')::interval)
+                """,
+                (user_id,)
+                )
+                rows = cur.fetchall()
+                return rows
+        except Exception as e:
+            conn.rollback()
+            print(f"Error querying spans older than threshold: {e}")
+            raise
+        finally:
+            self.return_connection(conn)
+
+    # permantently delete archived spans older than archive_retention days
+    def delete_expired_archived_spans(self, user_id: str):
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    WITH deleted AS (
+                        DELETE FROM spans_archive sa
+                        USING traces_archive ta, agents a
+                        WHERE ta.trace_archive_id = sa.trace_id
+                            AND a.agent_id = ta.agent_id
+                            AND a.user_id = %s
+                            AND sa.start_time < (now() - (a.archive_retention_days || ' days')::interval)
+                        RETURNING 1
+                    )
+                    SELECT count(*) FROM deleted;
+                """,
+                (user_id,)
+                )
+                result = cur.fetchone()
+                conn.commit()
+                return result[0] if result else 0
+        except Exception as e:
+            conn.rollback()
+            print(f"Error deleting expired archived spans: {e}")
+            raise
+        finally:
+            self.return_connection(conn)
+    
+    # permanently delete archived traces older than archive_retention_days
+    def delete_expired_archived_traces(self, user_id: str):
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                """
+                    WITH deleted AS (
+                        DELETE FROM traces_archive ta
+                        USING agents a
+                        WHERE a.agent_id = ta.agent_id
+                            AND a.user_id = %s
+                            AND ta.start_time < (now() - (a.archive_retention_days || ' days')::interval)
+                            -- only delete if no archived spans reference this trace
+                            AND NOT EXISTS (
+                                SELECT 1 FROM spans_archive sa WHERE sa.trace_id = ta.trace_archive_id
+                            )
+                        RETURNING 1
+                    )
+                    SELECT count(*) FROM deleted;
+                """,
+                (user_id,)
+                )
+                result = cur.fetchone()
+                conn.commit()
+                return result[0] if result else 0
+        except Exception as e:
+            conn.rollback()
+            print(f"Error deleting expired archived traces: {e}")
+            raise
+        finally:
+            self.return_connection(conn)
+    
+    # move spans older than retention_days to spans_archive in batches
+    def archive_spans_batch(self, user_id: str, batch_size: int = 1000):
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                """
+                WITH to_archive AS (
+                    SELECT s.span_id
+                    FROM spans s
+                    JOIN traces t ON s.trace_id = t.trace_id
+                    JOIN agents a ON t.agent_id = a.agent_id
+                    WHERE a.user_id = %s
+                      AND a.retention_enabled = true
+                      AND s.start_time < (now() - (a.retention_days || ' days')::interval)
+                    ORDER BY s.start_time
+                    LIMIT %s
+                ),
+                inserted AS (
+                    INSERT INTO spans_archive (
+                        span_archive_id, trace_id, parent_span_ids, name,
+                        start_time, end_time, duration, input_preview, input_blob_url,
+                        output_preview, output_blob_url, llm_model, prompt_tokens,
+                        completion_tokens, cost, status, error_message, is_streaming,
+                        time_to_first_token, tokens_per_second, prompt_id, prompt_name,
+                        prompt_version, prompt_hash, span_type, tool_metadata, http_method,
+                        http_url, http_status_code, api_name, db_type, db_operation, db_query,
+                        software_name, software_type, cli_command, cli_exit_code, cli_stdout,
+                        cli_stderr, tool_name, tool_category, tags, archived_at
+                    )
+                    SELECT
+                        s.span_id, s.trace_id, s.parent_span_ids, s.name,
+                        s.start_time, s.end_time, s.duration, s.input_preview, s.input_blob_url,
+                        s.output_preview, s.output_blob_url, s.llm_model, s.prompt_tokens,
+                        s.completion_tokens, s.cost, s.status, s.error_message, s.is_streaming,
+                        s.time_to_first_token, s.tokens_per_second, s.prompt_id, s.prompt_name,
+                        s.prompt_version, s.prompt_hash, s.span_type, s.tool_metadata, s.http_method,
+                        s.http_url, s.http_status_code, s.api_name, s.db_type, s.db_operation, s.db_query,
+                        s.software_name, s.software_type, s.cli_command, s.cli_exit_code, s.cli_stdout,
+                        s.cli_stderr, s.tool_name, s.tool_category, s.tags, now()
+                    FROM spans s
+                    WHERE s.span_id IN (SELECT span_id FROM to_archive)
+                    ON CONFLICT (span_archive_id) DO NOTHING
+                    RETURNING span_archive_id
+                ),
+                deleted AS (
+                    DELETE FROM spans
+                    WHERE span_id IN (SELECT span_id FROM to_archive)
+                    RETURNING span_id
+                )
+                SELECT count(*) FROM deleted;
+                """,
+                (user_id, batch_size)
+                )
+                result = cur.fetchone()
+                conn.commit()
+                return result[0] if result else 0
+        except Exception as e:
+            conn.rollback()
+            print(f"Error archiving spans: {e}")
+            raise
+        finally:
+            self.return_connection(conn)
+    
+    # move traces to traces_archive when all their spans have been archived
+    def archive_traces_batch(self, user_id: str, batch_size: int = 500):
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                """
+                WITH candidates AS (
+                    SELECT t.trace_id
+                    FROM traces t
+                    JOIN agents a ON a.agent_id = t.agent_id
+                    WHERE a.user_id = %s
+                      AND a.retention_enabled = true
+                      -- no spans left in main table
+                      AND NOT EXISTS (
+                          SELECT 1 FROM spans s WHERE s.trace_id = t.trace_id
+                      )
+                      -- must have archived spans (safety check)
+                      AND EXISTS (
+                          SELECT 1 FROM spans_archive sa WHERE sa.trace_id = t.trace_id
+                      )
+                    LIMIT %s
+                ),
+                inserted AS (
+                    INSERT INTO traces_archive (
+                        trace_archive_id, trace_hash_id, start_time, end_time,
+                        duration, total_cost, total_tokens, status, user_id, agent_id,
+                        tags, archived_at
+                    )
+                    SELECT
+                        t.trace_id, t.trace_hash_id, t.start_time, t.end_time,
+                        t.duration, t.total_cost, t.total_tokens, t.status, t.user_id, t.agent_id,
+                        t.tags, now()
+                    FROM traces t
+                    WHERE t.trace_id IN (SELECT trace_id FROM candidates)
+                    ON CONFLICT (trace_archive_id) DO NOTHING
+                    RETURNING trace_archive_id
+                ),
+                deleted AS (
+                    DELETE FROM traces
+                    WHERE trace_id IN (SELECT trace_id FROM candidates)
+                    RETURNING trace_id
+                )
+                SELECT count(*) FROM deleted;
+                """,
+                (user_id, batch_size)
+                )
+                result = cur.fetchone()
+                conn.commit()
+                return result[0] if result else 0
+        except Exception as e:
+            conn.rollback()
+            print(f"Error archiving traces: {e}")
+            raise
+        finally:
+            self.return_connection(conn)
+    
+    def get_agent_retention(self, user_id: str, agent_id: str):
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                """
+                    SELECT retention_days, archive_retention_days, retention_enabled
+                    FROM agents
+                    WHERE agent_id = %s
+                    AND user_id = %s
+                """,
+                (agent_id, user_id,)
+                )
+
+                rows = cur.fetchall()
+                return rows
+        finally:
+            self.return_connection(conn)
+
+    def update_agent_retention(self, agent_id: str, user_id: str, retention_days: int, archive_retention_days: int) -> bool:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                """
+                    UPDATE agents
+                    SET retention_days = %s,
+                        archive_retention_days = %s,
+                        retention_enabled = true
+                    WHERE agent_id = %s
+                      AND user_id = %s
+                """,
+                (retention_days, archive_retention_days, agent_id, user_id)
+                )
+                conn.commit()
+                return cur.rowcount > 0
+        except Exception as e:
+            conn.rollback()
+            print(f"Error updating agent retention: {e}")
+            raise
+        finally:
+            self.return_connection(conn)
+    
+    def get_archived_traces_agent(self, user_id: str, agent_id: str):
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                """
+                    SELECT *
+                    FROM traces_archive
+                    WHERE user_id = %s
+                    AND agent_id = %s
+                """,
+                (user_id, agent_id)
+                )
+                rows = cur.fetchall()
+                return rows
+        finally:
+            self.return_connection(conn)
     # closes all the connections in the pool
     def close(self):
         self.pool.closeall()

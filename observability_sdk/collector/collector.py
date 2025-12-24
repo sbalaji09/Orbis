@@ -1,5 +1,7 @@
 import threading
 import time
+import gzip
+import json
 import requests
 from typing import List, Dict, Any
 from queue import Queue, Empty
@@ -119,52 +121,73 @@ class SpanCollector:
     def _send_batch(self, spans: List[Dict[str, Any]]) -> None:
         if not spans:
             return
-        
+
         url = f"{get_config().api_url}/span"
-        
+        config = get_config()
+
         # send each span individually (sid's endpoint expects one span per req)
         for span_data in spans:
-            if get_config().debug:
+            if config.debug:
                 print(f"sending span data: {span_data}")
-            
-            for attempt in range(get_config().max_retries):
+
+            for attempt in range(config.max_retries):
                 try:
                     headers = {"Content-Type": "application/json"}
-                    if get_config().api_key:
-                        headers["X-API-Key"] = get_config().api_key
-                    
-                    response = requests.post(
-                        url,
-                        json=span_data,
-                        headers=headers,
-                        timeout=5.0
-                    )
-                    
+                    if config.api_key:
+                        headers["X-API-Key"] = config.api_key
+
+                    # Serialize to JSON
+                    json_body = json.dumps(span_data).encode('utf-8')
+
+                    # Compress if enabled and payload is large enough
+                    if config.compress_requests and len(json_body) >= config.compression_min_size:
+                        compressed_body = gzip.compress(json_body)
+                        headers["Content-Encoding"] = "gzip"
+
+                        if config.debug:
+                            ratio = len(compressed_body) / len(json_body) * 100
+                            print(f"compressed {len(json_body)} -> {len(compressed_body)} bytes ({ratio:.1f}%)")
+
+                        response = requests.post(
+                            url,
+                            data=compressed_body,
+                            headers=headers,
+                            timeout=5.0
+                        )
+                    else:
+                        # Send uncompressed
+                        response = requests.post(
+                            url,
+                            data=json_body,
+                            headers=headers,
+                            timeout=5.0
+                        )
+
                     if response.status_code == 202:
-                        if get_config().debug:
+                        if config.debug:
                             print(f"span sent: {span_data['name']}")
                         break  # success
                     else:
-                        if get_config().debug:
+                        if config.debug:
                             print(f"failed to send span: {response.status_code}")
                             print(f"✗ Response body: {response.text}")
-                        
+
                         # retry on server errors
-                        if response.status_code >= 500 and attempt < get_config().max_retries - 1:
-                            time.sleep(get_config().retry_delay)
+                        if response.status_code >= 500 and attempt < config.max_retries - 1:
+                            time.sleep(config.retry_delay)
                             continue
                         break
-                
+
                 except requests.exceptions.RequestException as e:
-                    if get_config().debug:
+                    if config.debug:
                         print(f"request failed: {e}")
-                    
+
                     # retry on network errors
-                    if attempt < get_config().max_retries - 1:
-                        time.sleep(get_config().retry_delay)
+                    if attempt < config.max_retries - 1:
+                        time.sleep(config.retry_delay)
                     else:
                         # give up after max retries
-                        if get_config().debug:
+                        if config.debug:
                             print(f"giving up on span: {span_data['name']}")
 
 

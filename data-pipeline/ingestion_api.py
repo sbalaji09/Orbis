@@ -1,6 +1,10 @@
 import time
+import gzip
 from fastapi import FastAPI, Request, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request as StarletteRequest
+from starlette.responses import JSONResponse
 from datetime import datetime, timezone
 from uuid import UUID
 from typing import Optional, Set
@@ -154,7 +158,48 @@ class EndTraceIn(BaseModel):
     end_time: str
     status: str = "completed"  # or "failed"
 
+# middleware to decompress gzip-encoded request bodies
+class GzipRequestMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: StarletteRequest, call_next):
+        content_encoding = request.headers.get("content-encoding", "").lower()
+
+        if content_encoding == "gzip":
+            compressed_body = await request.body()
+
+            try:
+                decompressed_body = gzip.decompress(compressed_body)
+
+                # create a new request with the decompressed body
+                async def receive():
+                    return {"type": "http.request", "body": decompressed_body}
+
+                request._receive = receive
+
+                new_headers = []
+                for key, value in request.headers.raw:
+                    key_lower = key.decode().lower()
+                    if key_lower == "content-encoding":
+                        continue
+                    if key_lower == "content-length":
+                        new_headers.append((key, str(len(decompressed_body)).encode()))
+                    else:
+                        new_headers.append((key, value))
+
+                request.scope["headers"] = new_headers
+
+            except gzip.BadGzipFile:
+                return JSONResponse(status_code=400, content={"detail": "Invalid gzip data"})
+            except Exception as e:
+                return JSONResponse(status_code=400, content={"detail": f"Failed to decompress request: {str(e)}"})
+
+        response = await call_next(request)
+        return response
+
+
 app = FastAPI()
+
+# Add gzip decompression middleware (must be added before other middleware)
+app.add_middleware(GzipRequestMiddleware)
 app.add_middleware(CORSMiddleware, **get_cors_config())
 
 # Include prompt versioning API

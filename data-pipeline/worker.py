@@ -7,6 +7,7 @@ import time
 from datetime import datetime, timezone
 import uuid
 
+import msgpack
 import redis
 from queues.redis_queue import RedisQueue
 from dotenv import load_dotenv
@@ -17,6 +18,7 @@ from collections import defaultdict
 import socket
 import signal
 from queues.dlq_processor import dlq_processor
+from jobs.retention_processor import retention_processor
 
 # add the application logging layer to the path
 sys.path.append(os.path.join(os.path.dirname(__file__), 'application_logging'))
@@ -28,6 +30,14 @@ load_dotenv()
 # Cost anomaly detection thresholds (can be overridden via env vars)
 TRACE_COST_ALERT_THRESHOLD = float(os.getenv('TRACE_COST_ALERT_THRESHOLD', '1.0'))  # Alert for traces > $1
 HIGH_TOKEN_ALERT_THRESHOLD = int(os.getenv('HIGH_TOKEN_ALERT_THRESHOLD', '50000'))  # Alert for traces > 50k tokens
+TTL_SECONDS = 3600
+
+DRAIN_TIMEOUT = 30
+
+WORKER_IDLE_TIMEOUT = 300
+DEQUEUE_TIMEOUT = 5
+
+RETENTION_CHECK_INTERVAL = 86400
 
 # this class represents a worker that processes span tasks from the Redis queue
 # it continuously pulls task from the queue and processes them and is separate from the API
@@ -52,6 +62,46 @@ class SpanWorker:
         self.tasks_processed = 0
         self.last_heartbeat_time = time.time()
         self.HEARTBEAT_INTERVAL = 30  # Send heartbeat every 30 seconds
+
+        self.drain_start_time = None
+
+        self.last_retention_run = time.time()
+
+        # Idle tracking for self-termination
+        self.consecutive_empty_polls = 0
+        self.max_empty_polls = WORKER_IDLE_TIMEOUT // DEQUEUE_TIMEOUT
+
+    def invalidate_cost_caches(self, user_ids: set):
+        """
+        Invalidate cached cost aggregation data when new spans arrive.
+        Uses pattern matching to delete all cache keys for affected users.
+        """
+        for user_id in user_ids:
+            if not user_id:
+                continue
+            try:
+                # Delete all cost-related cache keys for this user
+                patterns = [
+                    f"cache:cost_summary:{user_id}:*",
+                    f"cache:cost_by_agent:{user_id}:*",
+                    f"cache:cost_by_model:{user_id}:*",
+                    f"cache:cost_trends:{user_id}:*",
+                    f"cache:token_breakdown:{user_id}:*",
+                ]
+                for pattern in patterns:
+                    cursor = 0
+                    while True:
+                        cursor, keys = self.queue.redis_client.scan(
+                            cursor=cursor,
+                            match=pattern,
+                            count=100
+                        )
+                        if keys:
+                            self.queue.redis_client.delete(*keys)
+                        if cursor == 0:
+                            break
+            except Exception as e:
+                self.logger.warning(f"Failed to invalidate cost caches for user {user_id}: {e}")
 
     # this function processes a single span task
     # instead of having the backend infra do it automatically, we have this worker do it because it saves time
@@ -149,15 +199,16 @@ class SpanWorker:
             # Accumulate token/cost/duration in Redis for trace-level aggregation
             # These will be read when the SDK calls /trace/end
             self.queue.redis_client.incrbyfloat(f"trace:{trace_id}:total_tokens", span.get('input_tokens', 0) + span.get('output_tokens', 0))
+            self.queue.redis_client.expire(f"trace:{trace_id}:total_tokens", TTL_SECONDS)
             self.queue.redis_client.incrbyfloat(f"trace:{trace_id}:total_cost", span.get('total_cost', 0))
+            self.queue.redis_client.expire(f"trace:{trace_id}:total_cost", TTL_SECONDS)
             self.queue.redis_client.incrbyfloat(f"trace:{trace_id}:total_duration", span.get('duration', 0))
+            self.queue.redis_client.expire(f"trace:{trace_id}:total_duration", TTL_SECONDS)
 
-            # Check if trace exists, if not create it
-            # This handles SDK sending spans out of order or without explicit start span
+            # check if trace exists, if not create it
             existing_trace = db.get_trace_by_id(trace_id)
 
             if not existing_trace:
-                # Auto-create trace if it doesn't exist
                 trace = {
                     "start_time": str(span.get('start_time')),
                     "end_time": "",
@@ -353,22 +404,58 @@ class SpanWorker:
         self.queue.redis_client.hset(
             "workers:active",
             self.worker_id,
-            json.dumps({"started": time.time(), "pid": os.getpid()})
+            msgpack.packb({"started": time.time(), "pid": os.getpid()})
         )
 
         self.logger.info("Worker started - waiting for tasks from queue")
         
         def handle_shutdown(signum, frame):
+            signal_name = "SIGTERM" if signum == signal.SIGTERM else "SIGINT"
+            self.logger.info(
+                f"Received {signal_name}, initiating graceful shutdown",
+                extra={'extra_data': {
+                    'worker_id': self.worker_id,
+                    'pending_spans': len(self.pending_spans),
+                    'signal': signal_name
+                }}
+            )
+
+            self.drain_start_time = time.time()
+
             self.queue.redis_client.hdel("workers:active", self.worker_id)
             self.queue.redis_client.hdel("workers:heartbeat", self.worker_id)
+
             self.shutdown_requested = True
         
         signal.signal(signal.SIGTERM, handle_shutdown)
         signal.signal(signal.SIGINT, handle_shutdown)
 
+        if time.time() - self.last_retention_run > RETENTION_CHECK_INTERVAL:
+            retention_processor.run()
+            self.last_retention_run = time.time()
 
         try:
             while not self.shutdown_requested:
+                # if we are in drain mode and timeout has elapsed, force exit
+                if self.drain_start_time:
+                    elapsed = time.time() - self.drain_start_time
+                    if elapsed > DRAIN_TIMEOUT:
+                        self.logger.error(
+                            f"Drain timeout exceeded ({DRAIN_TIMEOUT}s), forcing exit",
+                            extra={'extra_data': {
+                                'worker_id': self.worker_id,
+                                'pending_spans_lost': len(self.pending_spans),
+                                'elapsed_seconds': elapsed
+                            }}
+                        )
+
+                        # re-queue pending spans before force exit
+                        for task in self.pending_spans:
+                            self.queue.enqueue(task)
+                        
+                        self.pending_spans = []
+                        break
+
                 # Send heartbeat periodically
                 if time.time() - self.last_heartbeat_time >= self.HEARTBEAT_INTERVAL:
                     self.queue.redis_client.hset(
@@ -381,9 +468,11 @@ class SpanWorker:
                     self.finalize_stale_traces()
 
                 # dequeues a task and waits 5 seconds before checking the queue again
-                task = self.queue.dequeue(timeout=5)
+                task = self.queue.dequeue(timeout=DEQUEUE_TIMEOUT)
 
                 if task:
+                    self.consecutive_empty_polls = 0
+
                     # add the task to the pending spans
                     self.pending_spans.append(task)
                     if not self.batch_start_time:
@@ -394,8 +483,36 @@ class SpanWorker:
                         self.flush_batch()
 
                 else:
-                    if self.pending_spans and time.time() - self.batch_start_time >= self.FLUSH_INTERVAL:
-                        self.flush_batch()
+                    self.consecutive_empty_polls += 1
+
+                    # log every 12 polls (1 minute) to show we are still alive
+                    if self.consecutive_empty_polls % 12 == 0:
+                        minutes_idle = (self.consecutive_empty_polls * DEQUEUE_TIMEOUT) / 60
+                        self.logger.info(
+                            f"Worker idle for {minutes_idle:.1f} minutes",
+                            extra={'extra_data': {
+                                'worker_id': self.worker_id,
+                                'consecutive_empty_polls': self.consecutive_empty_polls,
+                                'max_before_termination': self.max_empty_polls
+                            }}
+                        )
+                    
+                    # check for self termination
+                    if self.consecutive_empty_polls >= self.max_empty_polls:
+                        self.logger.info(
+                            f"No work for {WORKER_IDLE_TIMEOUT} seconds, self-terminating",
+                            extra={'extra_data': {
+                                'worker_id': self.worker_id,
+                                'idle_seconds': self.consecutive_empty_polls * DEQUEUE_TIMEOUT,
+                                'reason': 'prolonged_idle'
+                            }}
+                        )
+
+                        # clean up redis registrations
+                        self.queue.redis_client.hdel("workers:active", self.worker_id)
+                        self.queue.redis_client.hdel("workers:heartbeat", self.worker_id)
+
+                        break
             
             # process the DLQ every 5 minutes
             if not hasattr(self, '_last_dlq_process'):
@@ -411,9 +528,36 @@ class SpanWorker:
                 self._last_dlq_process = time.time()
             
             if self.pending_spans:
-                self.logger.info(f"Flushing {len(self.pending_spans)} remaining spans before shutdown")
-                self.flush_batch()
+                self.logger.info(
+                    f"Draining {len(self.pending_spans)} pending spans before shutdown",
+                    extra={'extra_data': {
+                        'worker_id': self.worker_id,
+                        'pending_count': len(self.pending_spans)
+                    }}
+                )                
+                try:
+                    self.flush_batch()
 
+                    self.logger.info(
+                        "Drain completed successfully",
+                        extra={'extra_data': {'worker_id': self.worker_id}}
+                    )
+                except Exception as e:
+                    self.logger.error(
+                        f"Drain flush failed, re-queuing spans: {e}",
+                        extra={'extra_data': {
+                            'worker_id': self.worker_id,
+                            'pending_count': len(self.pending_spans)
+                        }}
+                    )
+
+                    for task in self.pending_spans:
+                        self.queue.enqueue(task)
+            else:
+                self.logger.info(
+                    "No pending spans to drain",
+                    extra={'extra_data': {'worker_id': self.worker_id}}
+                )
 
         except KeyboardInterrupt:
             self.logger.info("Worker received shutdown signal (Ctrl+C)")
@@ -445,6 +589,9 @@ class SpanWorker:
                 span_dicts = [s[1] for s in prepared_spans]
                 db.insert_spans_batch(span_dicts)
 
+                # Collect unique user_ids for cache invalidation
+                affected_user_ids = set()
+
                 for task, span_data in prepared_spans:
                     user_id = str(
                         task.get('user_id')
@@ -452,8 +599,14 @@ class SpanWorker:
                         or span_data.get('user_id')  # in case you add it later
                         or ""
                     )
+                    if user_id:
+                        affected_user_ids.add(user_id)
                     self.publish_span_to_redis(span_data, user_id=user_id or None)
-                    
+
+                # Invalidate cost caches for affected users
+                if affected_user_ids:
+                    self.invalidate_cost_caches(affected_user_ids)
+
                 self.tasks_processed += len(prepared_spans)
                 self.last_task_time = time.time()
             
@@ -474,9 +627,11 @@ class SpanWorker:
                 )
                 total_cost = sum(s.get('cost') or 0 for s in trace_spans)
                 
-                # Use existing Redis accumulation
+                # Use existing Redis accumulation with TTL
                 self.queue.redis_client.incrbyfloat(f"trace:{trace_id}:total_tokens", total_tokens)
+                self.queue.redis_client.expire(f"trace:{trace_id}:total_tokens", TTL_SECONDS)
                 self.queue.redis_client.incrbyfloat(f"trace:{trace_id}:total_cost", total_cost)
+                self.queue.redis_client.expire(f"trace:{trace_id}:total_cost", TTL_SECONDS)
 
                 # add a last activity timestamp to Redis to track the last active span
                 self.queue.redis_client.set(
@@ -584,6 +739,25 @@ class SpanWorker:
                 "total_cost": float(total_cost or 0)
             }
             db.update_trace(trace_id, update_data)
+
+            # Update daily aggregates with cost breakdown by model
+            user_id = trace.get('user_id')
+            if user_id and spans:
+                by_model = {}
+                for span in spans:
+                    model = span.get('llm_model') or 'unknown'
+                    cost = float(span.get('cost') or 0)
+                    if model in by_model:
+                        by_model[model] += cost
+                    else:
+                        by_model[model] = cost
+                db.update_daily_aggregates(
+                    total_cost=float(total_cost or 0),
+                    total_tokens=int(float(total_tokens or 0)),
+                    by_model=by_model,
+                    user_id=user_id
+                )
+
             self.publish_trace_completed(trace_id, trace.get('user_id'), update_data)
             
             event = {
@@ -615,7 +789,6 @@ class SpanWorker:
             }})
 
             # Check for cost anomalies and publish alerts
-            user_id = trace.get('user_id')
             final_cost = float(total_cost or 0)
             final_tokens = int(float(total_tokens or 0))
 
@@ -647,7 +820,7 @@ class SpanWorker:
             self.logger.error(f"Failed to finalize trace {trace_id}: {e}")
     
     def publish_event(self, channel: str, event: dict):
-        self.queue.redis_client.publish(channel, json.dumps(event))
+        self.queue.redis_client.publish(channel, msgpack.packb(event))
     
     def publish_span_to_redis(self, span_data: dict, user_id: str | None = None) -> None:
         if os.getenv("REALTIME_UPDATES_ENABLED", "true").lower() == "false":
@@ -670,7 +843,7 @@ class SpanWorker:
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             }
 
-            payload = json.dumps(message)
+            payload = msgpack.packb(message)
 
             # specific channel for the traces
             try:
@@ -724,7 +897,7 @@ class SpanWorker:
                 "timestamp": datetime.now(timezone.utc).isoformat()
             }
 
-            json_message = json.dumps(message_dict)
+            json_message = msgpack.packb(message_dict)
 
             try:
                 self.queue.redis_client.publish(f"trace:{trace_id}", json_message)
@@ -810,7 +983,7 @@ class SpanWorker:
                 "timestamp": datetime.now(timezone.utc).isoformat()
             }
 
-            json_message = json.dumps(message)
+            json_message = msgpack.packb(message)
 
             try:
                 # Publish to user-specific anomaly channel

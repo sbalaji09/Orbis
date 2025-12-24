@@ -30,6 +30,10 @@ class SDKConfig:
     # time to wait after auto-flush to ensure HTTP requests complete (in seconds)
     auto_flush_wait_time: float = 2.0
 
+    # gzip compression for requests (reduces bandwidth, especially for large prompts)
+    compress_requests: bool = True
+    compression_min_size: int = 512  # only compress payloads larger than this (bytes)
+
     # load configuration from env variables
     @classmethod
     def from_env(cls) -> "SDKConfig":
@@ -44,6 +48,8 @@ class SDKConfig:
             debug=os.getenv("OBSERVABILITY_DEBUG", "false").lower() == "true",
             auto_flush_on_root_span=os.getenv("OBSERVABILITY_AUTO_FLUSH_ROOT", "true").lower() == "true",
             auto_flush_wait_time=float(os.getenv("OBSERVABILITY_AUTO_FLUSH_WAIT", "2.0")),
+            compress_requests=os.getenv("OBSERVABILITY_COMPRESS_REQUESTS", "true").lower() == "true",
+            compression_min_size=int(os.getenv("OBSERVABILITY_COMPRESSION_MIN_SIZE", "512")),
         )
 
 _config = SDKConfig.from_env()
@@ -63,6 +69,8 @@ def configure(
     debug: Optional[bool] = None,
     auto_flush_on_root_span: Optional[bool] = None,
     auto_flush_wait_time: Optional[float] = None,
+    compress_requests: Optional[bool] = None,
+    compression_min_size: Optional[int] = None,
 ) -> None:
     # update SDK config
     global _config
@@ -87,3 +95,7 @@ def configure(
         _config.auto_flush_on_root_span = auto_flush_on_root_span
     if auto_flush_wait_time is not None:
         _config.auto_flush_wait_time = auto_flush_wait_time
+    if compress_requests is not None:
+        _config.compress_requests = compress_requests
+    if compression_min_size is not None:
+        _config.compression_min_size = compression_min_size

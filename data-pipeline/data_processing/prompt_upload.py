@@ -1,10 +1,25 @@
 import os
+import gzip
+import hashlib
+import base64
 import boto3
 from datetime import datetime, timezone
 from botocore.exceptions import ClientError
 from dotenv import load_dotenv
+import redis
 
 load_dotenv()
+
+# Thresholds for cost optimization
+MIN_SIZE_FOR_S3_UPLOAD = int(os.getenv('MIN_SIZE_FOR_S3_UPLOAD', 1024))  # 1KB default
+COMPRESSION_THRESHOLD = int(os.getenv('COMPRESSION_THRESHOLD', 5120))    # 5KB default
+
+redis_client = redis.Redis(
+    host=os.getenv("REDIS_HOST", "localhost"),
+    port=int(os.getenv("REDIS_PORT", 6379)),
+    db=0,
+    decode_responses=True,  # returns str instead of bytes
+)
 
 # S3Uploader class that allows for us to upload prompts to the S3 Buckets for prompts
 class S3Uploader:
@@ -25,27 +40,52 @@ class S3Uploader:
     # upload the prompt to the s3 bucket and return the url link for the prompt
     def upload_prompt(self, user_id: str, trace_id: str, span_id: str, content: str, content_type: str = 'input') -> str:
         try:
+            if len(content) < MIN_SIZE_FOR_S3_UPLOAD:
+                encoded = base64.b64encode(content.encode('utf-8')).decode('utf-8')
+                return f"inline://{encoded}"
+            
+            hash_value = hashlib.sha256(content.encode()).hexdigest()
+            cache_key = f"s3:hash:{hash_value}"
+
+            cached_url = redis_client.get(cache_key)
+            if cached_url:
+                return cached_url
+            
             timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
             key = f"prompts/{user_id}/{trace_id}/{content_type}/{span_id}_{timestamp}.txt"
 
+            raw_bytes = content.encode("utf-8")
+            body = raw_bytes
+
+            s3_content_type = "text/plain; charset=utf-8"
+            content_encoding = None
+
+            if len(content) > COMPRESSION_THRESHOLD:
+                body = gzip.compress(raw_bytes)
+                key = key[0:-4] + ".txt.gz"
+                content_encoding = "gzip"
+
             # puts the specific object with user_id, trace_id, span_id, and content_type into the s3 bucket
-            self.s3_client.put_object(
+            put_args = dict(
                 Bucket=self.bucket_name,
                 Key=key,
-                Body=content.encode('utf-8'),
-                ContentType='text/plain',
+                Body=body,
+                ContentType=s3_content_type,
                 Metadata={
-                    'user_id': user_id,
-                    'trace_id': trace_id,
-                    'span_id': span_id,
-                    'content_type': content_type
-
-                }
+                    "user_id": str(user_id),
+                    "trace_id": str(trace_id),
+                    "span_id": str(span_id),
+                    "logical_content_type": str(content_type),  # preserve your path semantics
+                },
             )
 
-            s3_url = f"s3://{self.bucket_name}/{key}"
-            print(f"✓ Uploaded {content_type} to {s3_url}")
+            if content_encoding:
+                put_args["ContentEncoding"] = content_encoding
 
+            self.s3_client.put_object(**put_args)
+
+            s3_url = f"s3://{self.bucket_name}/{key}"
+            redis_client.set(cache_key, s3_url)
             return s3_url
         
         except ClientError as e:
@@ -91,6 +131,24 @@ def upload_input(user_id: str, trace_id: str, span_id: str, content: str) -> str
 # helper function for uploading the output
 def upload_output(user_id: str, trace_id: str, span_id: str, content: str) -> str:
     return uploader.upload_prompt(user_id, trace_id, span_id, content, 'output')
+
+def decode_blob_url(blob_url: str) -> str:
+    """
+    Decode a blob URL to get the content.
+    - For inline:// URLs, decode the base64 content directly
+    - For s3:// URLs, return as-is (caller should fetch from S3)
+    - For other URLs, return as-is
+
+    Returns the decoded content for inline URLs, or the original URL for others.
+    """
+    if blob_url and blob_url.startswith('inline://'):
+        encoded_content = blob_url[9:]  # Remove 'inline://' prefix
+        return base64.b64decode(encoded_content).decode('utf-8')
+    return blob_url
+
+def is_inline_url(blob_url: str) -> bool:
+    """Check if a blob URL is an inline URL (content embedded in the URL)."""
+    return blob_url and blob_url.startswith('inline://')
 
 # Test the uploader
 if __name__ == "__main__":
