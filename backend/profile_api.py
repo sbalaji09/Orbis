@@ -138,18 +138,26 @@ async def get_agent_retention(agent_id: str, user_id: str = Depends(get_user_id_
         raise HTTPException(status_code=500, detail=str(e))
     
 @router.put("/agent/{agent_id}/retention")
-async def update_agent_id_retention(agent_id: str, retention_days: int, archive_retention_days: 30, user_id: str = Depends(get_user_id_from_token)):
+async def update_agent_id_retention(
+    agent_id: str,
+    retention_days: int = 30,
+    archive_retention_days: int = 60,
+    user_id: str = Depends(get_user_id_from_token)
+):
     try:
-        res = db.update_agent_retention(user_id, retention_days, archive_retention_days, agent_id)
-
-        return res
+        res = db.update_agent_retention(agent_id, user_id, retention_days, archive_retention_days)
+        return {"success": res}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/agent/{agent_id}/archived-traces")
-async def get_archived_traces_agent(agent_id: str, user_id: str):
+async def get_archived_traces_agent(
+    agent_id: str,
+    user_id: str = Depends(get_user_id_from_token)
+):
     try:
-        pass
+        traces = db.get_archived_traces_agent(user_id, agent_id)
+        return {"traces": traces}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 print("[PROFILE_API] Router created successfully!")
