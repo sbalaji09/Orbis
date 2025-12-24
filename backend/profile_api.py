@@ -146,4 +146,10 @@ async def update_agent_id_retention(agent_id: str, retention_days: int, archive_
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/agent/{agent_id}/archived-traces")
+async def get_archived_traces_agent(agent_id: str, user_id: str):
+    try:
+        pass
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 print("[PROFILE_API] Router created successfully!")

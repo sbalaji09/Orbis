@@ -2800,7 +2800,9 @@ class SupabaseDB:
                         completion_tokens, cost, status, error_message, is_streaming,
                         time_to_first_token, tokens_per_second, prompt_id, prompt_name,
                         prompt_version, prompt_hash, span_type, tool_metadata, http_method,
-                        archived_at
+                        http_url, http_status_code, api_name, db_type, db_operation, db_query,
+                        software_name, software_type, cli_command, cli_exit_code, cli_stdout,
+                        cli_stderr, tool_name, tool_category, tags, archived_at
                     )
                     SELECT
                         s.span_id, s.trace_id, s.parent_span_ids, s.name,
@@ -2809,7 +2811,9 @@ class SupabaseDB:
                         s.completion_tokens, s.cost, s.status, s.error_message, s.is_streaming,
                         s.time_to_first_token, s.tokens_per_second, s.prompt_id, s.prompt_name,
                         s.prompt_version, s.prompt_hash, s.span_type, s.tool_metadata, s.http_method,
-                        now()
+                        s.http_url, s.http_status_code, s.api_name, s.db_type, s.db_operation, s.db_query,
+                        s.software_name, s.software_type, s.cli_command, s.cli_exit_code, s.cli_stdout,
+                        s.cli_stderr, s.tool_name, s.tool_category, s.tags, now()
                     FROM spans s
                     WHERE s.span_id IN (SELECT span_id FROM to_archive)
                     ON CONFLICT (span_archive_id) DO NOTHING
@@ -2861,12 +2865,12 @@ class SupabaseDB:
                     INSERT INTO traces_archive (
                         trace_archive_id, trace_hash_id, start_time, end_time,
                         duration, total_cost, total_tokens, status, user_id, agent_id,
-                        archived_at
+                        tags, archived_at
                     )
                     SELECT
                         t.trace_id, t.trace_hash_id, t.start_time, t.end_time,
                         t.duration, t.total_cost, t.total_tokens, t.status, t.user_id, t.agent_id,
-                        now()
+                        t.tags, now()
                     FROM traces t
                     WHERE t.trace_id IN (SELECT trace_id FROM candidates)
                     ON CONFLICT (trace_archive_id) DO NOTHING
@@ -2897,7 +2901,7 @@ class SupabaseDB:
             with conn.cursor() as cur:
                 cur.execute(
                 """
-                    SELECT retention_days, archive_retention_days, retention_enabld
+                    SELECT retention_days, archive_retention_days, retention_enabled
                     FROM agents
                     WHERE agent_id = %s
                     AND user_id = %s
@@ -2910,28 +2914,47 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
 
-    def update_agent_retention(self, user_id: str, retention_days: int, archive_retention_days: int, agent_id: str):
+    def update_agent_retention(self, agent_id: str, user_id: str, retention_days: int, archive_retention_days: int) -> bool:
         conn = self.get_connection()
         try:
             with conn.cursor() as cur:
                 cur.execute(
                 """
                     UPDATE agents
-                    SET retention_days = %s
-                    AND archive_retention_days = %s
-                    AND retention_enabled = True
+                    SET retention_days = %s,
+                        archive_retention_days = %s,
+                        retention_enabled = true
                     WHERE agent_id = %s
-                    AND user_id = %s
-                    AND retention_days IS DISTINCT FROM %s;
+                      AND user_id = %s
                 """,
                 (retention_days, archive_retention_days, agent_id, user_id)
                 )
-                result = cur.fetchone()
                 conn.commit()
-                return str(result[0])
+                return cur.rowcount > 0
+        except Exception as e:
+            conn.rollback()
+            print(f"Error updating agent retention: {e}")
+            raise
         finally:
             self.return_connection(conn)
     
+    def get_archived_traces_agent(self, user_id: str, agent_id: str):
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                """
+                    SELECT *
+                    FROM traces_archive
+                    WHERE user_id = %s
+                    AND agent_id = %s
+                """,
+                (user_id, agent_id)
+                )
+                rows = cur.fetchall()
+                return rows
+        finally:
+            self.return_connection(conn)
     # closes all the connections in the pool
     def close(self):
         self.pool.closeall()

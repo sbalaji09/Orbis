@@ -27,6 +27,10 @@ class WorkerPoolMonitor:
         self._pubsub_thread = None
         self._shutdown_requested = False
 
+        # Threading event for wake-up signals from pub/sub listener
+        # Set by listener thread when work arrives, checked by main loop
+        self.wakeup_event = threading.Event()
+
     # get the current queue depth
     def get_queue_depth(self) -> int:
         return self.queue.get_queue_length()

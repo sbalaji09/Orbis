@@ -191,12 +191,24 @@ class RetentionProcessor:
 
         return self.metrics
     
-def acquire_lock(worker_id: int):
-    acquired = redis.set(LOCK_KEY, worker_id, nx=True, ex=LOCK_TTL)
+def acquire_lock(redis_client, worker_id: str) -> bool:
+    """
+    Acquire a distributed lock using Redis SETNX.
+    Returns True if lock was acquired, False if another worker holds it.
+    """
+    acquired = redis_client.set(LOCK_KEY, worker_id, nx=True, ex=LOCK_TTL)
+    return acquired is not None
 
-def release_lock(worker_id: int):
-    if redis.get(LOCK_KEY) == worker_id:
-        redis.delete(LOCK_KEY)
+def release_lock(redis_client, worker_id: str) -> bool:
+    """
+    Release the distributed lock only if we own it.
+    Returns True if lock was released, False otherwise.
+    """
+    current_holder = redis_client.get(LOCK_KEY)
+    if current_holder and current_holder == worker_id:
+        redis_client.delete(LOCK_KEY)
+        return True
+    return False
 
 
 

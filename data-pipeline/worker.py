@@ -67,6 +67,10 @@ class SpanWorker:
 
         self.last_retention_run = time.time()
 
+        # Idle tracking for self-termination
+        self.consecutive_empty_polls = 0
+        self.max_empty_polls = WORKER_IDLE_TIMEOUT // DEQUEUE_TIMEOUT
+
     def invalidate_cost_caches(self, user_ids: set):
         """
         Invalidate cached cost aggregation data when new spans arrive.

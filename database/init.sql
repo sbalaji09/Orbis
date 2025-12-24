@@ -43,7 +43,8 @@ CREATE TABLE traces (
     total_tokens INT DEFAULT 0,
     status VARCHAR(50),
     user_id UUID,
-    agent_id UUID REFERENCES agents(agent_id)
+    agent_id UUID REFERENCES agents(agent_id),
+    tags TEXT[]
 );
 
 CREATE TABLE traces_archive (
@@ -57,6 +58,7 @@ CREATE TABLE traces_archive (
     status VARCHAR(50),
     user_id UUID,
     agent_id UUID REFERENCES agents(agent_id),
+    tags TEXT[],
     archived_at TIMESTAMP
 );
 
@@ -85,9 +87,25 @@ CREATE TABLE spans (
     prompt_name VARCHAR(50),
     prompt_version TEXT,
     prompt_hash TEXT,
-    span_type VARCHAR,
+    -- Tool tracking columns (from migration 001)
+    span_type VARCHAR(50) DEFAULT 'llm',
     tool_metadata JSONB,
-    http_method VARCHAR,
+    http_method VARCHAR(10),
+    http_url VARCHAR(500),
+    http_status_code INT,
+    api_name VARCHAR(100),
+    db_type VARCHAR(50),
+    db_operation VARCHAR(50),
+    db_query TEXT,
+    software_name VARCHAR(100),
+    software_type VARCHAR(50),
+    cli_command TEXT,
+    cli_exit_code INT,
+    cli_stdout TEXT,
+    cli_stderr TEXT,
+    tool_name VARCHAR(100),
+    tool_category VARCHAR(50),
+    tags TEXT[]
 );
 
 CREATE TABLE spans_archive (
@@ -115,9 +133,25 @@ CREATE TABLE spans_archive (
     prompt_name VARCHAR(50),
     prompt_version TEXT,
     prompt_hash TEXT,
-    span_type VARCHAR,
+    -- Tool tracking columns (mirrors spans table)
+    span_type VARCHAR(50),
     tool_metadata JSONB,
-    http_method VARCHAR,
+    http_method VARCHAR(10),
+    http_url VARCHAR(500),
+    http_status_code INT,
+    api_name VARCHAR(100),
+    db_type VARCHAR(50),
+    db_operation VARCHAR(50),
+    db_query TEXT,
+    software_name VARCHAR(100),
+    software_type VARCHAR(50),
+    cli_command TEXT,
+    cli_exit_code INT,
+    cli_stdout TEXT,
+    cli_stderr TEXT,
+    tool_name VARCHAR(100),
+    tool_category VARCHAR(50),
+    tags TEXT[],
     archived_at TIMESTAMP
 );
 
