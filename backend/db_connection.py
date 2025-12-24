@@ -2686,12 +2686,9 @@ class SupabaseDB:
             raise
         finally:
             self.return_connection(conn)
-
+    
+    # query spans that are older than the agent's retention_days threshold
     def query_spans_older_threshold(self, user_id: str):
-        """
-        Query spans that are older than the agent's retention_days threshold.
-        Used for inspection/debugging - archiving is done by archive_spans_batch.
-        """
         conn = self.get_connection()
         try:
             with conn.cursor() as cur:
@@ -2715,11 +2712,8 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
 
+    # permantently delete archived spans older than archive_retention days
     def delete_expired_archived_spans(self, user_id: str):
-        """
-        Permanently delete archived spans older than archive_retention_days.
-        Returns the count of deleted spans.
-        """
         conn = self.get_connection()
         try:
             with conn.cursor() as cur:
@@ -2747,12 +2741,8 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
     
+    # permanently delete archived traces older than archive_retention_days
     def delete_expired_archived_traces(self, user_id: str):
-        """
-        Permanently delete archived traces older than archive_retention_days.
-        Must be called AFTER delete_expired_archived_spans to avoid FK violations.
-        Returns the count of deleted traces.
-        """
         conn = self.get_connection()
         try:
             with conn.cursor() as cur:
@@ -2784,11 +2774,8 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
     
+    # move spans older than retention_days to spans_archive in batches
     def archive_spans_batch(self, user_id: str, batch_size: int = 1000):
-        """
-        Move spans older than retention_days to spans_archive in batches.
-        Returns the count of archived spans.
-        """
         conn = self.get_connection()
         try:
             with conn.cursor() as cur:
@@ -2847,11 +2834,8 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
     
+    # move traces to traces_archive when all their spans have been archived
     def archive_traces_batch(self, user_id: str, batch_size: int = 500):
-        """
-        Move traces to traces_archive when all their spans have been archived.
-        Returns the count of archived traces.
-        """
         conn = self.get_connection()
         try:
             with conn.cursor() as cur:
