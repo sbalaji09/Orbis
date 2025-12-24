@@ -11,7 +11,10 @@ CREATE TABLE agents (
     user_id UUID REFERENCES auth.users(id),
     agent_name VARCHAR(50),
     created_at TIMESTAMP DEFAULT NOW(),
-    api_key TEXT
+    api_key TEXT,
+    retention_days INT,
+    archive_retention_days INT,
+    retention_enabled BOOLEAN
 );
 
 -- Create prompt_versions before spans (spans references prompt_versions)
@@ -43,6 +46,20 @@ CREATE TABLE traces (
     agent_id UUID REFERENCES agents(agent_id)
 );
 
+CREATE TABLE traces_archive (
+    trace_archive_id UUID PRIMARY KEY,
+    trace_hash_id TEXT,
+    start_time TIMESTAMP,
+    end_time TIMESTAMP,
+    duration FLOAT DEFAULT 0,
+    total_cost FLOAT DEFAULT 0,
+    total_tokens INT DEFAULT 0,
+    status VARCHAR(50),
+    user_id UUID,
+    agent_id UUID REFERENCES agents(agent_id),
+    archived_at TIMESTAMP
+);
+
 CREATE TABLE spans (
     span_id UUID PRIMARY KEY,
     trace_id UUID REFERENCES traces(trace_id),
@@ -71,7 +88,37 @@ CREATE TABLE spans (
     span_type VARCHAR,
     tool_metadata JSONB,
     http_method VARCHAR,
-    
+);
+
+CREATE TABLE spans_archive (
+    span_archive_id UUID PRIMARY KEY,
+    trace_id UUID REFERENCES traces(trace_id),
+    parent_span_ids UUID[],
+    name VARCHAR(100),
+    start_time TIMESTAMP,
+    end_time TIMESTAMP,
+    duration FLOAT,
+    input_preview VARCHAR(200),
+    input_blob_url VARCHAR(250),
+    output_preview VARCHAR(200),
+    output_blob_url VARCHAR(250),
+    llm_model VARCHAR(50),
+    prompt_tokens INT,
+    completion_tokens INT,
+    cost FLOAT,
+    status VARCHAR(50),
+    error_message VARCHAR(200),
+    is_streaming BOOLEAN DEFAULT FALSE,
+    time_to_first_token FLOAT,
+    tokens_per_second FLOAT,
+    prompt_id UUID REFERENCES prompt_versions(prompt_id),
+    prompt_name VARCHAR(50),
+    prompt_version TEXT,
+    prompt_hash TEXT,
+    span_type VARCHAR,
+    tool_metadata JSONB,
+    http_method VARCHAR,
+    archived_at TIMESTAMP
 );
 
 CREATE TABLE evaluations (
@@ -103,3 +150,4 @@ CREATE UNIQUE INDEX idx_agents_api_key ON agents(api_key);
 CREATE INDEX prompts_per_agent ON prompt_versions(agent_id, name);
 CREATE INDEX prompt_analytics ON spans(prompt_id, prompt_version);
 CREATE INDEX created_at ON spans(start_time);
+CREATE INDEX archival_query ON spans(start_time, trace_id);
