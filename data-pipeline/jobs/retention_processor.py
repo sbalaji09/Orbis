@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import Dict, List
 
 from dotenv import load_dotenv
+import redis
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 from backend.db_connection import db
@@ -20,6 +21,8 @@ TRACE_BATCH_SIZE = int(os.getenv("RETENTION_TRACE_BATCH_SIZE", "500"))
 MAX_BATCHES_PER_RUN = int(os.getenv("RETENTION_MAX_BATCHES", "100"))
 BATCH_DELAY_SECONDS = float(os.getenv("RETENTION_BATCH_DELAY", "0.1"))
 
+LOCK_KEY = "retention:lock"
+LOCK_TTL = 3600
 
 class RetentionProcessor:
     def __init__(self):
@@ -187,6 +190,14 @@ class RetentionProcessor:
         )
 
         return self.metrics
+    
+def acquire_lock(worker_id: int):
+    acquired = redis.set(LOCK_KEY, worker_id, nx=True, ex=LOCK_TTL)
+
+def release_lock(worker_id: int):
+    if redis.get(LOCK_KEY) == worker_id:
+        redis.delete(LOCK_KEY)
+
 
 
 retention_processor = RetentionProcessor()
