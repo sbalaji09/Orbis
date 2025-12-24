@@ -18,6 +18,7 @@ from collections import defaultdict
 import socket
 import signal
 from queues.dlq_processor import dlq_processor
+from jobs.retention_processor import retention_processor
 
 # add the application logging layer to the path
 sys.path.append(os.path.join(os.path.dirname(__file__), 'application_logging'))
@@ -35,6 +36,8 @@ DRAIN_TIMEOUT = 30
 
 WORKER_IDLE_TIMEOUT = 300
 DEQUEUE_TIMEOUT = 5
+
+RETENTION_CHECK_INTERVAL = 86400
 
 # this class represents a worker that processes span tasks from the Redis queue
 # it continuously pulls task from the queue and processes them and is separate from the API
@@ -61,6 +64,8 @@ class SpanWorker:
         self.HEARTBEAT_INTERVAL = 30  # Send heartbeat every 30 seconds
 
         self.drain_start_time = None
+
+        self.last_retention_run = time.time()
 
     def invalidate_cost_caches(self, user_ids: set):
         """
@@ -421,6 +426,9 @@ class SpanWorker:
         signal.signal(signal.SIGTERM, handle_shutdown)
         signal.signal(signal.SIGINT, handle_shutdown)
 
+        if time.time() - self.last_retention_run > RETENTION_CHECK_INTERVAL:
+            retention_processor.run()
+            self.last_retention_run = time.time()
 
         try:
             while not self.shutdown_requested:
