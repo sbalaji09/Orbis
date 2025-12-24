@@ -102,3 +102,4 @@ CREATE INDEX idx_evaluations_trace_id ON evaluations(trace_id);
 CREATE UNIQUE INDEX idx_agents_api_key ON agents(api_key);
 CREATE INDEX prompts_per_agent ON prompt_versions(agent_id, name);
 CREATE INDEX prompt_analytics ON spans(prompt_id, prompt_version);
+CREATE INDEX created_at ON spans(start_time);
