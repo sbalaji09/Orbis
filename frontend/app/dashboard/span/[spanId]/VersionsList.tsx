@@ -140,7 +140,7 @@ export default function VersionsList({
 
               return (
                 <div
-                  key={semanticVersion}
+                  key={`${version.prompt_id}-${semanticVersion}`}
                   className={`p-4 transition-colors ${
                     isSelected ? "bg-babyblue/10" : "hover:bg-black/2"
                   } ${isBest ? "ring-2 ring-inset ring-success/30" : ""}`}
