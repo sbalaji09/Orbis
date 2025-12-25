@@ -33,7 +33,7 @@ def get_llm_comparison_analysis(
     )
 
     response = client.chat.completions.create(
-        model="gpt-5-mini",
+        model="gpt-4o-mini",
         messages=[
             {"role": "user", "content": evaluation_prompt}
         ],

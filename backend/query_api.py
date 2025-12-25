@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 import redis
-from backend.llm_service import get_trace_explanation
+from llm_service import get_trace_explanation
 from prompt_api import router as prompt_router
 from db_connection import db
 from fastapi import FastAPI, HTTPException, Query, Header, Request
