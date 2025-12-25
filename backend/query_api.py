@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 import redis
+from backend.llm_service import get_trace_explanation
 from prompt_api import router as prompt_router
 from db_connection import db
 from fastapi import FastAPI, HTTPException, Query, Header, Request
@@ -778,7 +779,21 @@ async def acknowledge_all_anomalies(user_id: str = Depends(get_user_id_from_toke
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
+
+@app.post("/traces/explain")
+async def explain_traces(trace_id: str, user_id: str = Depends(get_user_id_from_token)):
+    try:
+        trace = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: db.get_trace_by_id(trace_id)
+        )
+        spans = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: db.get_spans_by_trace(trace_id)
+        )
+
+        explanation = get_trace_explanation({trace["duration"], trace["total_cost"], trace["status"], trace["agent_id"]}, spans)
+        return json(explanation)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 @app.exception_handler(ValidationError)
 async def validation_error_handler(request, exc: ValidationError):
     return JSONResponse(
