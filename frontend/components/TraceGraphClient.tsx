@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useMemo, useEffect } from "react";
+import { useCallback, useMemo, useEffect, useState } from "react";
 import useSWR from "swr";
 import ReactFlow, {
   Node,
@@ -20,6 +20,7 @@ import { Span } from "@/lib/types";
 import GraphNode from "@/components/GraphNode";
 import { useAuth } from "@/hooks/useAuth";
 import { getSpanTypeHexColor } from "@/lib/span-type-config";
+import { ExplainTraceModal } from "@/components/ExplainTraceModal";
 
 interface NodePosition {
   x: number;
@@ -140,6 +141,72 @@ export default function TraceGraphClient({
   const traceId = initialSpans.length > 0 ? initialSpans[0].trace_id : null;
   const { session } = useAuth();
 
+  // Explain trace modal state
+  const [showExplainModal, setShowExplainModal] = useState(false);
+  const [shouldFetchExplanation, setShouldFetchExplanation] = useState(false);
+
+  // SWR for caching trace explanations
+  const {
+    data: explanationData,
+    error: explainError,
+    isLoading: explainLoading,
+  } = useSWR(
+    shouldFetchExplanation && traceId && session?.access_token
+      ? `/traces/${traceId}/explain`
+      : null,
+    async () => {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/traces/explain?trace_id=${encodeURIComponent(traceId!)}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session!.access_token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to explain trace: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.explanation as string;
+    },
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      dedupingInterval: 60000, // Cache for 1 minute
+    }
+  );
+
+  const handleExplainTrace = useCallback(() => {
+    if (!traceId || !session?.access_token) return;
+    setShowExplainModal(true);
+    setShouldFetchExplanation(true);
+  }, [traceId, session?.access_token]);
+
+  // Keyboard shortcut: E key to explain trace
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if user is typing in an input
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+
+      if (e.key === "e" || e.key === "E") {
+        e.preventDefault();
+        handleExplainTrace();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleExplainTrace]);
+
   // Fetch spans with SWR for real-time updates (polls every 2 seconds)
   const { data: fetchedSpans } = useSWR(
     traceId && session?.access_token ? `/traces/${traceId}/spans` : null,
@@ -238,6 +305,32 @@ export default function TraceGraphClient({
 
   return (
     <div className="w-full h-full relative">
+      {/* Explain Trace Button */}
+      <button
+        onClick={handleExplainTrace}
+        disabled={!traceId}
+        title="Explain this trace (E)"
+        className="absolute top-4 right-4 z-10 flex items-center gap-2 px-3 py-2 text-sm font-medium border-2 border-black bg-white hover:bg-babyblue/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-[3px_3px_0_rgba(0,0,0,0.2)]"
+      >
+        <svg
+          className="w-4 h-4"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"
+          />
+        </svg>
+        Explain Trace
+        <kbd className="hidden sm:inline-block ml-1 px-1.5 py-0.5 text-[10px] font-mono bg-black/5 border border-black/20 rounded">
+          E
+        </kbd>
+      </button>
+
       <ReactFlow
         key={spanIds}
         nodes={nodes}
@@ -295,6 +388,18 @@ export default function TraceGraphClient({
           maskColor="rgba(0, 0, 0, 0.05)"
         />
       </ReactFlow>
+
+      {/* Explain Trace Modal */}
+      {showExplainModal && traceId && (
+        <ExplainTraceModal
+          isOpen={showExplainModal}
+          onClose={() => setShowExplainModal(false)}
+          traceId={traceId}
+          explanation={explanationData ?? null}
+          isLoading={explainLoading}
+          error={explainError ? (explainError instanceof Error ? explainError.message : "An error occurred") : null}
+        />
+      )}
     </div>
   );
 }

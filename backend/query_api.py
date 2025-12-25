@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 import redis
+from backend.llm_service import get_trace_explanation
 from prompt_api import router as prompt_router
 from db_connection import db
 from fastapi import FastAPI, HTTPException, Query, Header, Request
@@ -829,7 +830,46 @@ async def acknowledge_all_anomalies(user_id: str = Depends(get_user_id_from_toke
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
+
+@app.post("/traces/explain")
+async def explain_trace(trace_id: str, user_id: str = Depends(get_user_id_from_token)):
+    try:
+        validate_trace_id(trace_id)
+        validate_user_id(user_id)
+
+        trace = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: db.get_trace_by_id(trace_id)
+        )
+
+        if not trace:
+            raise HTTPException(status_code=404, detail="Trace not found")
+
+        if trace.get('user_id') != user_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        spans = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: db.get_spans_by_trace(trace_id)
+        )
+
+        trace_metadata = {
+            "duration": trace.get("duration"),
+            "total_cost": trace.get("total_cost"),
+            "status": trace.get("status"),
+            "agent_id": trace.get("agent_id")
+        }
+
+        explanation = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: get_trace_explanation(trace_metadata, spans)
+        )
+
+        return {"explanation": explanation}
+    except HTTPException:
+        raise
+    except ValueError as e:
+        # Handle missing API key or configuration errors
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 @app.exception_handler(ValidationError)
 async def validation_error_handler(request, exc: ValidationError):
     return JSONResponse(

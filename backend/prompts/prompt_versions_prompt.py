@@ -1,3 +1,6 @@
+from typing import Any, Dict, List
+
+
 def build_prompt_evaluator(
     prompt_a: str,
     prompt_b: str,
@@ -78,5 +81,37 @@ Your final answer **must** include a structured response with these sections:
 8. **Final Verdict** (clearly state A or B is better)
 
 All reasoning must be explicit. No vague or subjective statements.
+"""
+    return prompt
+
+def build_explain_trace(trace_metadata: dict, spans: List[Dict[str, Any]]):
+    prompt = f"""You are an expert observability engineer. You will be given a single execution trace with metadata and a list of spans.
+
+Your job:
+1) Explain, in plain English, what this trace is doing overall (the "purpose" or user intent).
+2) Describe the execution flow from start to finish, using the parent/child relationships to reconstruct the call tree.
+3) Point out notable patterns, issues, or opportunities:
+   - bottlenecks (slow spans / long critical path)
+   - retries, loops, fan-out/fan-in, parallelism indicators
+   - errors, timeouts, partial failures, or suspicious statuses
+   - repeated tool/model calls or unexpectedly large inputs/outputs
+   - high cost drivers (if cost is provided)
+
+Important rules:
+- Only use information present in the provided metadata and spans. If something is unknown, say so.
+- If parent relationships are missing or inconsistent, do your best and call out uncertainty.
+- Keep the explanation concise but specific. Refer to spans by name and span_id when helpful.
+
+Output format (use these headings exactly):
+## Summary
+## Execution Flow
+## Notable Patterns & Issues
+## Suggested Improvements
+
+Trace Metadata:
+{trace_metadata}
+
+Spans:
+{spans}
 """
     return prompt

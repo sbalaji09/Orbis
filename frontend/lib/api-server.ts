@@ -352,3 +352,28 @@ export async function getCostTrends(days: number) {
     return [];
   }
 }
+
+export async function explainTrace(traceId: string): Promise<{ explanation: string } | null> {
+  try {
+    const authHeaders = await getAuthHeaders();
+
+    const response = await fetch(`${API_BASE_URL}/traces/explain?trace_id=${encodeURIComponent(traceId)}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders,
+      },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      console.error(`Failed to explain trace: ${response.status} ${response.statusText}`);
+      return null;
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error explaining trace:", error);
+    return null;
+  }
+}
