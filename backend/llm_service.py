@@ -42,18 +42,31 @@ def get_llm_comparison_analysis(
 
     return response.choices[0].message.content
 
-def get_trace_explanation(trace_metadata: Dict, spans: List[Dict[str, Any]]):
+def get_trace_explanation(trace_metadata: Dict[str, Any], spans: List[Dict[str, Any]]) -> str:
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-    # Join outputs into single strings for the evaluator
-    trace_metadata = "\n---\n".join(trace_metadata) if trace_metadata else "No outputs available"
-    spans = "\n---\n".join(spans) if spans else "No outputs available"
+    # Format spans for the prompt - extract relevant fields from each span
+    formatted_spans = []
+    for span in spans:
+        span_info = {
+            "span_id": span.get("span_id"),
+            "name": span.get("name"),
+            "type": span.get("span_type"),
+            "status": span.get("status"),
+            "duration_ms": span.get("duration_ms"),
+            "parent_span_id": span.get("parent_span_id"),
+            "input_preview": span.get("input_preview", "")[:500] if span.get("input_preview") else "",
+            "output_preview": span.get("output_preview", "")[:500] if span.get("output_preview") else "",
+        }
+        formatted_spans.append(str(span_info))
+
+    spans_text = "\n---\n".join(formatted_spans) if formatted_spans else "No spans available"
 
     # Build the evaluation prompt with all data injected
-    evaluation_prompt = build_explain_trace(trace_metadata, spans)
+    evaluation_prompt = build_explain_trace(trace_metadata, spans_text)
 
     response = client.chat.completions.create(
-        model="gpt-5-mini",
+        model="gpt-4o-mini",
         messages=[
             {"role": "user", "content": evaluation_prompt}
         ],
