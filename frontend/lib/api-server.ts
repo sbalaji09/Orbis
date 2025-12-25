@@ -352,3 +352,28 @@ export async function getCostTrends(days: number) {
     return [];
   }
 }
+
+export async function explainTrace(traceId: string) {
+  try {
+    const authHeaders = await getAuthHeaders();
+
+    const url = new URL(`${API_BASE_URL}/trace/explain`);
+    url.searchParams.set("trace_id", String(traceId));
+
+    const response = await fetch(url.toString(), {
+      headers: { ...authHeaders },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      console.error(`Failed to fetch cost trends: ${response.status} ${response.statusText}`);
+      return [];
+    }
+
+    const data = await response.json();
+    return unwrapList(data);
+  } catch (error) {
+    console.error("Error getting cost trends:", error);
+    return [];
+  }
+}

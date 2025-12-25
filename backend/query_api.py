@@ -780,7 +780,7 @@ async def acknowledge_all_anomalies(user_id: str = Depends(get_user_id_from_toke
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/traces/{trace_id}/explain")
+@app.post("/traces/explain")
 async def explain_trace(trace_id: str, user_id: str = Depends(get_user_id_from_token)):
     try:
         validate_trace_id(trace_id)
