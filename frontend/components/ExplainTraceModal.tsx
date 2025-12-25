@@ -127,11 +127,11 @@ export function ExplainTraceModal({
                       <p className="text-xs text-black/40">{error}</p>
                     </div>
                   ) : explanation ? (
-                    <div className="prose prose-sm max-w-none font-mono">
+                    <div className="prose prose-sm prose-neutral max-w-none">
                       <ReactMarkdown
                         components={{
                           h2: ({ children }) => (
-                            <h2 className="text-base font-bold mt-6 mb-3 pb-2 border-b-2 border-black/10">
+                            <h2 className="text-base font-bold mt-6 mb-3 pb-2 border-b-2 border-black/10 first:mt-0">
                               {children}
                             </h2>
                           ),
@@ -146,27 +146,43 @@ export function ExplainTraceModal({
                             </p>
                           ),
                           ul: ({ children }) => (
-                            <ul className="list-disc list-inside text-sm text-black/80 space-y-1 mb-3">
+                            <ul className="list-disc pl-5 text-sm text-black/80 space-y-1.5 mb-3">
                               {children}
                             </ul>
                           ),
                           ol: ({ children }) => (
-                            <ol className="list-decimal list-inside text-sm text-black/80 space-y-1 mb-3">
+                            <ol className="list-decimal pl-5 text-sm text-black/80 space-y-1.5 mb-3">
                               {children}
                             </ol>
                           ),
                           li: ({ children }) => (
-                            <li className="text-sm">{children}</li>
+                            <li className="text-sm pl-1">{children}</li>
+                          ),
+                          strong: ({ children }) => (
+                            <strong className="font-semibold text-black">
+                              {children}
+                            </strong>
+                          ),
+                          em: ({ children }) => (
+                            <em className="italic text-black/70">{children}</em>
                           ),
                           code: ({ children }) => (
-                            <code className="px-1.5 py-0.5 bg-black/5 border border-black/10 text-xs">
+                            <code className="px-1.5 py-0.5 bg-black/5 border border-black/10 text-xs font-mono rounded">
                               {children}
                             </code>
                           ),
                           pre: ({ children }) => (
-                            <pre className="p-3 bg-black/5 border-2 border-black/10 overflow-x-auto text-xs mb-3">
+                            <pre className="p-3 bg-black/5 border-2 border-black/10 overflow-x-auto text-xs font-mono mb-3 rounded">
                               {children}
                             </pre>
+                          ),
+                          blockquote: ({ children }) => (
+                            <blockquote className="border-l-4 border-babyblue/50 pl-4 italic text-black/60 my-3">
+                              {children}
+                            </blockquote>
+                          ),
+                          hr: () => (
+                            <hr className="border-t-2 border-black/10 my-4" />
                           ),
                         }}
                       >

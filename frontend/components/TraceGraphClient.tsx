@@ -143,26 +143,25 @@ export default function TraceGraphClient({
 
   // Explain trace modal state
   const [showExplainModal, setShowExplainModal] = useState(false);
-  const [explanation, setExplanation] = useState<string | null>(null);
-  const [explainLoading, setExplainLoading] = useState(false);
-  const [explainError, setExplainError] = useState<string | null>(null);
+  const [shouldFetchExplanation, setShouldFetchExplanation] = useState(false);
 
-  const handleExplainTrace = useCallback(async () => {
-    if (!traceId || !session?.access_token) return;
-
-    setShowExplainModal(true);
-    setExplainLoading(true);
-    setExplainError(null);
-    setExplanation(null);
-
-    try {
+  // SWR for caching trace explanations
+  const {
+    data: explanationData,
+    error: explainError,
+    isLoading: explainLoading,
+  } = useSWR(
+    shouldFetchExplanation && traceId && session?.access_token
+      ? `/traces/${traceId}/explain`
+      : null,
+    async () => {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/traces/explain?trace_id=${encodeURIComponent(traceId)}`,
+        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/traces/explain?trace_id=${encodeURIComponent(traceId!)}`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
+            Authorization: `Bearer ${session!.access_token}`,
           },
         }
       );
@@ -172,13 +171,41 @@ export default function TraceGraphClient({
       }
 
       const data = await response.json();
-      setExplanation(data.explanation);
-    } catch (err) {
-      setExplainError(err instanceof Error ? err.message : "An error occurred");
-    } finally {
-      setExplainLoading(false);
+      return data.explanation as string;
+    },
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      dedupingInterval: 60000, // Cache for 1 minute
     }
+  );
+
+  const handleExplainTrace = useCallback(() => {
+    if (!traceId || !session?.access_token) return;
+    setShowExplainModal(true);
+    setShouldFetchExplanation(true);
   }, [traceId, session?.access_token]);
+
+  // Keyboard shortcut: E key to explain trace
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if user is typing in an input
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+
+      if (e.key === "e" || e.key === "E") {
+        e.preventDefault();
+        handleExplainTrace();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleExplainTrace]);
 
   // Fetch spans with SWR for real-time updates (polls every 2 seconds)
   const { data: fetchedSpans } = useSWR(
@@ -282,6 +309,7 @@ export default function TraceGraphClient({
       <button
         onClick={handleExplainTrace}
         disabled={!traceId}
+        title="Explain this trace (E)"
         className="absolute top-4 right-4 z-10 flex items-center gap-2 px-3 py-2 text-sm font-medium border-2 border-black bg-white hover:bg-babyblue/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-[3px_3px_0_rgba(0,0,0,0.2)]"
       >
         <svg
@@ -298,6 +326,9 @@ export default function TraceGraphClient({
           />
         </svg>
         Explain Trace
+        <kbd className="hidden sm:inline-block ml-1 px-1.5 py-0.5 text-[10px] font-mono bg-black/5 border border-black/20 rounded">
+          E
+        </kbd>
       </button>
 
       <ReactFlow
@@ -364,9 +395,9 @@ export default function TraceGraphClient({
           isOpen={showExplainModal}
           onClose={() => setShowExplainModal(false)}
           traceId={traceId}
-          explanation={explanation}
+          explanation={explanationData ?? null}
           isLoading={explainLoading}
-          error={explainError}
+          error={explainError ? (explainError instanceof Error ? explainError.message : "An error occurred") : null}
         />
       )}
     </div>
