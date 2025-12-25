@@ -1,6 +1,7 @@
 import os
+from typing import Any, Dict, List
 from openai import OpenAI
-from prompts.prompt_versions_prompt import build_prompt_evaluator
+from prompts.prompt_versions_prompt import build_explain_trace, build_prompt_evaluator
 
 # call LLM to analyze and compare two prompt versions
 def get_llm_comparison_analysis(
@@ -30,6 +31,26 @@ def get_llm_comparison_analysis(
         model_a=model_a,
         model_b=model_b
     )
+
+    response = client.chat.completions.create(
+        model="gpt-5-mini",
+        messages=[
+            {"role": "user", "content": evaluation_prompt}
+        ],
+        temperature=0.3
+    )
+
+    return response.choices[0].message.content
+
+def get_trace_explanation(trace_metadata: Dict, spans: List[Dict[str, Any]]):
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+    # Join outputs into single strings for the evaluator
+    trace_metadata = "\n---\n".join(trace_metadata) if trace_metadata else "No outputs available"
+    spans = "\n---\n".join(spans) if spans else "No outputs available"
+
+    # Build the evaluation prompt with all data injected
+    evaluation_prompt = build_explain_trace(trace_metadata, spans)
 
     response = client.chat.completions.create(
         model="gpt-5-mini",
