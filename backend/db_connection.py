@@ -1688,14 +1688,22 @@ class SupabaseDB:
                 has_aggregated_data = any(row['total_cost'] > 0 for row in rows)
 
                 if has_aggregated_data:
-                    # Use aggregated data
+                    # Hybrid approach: use aggregated data where available,
+                    # but fill in missing days from raw traces/spans
+                    missing_days = []
                     results: List[Dict[str, Any]] = []
+
                     for row in rows:
                         day_val = row.get("day")
                         try:
                             day_str = day_val.isoformat()
                         except Exception:
                             day_str = str(day_val)
+
+                        # If this day has no aggregated data but has call_count,
+                        # or if both are zero but we need to check raw data
+                        if row.get("total_cost") == 0 and row.get("by_model") is None:
+                            missing_days.append(day_val)
 
                         results.append({
                             "date": day_str,
@@ -1704,6 +1712,50 @@ class SupabaseDB:
                             "by_model": row.get("by_model") or {},
                             "call_count": int(row.get("call_count") or 0),
                         })
+
+                    # Backfill missing days from raw traces/spans
+                    if missing_days:
+                        backfill_query = """
+                            SELECT
+                                (t.start_time AT TIME ZONE 'UTC')::date AS day,
+                                COALESCE(SUM(s.cost), 0)::numeric(18,6) AS total_cost,
+                                COALESCE(SUM(s.prompt_tokens + s.completion_tokens), 0) AS total_tokens,
+                                COALESCE(
+                                    jsonb_object_agg(
+                                        COALESCE(s.llm_model, 'unknown'),
+                                        s.cost
+                                    ) FILTER (WHERE s.cost IS NOT NULL),
+                                    '{}'::jsonb
+                                ) AS by_model
+                            FROM traces t
+                            JOIN spans s ON s.trace_id = t.trace_id
+                            WHERE t.user_id = %s
+                            AND (t.start_time AT TIME ZONE 'UTC')::date = ANY(%s)
+                            AND COALESCE(s.span_type, 'llm') = 'llm'
+                            GROUP BY (t.start_time AT TIME ZONE 'UTC')::date
+                        """
+
+                        cur.execute(backfill_query, [user_id, missing_days])
+                        backfill_rows = cur.fetchall()
+
+                        # Create a map of backfilled data
+                        backfill_map = {}
+                        for bf_row in backfill_rows:
+                            day_val = bf_row.get("day")
+                            try:
+                                day_str = day_val.isoformat()
+                            except Exception:
+                                day_str = str(day_val)
+                            backfill_map[day_str] = bf_row
+
+                        # Update results with backfilled data
+                        for result in results:
+                            if result["date"] in backfill_map:
+                                bf_data = backfill_map[result["date"]]
+                                result["total_cost"] = float(bf_data.get("total_cost") or 0)
+                                result["total_tokens"] = int(bf_data.get("total_tokens") or 0)
+                                result["by_model"] = bf_data.get("by_model") or {}
+
                     return results
 
             # Fallback: aggregate from spans (for historical data before aggregation was enabled)
