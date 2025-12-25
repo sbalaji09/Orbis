@@ -34,8 +34,8 @@ TTL_SECONDS = 3600
 
 DRAIN_TIMEOUT = 30
 
-WORKER_IDLE_TIMEOUT = 300
-DEQUEUE_TIMEOUT = 5
+WORKER_IDLE_TIMEOUT = int(os.getenv("WORKER_IDLE_TIMEOUT", "300"))
+DEQUEUE_TIMEOUT = int(os.getenv("DEQUEUE_TIMEOUT", "5"))
 
 RETENTION_CHECK_INTERVAL = 86400
 
@@ -69,7 +69,11 @@ class SpanWorker:
 
         # Idle tracking for self-termination
         self.consecutive_empty_polls = 0
-        self.max_empty_polls = WORKER_IDLE_TIMEOUT // DEQUEUE_TIMEOUT
+        self.max_empty_polls = (
+            WORKER_IDLE_TIMEOUT // max(DEQUEUE_TIMEOUT, 1)
+            if WORKER_IDLE_TIMEOUT > 0
+            else None
+        )
 
     def invalidate_cost_caches(self, user_ids: set):
         """
@@ -510,7 +514,7 @@ class SpanWorker:
                         )
                     
                     # check for self termination
-                    if self.consecutive_empty_polls >= self.max_empty_polls:
+                    if self.max_empty_polls is not None and self.consecutive_empty_polls >= self.max_empty_polls:
                         self.logger.info(
                             f"No work for {WORKER_IDLE_TIMEOUT} seconds, self-terminating",
                             extra={'extra_data': {

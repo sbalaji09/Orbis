@@ -6,8 +6,8 @@ import { CostAnomaly } from "@/lib/cost-api-client";
 
 interface CostAnomalyBannerProps {
   anomalies: CostAnomaly[];
-  onAcknowledge: (anomalyId: string) => void;
-  onAcknowledgeAll: () => void;
+  onDismiss: (anomaly: CostAnomaly) => void;
+  onDismissAll: (anomalies: CostAnomaly[]) => void;
   onOpenSettings?: () => void;
 }
 
@@ -16,6 +16,10 @@ const ANOMALY_TYPE_LABELS: Record<string, string> = {
   trace_spike: "High-Cost Trace",
   runaway_loop: "Runaway Loop",
   high_token_response: "High Token Usage",
+  budget: "Budget",
+  error_rate: "Error Rate",
+  latency: "Latency",
+  prompt_regression: "Prompt Regression",
 };
 
 const SEVERITY_STYLES = {
@@ -70,6 +74,7 @@ function AnomalyCard({
 }) {
   const styles = SEVERITY_STYLES[anomaly.severity] || SEVERITY_STYLES.info;
   const typeLabel = ANOMALY_TYPE_LABELS[anomaly.anomaly_type] || anomaly.anomaly_type;
+  const isPromptRegression = anomaly.anomaly_type === "prompt_regression";
 
   return (
     <div className={`${styles.bg} border-2 ${styles.border} p-4 transition-all hover:shadow-md`}>
@@ -90,12 +95,18 @@ function AnomalyCard({
                 </span>
               )}
             </div>
-            <h4 className="font-semibold text-sm text-foreground mb-1 truncate">
+            <h4 className={`font-semibold text-sm text-foreground mb-1 ${isPromptRegression ? "" : "truncate"}`}>
               {anomaly.title}
             </h4>
-            <p className="text-xs text-muted line-clamp-2">
+            <p className={`text-xs text-muted ${isPromptRegression ? "whitespace-normal" : "line-clamp-2"}`}>
               {anomaly.description}
             </p>
+            {isPromptRegression && (anomaly.latest_version || anomaly.prev_version) && (
+              <p className="text-[10px] text-muted mt-2 font-mono">
+                {anomaly.prev_version ? `prev v${anomaly.prev_version}` : "prev v?"} →{" "}
+                {anomaly.latest_version ? `latest v${anomaly.latest_version}` : "latest v?"}
+              </p>
+            )}
             {anomaly.agent_name && (
               <p className="text-[10px] text-muted mt-1">
                 Agent: <span className="font-medium">{anomaly.agent_name}</span>
@@ -128,38 +139,20 @@ function AnomalyCard({
 
 export function CostAnomalyBanner({
   anomalies,
-  onAcknowledge,
-  onAcknowledgeAll,
+  onDismiss,
+  onDismissAll,
   onOpenSettings
 }: CostAnomalyBannerProps) {
   const router = useRouter();
   const [isExpanded, setIsExpanded] = useState(false);
-  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
 
-  // Filter out dismissed anomalies (optimistic UI)
-  const visibleAnomalies = anomalies.filter(a => !dismissedIds.has(a.trace_id || a.title));
-
-  if (visibleAnomalies.length === 0) {
+  if (anomalies.length === 0) {
     return null;
   }
 
-  const criticalCount = visibleAnomalies.filter(a => a.severity === "critical").length;
-  const warningCount = visibleAnomalies.filter(a => a.severity === "warning").length;
-  const mostSevere = visibleAnomalies[0]; // Already sorted by severity from backend
-
-  const handleAcknowledge = (anomaly: CostAnomaly) => {
-    const id = anomaly.trace_id || anomaly.title;
-    setDismissedIds(prev => new Set([...prev, id]));
-    if (anomaly.trace_id) {
-      onAcknowledge(anomaly.trace_id);
-    }
-  };
-
-  const handleAcknowledgeAll = () => {
-    const allIds = visibleAnomalies.map(a => a.trace_id || a.title);
-    setDismissedIds(new Set(allIds));
-    onAcknowledgeAll();
-  };
+  const criticalCount = anomalies.filter(a => a.severity === "critical").length;
+  const warningCount = anomalies.filter(a => a.severity === "warning").length;
+  const mostSevere = anomalies[0]; // Already sorted by severity from backend
 
   const handleViewTrace = (traceId: string) => {
     router.push(`/dashboard/trace/${traceId}`);
@@ -177,7 +170,7 @@ export function CostAnomalyBanner({
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-semibold text-sm">
-                  {visibleAnomalies.length} Cost {visibleAnomalies.length === 1 ? "Alert" : "Alerts"}
+                  {anomalies.length} {anomalies.length === 1 ? "Alert" : "Alerts"}
                 </span>
                 {criticalCount > 0 && (
                   <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 bg-error text-white">
@@ -204,7 +197,7 @@ export function CostAnomalyBanner({
               View All
             </button>
             <button
-              onClick={handleAcknowledgeAll}
+              onClick={() => onDismissAll(anomalies)}
               className="px-3 py-1.5 text-xs font-semibold bg-white text-black border-2 border-black hover:bg-black/5 transition-colors"
             >
               Dismiss All
@@ -221,7 +214,7 @@ export function CostAnomalyBanner({
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <h3 className="font-semibold text-sm">
-            Cost Alerts ({visibleAnomalies.length})
+            Alerts ({anomalies.length})
           </h3>
           {criticalCount > 0 && (
             <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 bg-error text-white">
@@ -244,7 +237,7 @@ export function CostAnomalyBanner({
             </button>
           )}
           <button
-            onClick={handleAcknowledgeAll}
+            onClick={() => onDismissAll(anomalies)}
             className="px-3 py-1.5 text-xs font-semibold bg-white text-black border-2 border-black hover:bg-black/5 transition-colors"
           >
             Dismiss All
@@ -259,11 +252,11 @@ export function CostAnomalyBanner({
       </div>
 
       <div className="space-y-3">
-        {visibleAnomalies.map((anomaly, index) => (
+        {anomalies.map((anomaly, index) => (
           <AnomalyCard
             key={anomaly.trace_id || `${anomaly.anomaly_type}-${index}`}
             anomaly={anomaly}
-            onAcknowledge={() => handleAcknowledge(anomaly)}
+            onAcknowledge={() => onDismiss(anomaly)}
             onViewTrace={() => anomaly.trace_id && handleViewTrace(anomaly.trace_id)}
           />
         ))}

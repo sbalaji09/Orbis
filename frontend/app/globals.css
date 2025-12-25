@@ -106,3 +106,29 @@ svg.recharts-surface:focus:not(:focus-visible) {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--muted);
 } */
+
+/* Blocky scrollbar (used for modal scroll areas) */
+.scrollbar-block {
+  scrollbar-width: auto;
+  scrollbar-color: var(--border) var(--card);
+  scrollbar-gutter: stable;
+}
+
+.scrollbar-block::-webkit-scrollbar {
+  width: 14px;
+}
+
+.scrollbar-block::-webkit-scrollbar-track {
+  background: var(--card);
+  border-left: 2px solid var(--border);
+}
+
+.scrollbar-block::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border: 2px solid var(--card);
+  border-radius: 0;
+}
+
+.scrollbar-block::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}

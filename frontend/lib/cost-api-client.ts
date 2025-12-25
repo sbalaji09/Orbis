@@ -153,7 +153,15 @@ export interface PromptLengthAnalysis {
 }
 
 export interface CostAnomaly {
-  anomaly_type: 'daily_spike' | 'trace_spike' | 'runaway_loop' | 'high_token_response';
+  anomaly_type:
+    | 'daily_spike'
+    | 'trace_spike'
+    | 'runaway_loop'
+    | 'high_token_response'
+    | 'budget'
+    | 'error_rate'
+    | 'latency'
+    | 'prompt_regression';
   severity: 'info' | 'warning' | 'critical';
   actual_value: number;
   expected_value?: number;
@@ -164,6 +172,11 @@ export interface CostAnomaly {
   description: string;
   agent_name?: string;
   model?: string;
+
+  // Prompt regression context (optional)
+  prompt_name?: string;
+  latest_version?: string;
+  prev_version?: string;
 }
 
 export interface AnomalyResponse {
@@ -181,6 +194,31 @@ export interface AlertSettings {
   daily_spike_multiplier: number;
   trace_cost_threshold: number;
   loop_count_threshold: number;
+  alert_cooldown_minutes?: number;
+
+  // Budget alerts
+  budget_alerts_enabled?: boolean;
+  monthly_budget_usd?: number | null;
+  monthly_budget_alert_percent?: number;
+
+  // Error rate alerts
+  error_rate_alerts_enabled?: boolean;
+  error_rate_threshold_pct?: number;
+  error_rate_window_minutes?: number;
+  error_rate_min_traces?: number;
+
+  // Latency alerts
+  latency_alerts_enabled?: boolean;
+  latency_p95_threshold_seconds?: number;
+  latency_window_minutes?: number;
+  latency_min_spans?: number;
+
+  // Prompt regression alerts
+  prompt_regression_alerts_enabled?: boolean;
+  prompt_regression_window_hours?: number;
+  prompt_regression_error_rate_increase_pp?: number;
+  prompt_regression_latency_increase_seconds?: number;
+  prompt_regression_min_traces?: number;
 }
 
 
@@ -490,13 +528,6 @@ export async function updateAlertSettings(
   token: string
 ): Promise<AlertSettings | null> {
   try {
-    if (
-      settings.daily_cost_threshold == null ||
-      settings.daily_spike_multiplier == null
-    ) {
-      throw new Error("daily_cost_threshold and daily_spike_multiplier are required");
-    }
-
     const url = new URL(`${API_BASE_URL}/cost/settings`);
 
     const response = await fetch(url.toString(), {
@@ -506,10 +537,7 @@ export async function updateAlertSettings(
         "Content-Type": "application/json",
       },
       cache: "no-store",
-      body: JSON.stringify({
-        daily_cost_threshold: settings.daily_cost_threshold,
-        daily_spike_multiplier: settings.daily_spike_multiplier,
-      }),
+      body: JSON.stringify(settings),
     });
 
     if (!response.ok) {

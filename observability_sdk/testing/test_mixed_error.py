@@ -17,10 +17,10 @@ GROQ_API_KEY = "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"
 
 # Configure Orbis
 configure(
-    api_key="test_LZmbYQh0EICyJHBpkg4UWiD69Mn6BybDo8G80In7CFA",
-    project_id="73635de3-eedc-4ac0-8acb-a22c9816847d",
-    user_id="00000000-0000-0000-0000-000000000000",
-    api_url="http://localhost:8080",
+    api_key="VGVzdCBUcmFjZSAMlhbKlbc_MKUVQ-Kb1c95",
+    project_id="aca167c7-6c08-4fe2-a7af-21ec298e1d68",
+    user_id="fbd31533-fe77-427f-9d2d-a1c4c69e9a6d",
+    api_url="http://localhost:8080"
 )
 
 # Enable instrumentation

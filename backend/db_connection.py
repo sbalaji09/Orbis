@@ -2251,7 +2251,17 @@ class SupabaseDB:
                     'trace_cost_threshold', 'trace_token_threshold',
                     'high_token_response_threshold', 'loop_detection_enabled',
                     'loop_similarity_threshold', 'loop_count_threshold',
-                    'email_alerts_enabled', 'webhook_url', 'alert_cooldown_minutes'
+                    'email_alerts_enabled', 'webhook_url', 'alert_cooldown_minutes',
+                    # Budget alerts
+                    'budget_alerts_enabled', 'monthly_budget_usd', 'monthly_budget_alert_percent',
+                    # Error rate alerts
+                    'error_rate_alerts_enabled', 'error_rate_threshold_pct', 'error_rate_window_minutes', 'error_rate_min_traces',
+                    # Latency alerts
+                    'latency_alerts_enabled', 'latency_p95_threshold_seconds', 'latency_window_minutes', 'latency_min_spans',
+                    # Prompt regression alerts
+                    'prompt_regression_alerts_enabled', 'prompt_regression_window_hours',
+                    'prompt_regression_error_rate_increase_pp', 'prompt_regression_latency_increase_seconds',
+                    'prompt_regression_min_traces'
                 ]
 
                 set_clauses = []
@@ -2274,6 +2284,282 @@ class SupabaseDB:
                 conn.commit()
                 result = cur.fetchone()
                 return dict(result) if result else {}
+        finally:
+            self.return_connection(conn)
+
+    def detect_monthly_budget_alert(self, user_id: str) -> Optional[Dict[str, Any]]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                settings = self.get_user_alert_settings(user_id)
+                if not settings.get('budget_alerts_enabled', False):
+                    return None
+
+                budget = settings.get('monthly_budget_usd')
+                if budget is None:
+                    return None
+
+                budget = float(budget)
+                if budget <= 0:
+                    return None
+
+                notify_percent = float(settings.get('monthly_budget_alert_percent', 90.0) or 90.0)
+                notify_percent = max(1.0, min(100.0, notify_percent))
+
+                cur.execute("""
+                    SELECT COALESCE(SUM(s.cost), 0) AS month_to_date_cost
+                    FROM traces t
+                    JOIN spans s ON t.trace_id = s.trace_id
+                    WHERE t.user_id = %s
+                    AND date_trunc('month', t.start_time AT TIME ZONE 'UTC') = date_trunc('month', NOW() AT TIME ZONE 'UTC')
+                """, (user_id,))
+                row = cur.fetchone() or {}
+                month_cost = float(row.get('month_to_date_cost') or 0)
+
+                warning_threshold = budget * (notify_percent / 100.0)
+                if month_cost < warning_threshold:
+                    return None
+
+                severity = 'critical' if month_cost >= budget else 'warning'
+                return {
+                    'anomaly_type': 'budget',
+                    'severity': severity,
+                    'actual_value': month_cost,
+                    'expected_value': None,
+                    'threshold_value': budget,
+                    'deviation_percent': round((month_cost / budget - 1) * 100, 1) if budget > 0 else None,
+                    'title': f"Budget alert: ${month_cost:.2f} this month",
+                    'description': (
+                        f"Month-to-date spend is ${month_cost:.2f}. "
+                        f"Budget is ${budget:.2f} (alert at {notify_percent:.0f}%+)."
+                    )
+                }
+        finally:
+            self.return_connection(conn)
+
+    def detect_error_rate_alert(self, user_id: str) -> Optional[Dict[str, Any]]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                settings = self.get_user_alert_settings(user_id)
+                if not settings.get('error_rate_alerts_enabled', False):
+                    return None
+
+                threshold_pct = float(settings.get('error_rate_threshold_pct', 5.0) or 5.0)
+                threshold_pct = max(0.0, min(100.0, threshold_pct))
+                window_minutes = int(settings.get('error_rate_window_minutes', 60) or 60)
+                window_minutes = max(5, min(24 * 60, window_minutes))
+                min_traces = int(settings.get('error_rate_min_traces', 20) or 20)
+                min_traces = max(1, min(100000, min_traces))
+
+                cur.execute("""
+                    SELECT
+                        COUNT(DISTINCT t.trace_id) AS total_traces,
+                        COUNT(DISTINCT CASE WHEN s.error_message IS NOT NULL THEN t.trace_id END) AS error_traces
+                    FROM traces t
+                    LEFT JOIN spans s ON s.trace_id = t.trace_id
+                    WHERE t.user_id = %s
+                    AND t.start_time >= NOW() - (%s || ' minutes')::interval
+                """, (user_id, window_minutes))
+                row = cur.fetchone() or {}
+                total_traces = int(row.get('total_traces') or 0)
+                error_traces = int(row.get('error_traces') or 0)
+
+                if total_traces < min_traces:
+                    return None
+
+                error_rate_pct = round((error_traces / max(total_traces, 1)) * 100.0, 2)
+                if error_rate_pct < threshold_pct:
+                    return None
+
+                severity = 'critical' if error_rate_pct >= min(100.0, threshold_pct * 2) else 'warning'
+                return {
+                    'anomaly_type': 'error_rate',
+                    'severity': severity,
+                    'actual_value': error_rate_pct,
+                    'expected_value': None,
+                    'threshold_value': threshold_pct,
+                    'deviation_percent': round((error_rate_pct - threshold_pct) / max(threshold_pct, 0.01) * 100, 1) if threshold_pct > 0 else None,
+                    'title': f"High error rate: {error_rate_pct:.2f}% ({window_minutes}m)",
+                    'description': (
+                        f"Error rate is {error_rate_pct:.2f}% over the last {window_minutes} minutes "
+                        f"({error_traces}/{total_traces} traces), threshold is {threshold_pct:.2f}%."
+                    )
+                }
+        finally:
+            self.return_connection(conn)
+
+    def detect_latency_alert(self, user_id: str) -> Optional[Dict[str, Any]]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                settings = self.get_user_alert_settings(user_id)
+                if not settings.get('latency_alerts_enabled', False):
+                    return None
+
+                threshold_seconds = float(settings.get('latency_p95_threshold_seconds', 2.0) or 2.0)
+                threshold_seconds = max(0.01, threshold_seconds)
+                window_minutes = int(settings.get('latency_window_minutes', 60) or 60)
+                window_minutes = max(5, min(24 * 60, window_minutes))
+                min_spans = int(settings.get('latency_min_spans', 50) or 50)
+                min_spans = max(1, min(1000000, min_spans))
+
+                cur.execute("""
+                    SELECT
+                        COUNT(*) AS span_count,
+                        COALESCE(AVG(s.duration) / 1000.0, 0) AS avg_latency_s,
+                        COALESCE(PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY s.duration) / 1000.0, 0) AS p95_latency_s
+                    FROM spans s
+                    JOIN traces t ON t.trace_id = s.trace_id
+                    WHERE t.user_id = %s
+                    AND s.duration IS NOT NULL
+                    AND t.start_time >= NOW() - (%s || ' minutes')::interval
+                """, (user_id, window_minutes))
+                row = cur.fetchone() or {}
+                span_count = int(row.get('span_count') or 0)
+                avg_latency_s = float(row.get('avg_latency_s') or 0)
+                p95_latency_s = float(row.get('p95_latency_s') or 0)
+
+                if span_count < min_spans:
+                    return None
+
+                if p95_latency_s < threshold_seconds:
+                    return None
+
+                severity = 'critical' if p95_latency_s >= threshold_seconds * 2 else 'warning'
+                return {
+                    'anomaly_type': 'latency',
+                    'severity': severity,
+                    'actual_value': p95_latency_s,
+                    'expected_value': avg_latency_s,
+                    'threshold_value': threshold_seconds,
+                    'deviation_percent': round((p95_latency_s / threshold_seconds - 1) * 100, 1) if threshold_seconds > 0 else None,
+                    'title': f"High latency (p95): {p95_latency_s:.2f}s ({window_minutes}m)",
+                    'description': (
+                        f"p95 latency is {p95_latency_s:.2f}s (avg {avg_latency_s:.2f}s) over the last {window_minutes} minutes "
+                        f"across {span_count} spans, threshold is {threshold_seconds:.2f}s."
+                    )
+                }
+        finally:
+            self.return_connection(conn)
+
+    def detect_prompt_regressions(self, user_id: str) -> List[Dict[str, Any]]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                settings = self.get_user_alert_settings(user_id)
+                if not settings.get('prompt_regression_alerts_enabled', False):
+                    return []
+
+                window_hours = int(settings.get('prompt_regression_window_hours', 24) or 24)
+                window_hours = max(1, min(24 * 14, window_hours))
+                min_traces = int(settings.get('prompt_regression_min_traces', 20) or 20)
+                min_traces = max(1, min(100000, min_traces))
+                delta_err_pp = float(settings.get('prompt_regression_error_rate_increase_pp', 2.0) or 2.0)
+                delta_err_pp = max(0.0, min(100.0, delta_err_pp))
+                delta_lat_s = float(settings.get('prompt_regression_latency_increase_seconds', 0.5) or 0.5)
+                delta_lat_s = max(0.0, delta_lat_s)
+
+                cur.execute("""
+                    WITH version_stats AS (
+                        SELECT
+                            pv.name,
+                            pv.semantic_version,
+                            pv.version_number,
+                            COUNT(DISTINCT s.trace_id) AS trace_count,
+                            COALESCE(AVG(s.duration) / 1000.0, 0) AS avg_latency_s,
+                            COALESCE(PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY s.duration) / 1000.0, 0) AS p95_latency_s,
+                            ROUND(
+                                COUNT(DISTINCT CASE WHEN s.error_message IS NOT NULL THEN s.trace_id END)::NUMERIC
+                                / NULLIF(COUNT(DISTINCT s.trace_id), 0) * 100, 2
+                            ) AS error_rate_pct
+                        FROM prompt_versions pv
+                        JOIN spans s ON s.prompt_id = pv.prompt_id
+                        JOIN traces t ON t.trace_id = s.trace_id
+                        LEFT JOIN agents a ON pv.agent_id = a.agent_id
+                        WHERE t.user_id = %s
+                        AND t.start_time >= NOW() - (%s || ' hours')::interval
+                        AND (
+                            pv.agent_id IS NULL
+                            OR a.user_id = %s
+                        )
+                        GROUP BY pv.name, pv.semantic_version, pv.version_number
+                        HAVING COUNT(DISTINCT s.trace_id) >= %s
+                    ),
+                    ranked AS (
+                        SELECT
+                            *,
+                            ROW_NUMBER() OVER (
+                                PARTITION BY name
+                                ORDER BY version_number DESC
+                            ) AS rn
+                        FROM version_stats
+                    )
+                    SELECT
+                        latest.name AS prompt_name,
+                        latest.semantic_version AS latest_version,
+                        prev.semantic_version AS prev_version,
+                        latest.trace_count AS latest_traces,
+                        prev.trace_count AS prev_traces,
+                        latest.error_rate_pct AS latest_error_rate_pct,
+                        prev.error_rate_pct AS prev_error_rate_pct,
+                        latest.p95_latency_s AS latest_p95_latency_s,
+                        prev.p95_latency_s AS prev_p95_latency_s,
+                        latest.avg_latency_s AS latest_avg_latency_s,
+                        prev.avg_latency_s AS prev_avg_latency_s
+                    FROM ranked latest
+                    JOIN ranked prev
+                      ON prev.name = latest.name
+                     AND prev.rn = 2
+                    WHERE latest.rn = 1
+                """, (user_id, window_hours, user_id, min_traces))
+
+                rows = cur.fetchall() or []
+                anomalies: List[Dict[str, Any]] = []
+
+                for row in rows:
+                    latest_err = float(row.get('latest_error_rate_pct') or 0)
+                    prev_err = float(row.get('prev_error_rate_pct') or 0)
+                    latest_p95 = float(row.get('latest_p95_latency_s') or 0)
+                    prev_p95 = float(row.get('prev_p95_latency_s') or 0)
+
+                    err_delta = round(latest_err - prev_err, 2)
+                    lat_delta = round(latest_p95 - prev_p95, 3)
+
+                    is_regression = (err_delta >= delta_err_pp) or (lat_delta >= delta_lat_s)
+                    if not is_regression:
+                        continue
+
+                    severity = 'critical' if (err_delta >= delta_err_pp * 2 or lat_delta >= delta_lat_s * 2) else 'warning'
+                    prompt_name = row.get('prompt_name') or 'Unknown'
+                    latest_version = row.get('latest_version') or '?'
+                    prev_version = row.get('prev_version') or '?'
+
+                    anomalies.append({
+                        'anomaly_type': 'prompt_regression',
+                        'severity': severity,
+                        'actual_value': latest_err,
+                        'expected_value': prev_err,
+                        'threshold_value': prev_err + delta_err_pp,
+                        'deviation_percent': None,
+                        'title': f"Prompt regression: {prompt_name} v{latest_version} vs v{prev_version}",
+                        'description': (
+                            f"Latest error rate {latest_err:.2f}% (prev {prev_err:.2f}%, Δ {err_delta:+.2f}pp) and "
+                            f"p95 latency {latest_p95:.2f}s (prev {prev_p95:.2f}s, Δ {lat_delta:+.2f}s) "
+                            f"over the last {window_hours}h."
+                        ),
+                        'prompt_name': prompt_name,
+                        'latest_version': latest_version,
+                        'prev_version': prev_version,
+                        'latest_p95_latency_s': latest_p95,
+                        'prev_p95_latency_s': prev_p95,
+                        'latest_error_rate_pct': latest_err,
+                        'prev_error_rate_pct': prev_err,
+                        'latest_traces': int(row.get('latest_traces') or 0),
+                        'prev_traces': int(row.get('prev_traces') or 0),
+                    })
+
+                return anomalies
         finally:
             self.return_connection(conn)
 
@@ -2536,22 +2822,64 @@ class SupabaseDB:
     def get_all_anomalies(self, user_id: str, hours: int = 24) -> Dict[str, Any]:
         anomalies = []
 
+        # budget alert (month-to-date)
+        try:
+            budget_alert = self.detect_monthly_budget_alert(user_id)
+            if budget_alert:
+                anomalies.append(budget_alert)
+        except Exception as e:
+            print(f"[ALERTS] Budget alert detection failed: {e}")
+
         # daily spike detection
-        daily_spike = self.detect_daily_cost_spike(user_id)
-        if daily_spike:
-            anomalies.append(daily_spike)
+        try:
+            daily_spike = self.detect_daily_cost_spike(user_id)
+            if daily_spike:
+                anomalies.append(daily_spike)
+        except Exception as e:
+            print(f"[ALERTS] Daily spike detection failed: {e}")
 
         # high cost traces
-        high_cost_traces = self.detect_high_cost_traces(user_id, hours)
-        anomalies.extend(high_cost_traces)
+        try:
+            high_cost_traces = self.detect_high_cost_traces(user_id, hours)
+            anomalies.extend(high_cost_traces)
+        except Exception as e:
+            print(f"[ALERTS] High-cost trace detection failed: {e}")
 
         # runaway loops
-        runaway_loops = self.detect_runaway_loops(user_id, hours)
-        anomalies.extend(runaway_loops)
+        try:
+            runaway_loops = self.detect_runaway_loops(user_id, hours)
+            anomalies.extend(runaway_loops)
+        except Exception as e:
+            print(f"[ALERTS] Runaway loop detection failed: {e}")
 
         # high token responses
-        high_token = self.detect_high_token_responses(user_id, hours)
-        anomalies.extend(high_token)
+        try:
+            high_token = self.detect_high_token_responses(user_id, hours)
+            anomalies.extend(high_token)
+        except Exception as e:
+            print(f"[ALERTS] High-token detection failed: {e}")
+
+        # error rate alerts
+        try:
+            error_rate_alert = self.detect_error_rate_alert(user_id)
+            if error_rate_alert:
+                anomalies.append(error_rate_alert)
+        except Exception as e:
+            print(f"[ALERTS] Error-rate detection failed: {e}")
+
+        # latency alerts
+        try:
+            latency_alert = self.detect_latency_alert(user_id)
+            if latency_alert:
+                anomalies.append(latency_alert)
+        except Exception as e:
+            print(f"[ALERTS] Latency detection failed: {e}")
+
+        # prompt regression alerts
+        try:
+            anomalies.extend(self.detect_prompt_regressions(user_id))
+        except Exception as e:
+            print(f"[ALERTS] Prompt regression detection failed: {e}")
 
         # sort by severity
         severity_order = {'critical': 0, 'warning': 1, 'info': 2}
