@@ -43,7 +43,11 @@ def get_llm_comparison_analysis(
     return response.choices[0].message.content
 
 def get_trace_explanation(trace_metadata: Dict[str, Any], spans: List[Dict[str, Any]]) -> str:
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY environment variable is not set")
+
+    client = OpenAI(api_key=api_key)
 
     # Format spans for the prompt - extract relevant fields from each span
     formatted_spans = []

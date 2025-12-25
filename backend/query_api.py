@@ -814,6 +814,9 @@ async def explain_trace(trace_id: str, user_id: str = Depends(get_user_id_from_t
         return {"explanation": explanation}
     except HTTPException:
         raise
+    except ValueError as e:
+        # Handle missing API key or configuration errors
+        raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 @app.exception_handler(ValidationError)
