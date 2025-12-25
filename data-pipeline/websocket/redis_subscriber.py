@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import msgpack
 import os
 import re
 from typing import Optional
@@ -51,8 +52,8 @@ class RedisSubscriber:
     async def _cleanup(self) -> None:
         if self._pubsub:
             try:
-                await self._pubsub.punsubscribe("trace:*")
-                await self._pubsub.punsubscribe("user:*:spans")
+                await self._pubsub.punsubscribe(b"trace:*")
+                await self._pubsub.punsubscribe(b"user:*:spans")
             except Exception as e:
                 logger.warning(f"Error closing pubsub: {e}")
         
@@ -66,11 +67,12 @@ class RedisSubscriber:
     # establish Redis connection and subscribe to patterns
     async def _connect(self) -> bool:
         try:
-            self._redis = aioredis.from_url(REDIS_URL, decode_responses=True)
+            # decode_responses=False because we receive msgpack binary data
+            self._redis = aioredis.from_url(REDIS_URL, decode_responses=False)
             self._pubsub = self._redis.pubsub()
 
-            await self._pubsub.psubscribe("trace:*")
-            await self._pubsub.psubscribe("user:*:spans")
+            await self._pubsub.psubscribe(b"trace:*")
+            await self._pubsub.psubscribe(b"user:*:spans")
 
             logger.info("Redis subscriber connected and subscribed to patterns")
             return True
@@ -105,17 +107,27 @@ class RedisSubscriber:
             if not self._running:
                 break
 
-            if message["type"] != "pmessage":
+            # Message dict keys are strings even with decode_responses=False
+            if message.get("type") != "pmessage":
                 continue
 
             try:
-                channel = message["channel"]
-                data = json.loads(message["data"])
+                # Channel and data are bytes when decode_responses=False
+                channel_bytes = message.get("channel")
+                msg_data = message.get("data")
+
+                if not channel_bytes or not msg_data:
+                    continue
+
+                channel = channel_bytes.decode('utf-8') if isinstance(channel_bytes, bytes) else channel_bytes
+
+                # Unpack msgpack binary data
+                data = msgpack.unpackb(msg_data, raw=False)
 
                 await self._route_message(channel, data)
 
-            except json.JSONDecodeError as e:
-                logger.warning(f"Invalid JSON in Redis message: {e}")
+            except (msgpack.exceptions.ExtraData, msgpack.exceptions.UnpackException) as e:
+                logger.warning(f"Invalid msgpack in Redis message: {e}")
             except Exception as e:
                 logger.error(f"Error routing message: {e}", exc_info=True)
     

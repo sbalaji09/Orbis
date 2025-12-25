@@ -592,7 +592,7 @@ async def get_cost_by_model(start_date: str, end_date: str, user_id: str = Depen
 async def get_cost_trends(days: int, user_id: str = Depends(get_user_id_from_token)):
     try:
         validate_user_id(user_id)
-        cache_key = f"cache:cost_trends:{user_id}:{days}"
+        cache_key = f"cache:cost_trends:v2:{user_id}:{days}"
         cached = redis_client.get(cache_key)
         if cached:
             return json.loads(cached)
@@ -716,7 +716,27 @@ async def get_anomalies(
         )
         return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # Don't break the dashboard if anomaly detection fails intermittently.
+        # Return empty results with current settings and include an error string for debugging.
+        print(f"[COST_ANOMALIES] Failed to compute anomalies: {e}")
+        try:
+            settings = await asyncio.get_event_loop().run_in_executor(
+                None, lambda: db.get_user_alert_settings(user_id)
+            )
+        except Exception:
+            settings = {}
+
+        return {
+            "anomalies": [],
+            "summary": {
+                "total_anomalies": 0,
+                "critical_count": 0,
+                "warning_count": 0,
+                "by_type": {}
+            },
+            "settings": settings,
+            "error": str(e)
+        }
 
 @app.get("/cost/anomalies/history")
 async def get_anomaly_history(
@@ -743,8 +763,33 @@ async def get_alert_settings(user_id: str = Depends(get_user_id_from_token)):
         raise HTTPException(status_code=500, detail=str(e))
     
 class AlertSettingsUpdate(BaseModel):
-    daily_cost_threshold: float = Field(..., gt=0)
-    daily_spike_multiplier: float = Field(..., gt=1)
+    # Cost alerts
+    daily_cost_threshold: Optional[float] = Field(default=None, gt=0)
+    daily_spike_multiplier: Optional[float] = Field(default=None, gt=1)
+
+    # Budget alerts
+    budget_alerts_enabled: Optional[bool] = None
+    monthly_budget_usd: Optional[float] = Field(default=None, gt=0)
+    monthly_budget_alert_percent: Optional[float] = Field(default=None, ge=1, le=100)
+
+    # Error rate alerts
+    error_rate_alerts_enabled: Optional[bool] = None
+    error_rate_threshold_pct: Optional[float] = Field(default=None, ge=0, le=100)
+    error_rate_window_minutes: Optional[int] = Field(default=None, ge=5, le=1440)
+    error_rate_min_traces: Optional[int] = Field(default=None, ge=1, le=100000)
+
+    # Latency alerts
+    latency_alerts_enabled: Optional[bool] = None
+    latency_p95_threshold_seconds: Optional[float] = Field(default=None, gt=0)
+    latency_window_minutes: Optional[int] = Field(default=None, ge=5, le=1440)
+    latency_min_spans: Optional[int] = Field(default=None, ge=1, le=1000000)
+
+    # Prompt regression alerts
+    prompt_regression_alerts_enabled: Optional[bool] = None
+    prompt_regression_window_hours: Optional[int] = Field(default=None, ge=1, le=336)
+    prompt_regression_error_rate_increase_pp: Optional[float] = Field(default=None, ge=0, le=100)
+    prompt_regression_latency_increase_seconds: Optional[float] = Field(default=None, ge=0)
+    prompt_regression_min_traces: Optional[int] = Field(default=None, ge=1, le=100000)
     
 @app.put("/cost/settings")
 async def update_alert_settings(
@@ -752,10 +797,16 @@ async def update_alert_settings(
     user_id: str = Depends(get_user_id_from_token)):
 
     try:
+        payload = body.model_dump(exclude_unset=True)
+        if not payload:
+            raise HTTPException(status_code=400, detail="No settings provided")
+
         result = await asyncio.get_event_loop().run_in_executor(
-            None, lambda: db.update_user_alert_settings(user_id, {"daily_cost_threshold": body.daily_cost_threshold,"daily_spike_multiplier": body.daily_spike_multiplier})
+            None, lambda: db.update_user_alert_settings(user_id, payload)
         )
         return result
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -790,4 +841,3 @@ if __name__ == "__main__":
     import uvicorn
     print("Starting Query API on http://localhost:8000")
     uvicorn.run(app, host="0.0.0.0", port=8000)
-

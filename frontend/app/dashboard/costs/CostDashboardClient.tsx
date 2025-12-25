@@ -12,13 +12,12 @@ import {
   type CostTrend,
   type CostByAgent,
   type CostByModel,
-  acknowledgeAllAnomalies,
 } from "@/lib/cost-api-client";
 import ECharts from "@/components/ECharts";
 import type { EChartsOption } from "echarts";
 import CostAnomalyBanner from "@/components/CostAnomalyBanner";
 import AlertSettingsModal from "@/components/AlertSettingsModal";
-import { fetchCostAnomalies, acknowledgeAnomaly, type CostAnomaly } from "@/lib/cost-api-client";
+import { fetchCostAnomalies, type AlertSettings, type CostAnomaly } from "@/lib/cost-api-client";
 
 // Lazy load tab components to reduce initial bundle size
 const OverviewTab = dynamic(() => import("./OverviewTab"), {
@@ -78,6 +77,39 @@ interface CostDashboardClientProps {
   initialByModel: CostByModel[];
 }
 
+function toFiniteNumber(value: unknown, fallback = 0): number {
+  const num = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(num) ? num : fallback;
+}
+
+function toCount(value: unknown): number {
+  return Math.max(0, Math.trunc(toFiniteNumber(value, 0)));
+}
+
+function normalizeCostTrend(row: CostTrend): CostTrend {
+  return {
+    ...row,
+    total_cost: toFiniteNumber((row as unknown as { total_cost?: unknown }).total_cost, 0),
+    call_count: toCount((row as unknown as { call_count?: unknown }).call_count),
+  };
+}
+
+function normalizeCostByAgent(row: CostByAgent): CostByAgent {
+  return {
+    ...row,
+    total_cost: toFiniteNumber((row as unknown as { total_cost?: unknown }).total_cost, 0),
+    call_count: toCount((row as unknown as { call_count?: unknown }).call_count),
+  };
+}
+
+function normalizeCostByModel(row: CostByModel): CostByModel {
+  return {
+    ...row,
+    total_cost: toFiniteNumber((row as unknown as { total_cost?: unknown }).total_cost, 0),
+    call_count: toCount((row as unknown as { call_count?: unknown }).call_count),
+  };
+}
+
 // Cost-by-agent palette (blue -> green -> orange)
 const AGENT_COLORS = [
   CHART_PALETTE.blue,
@@ -112,20 +144,27 @@ export default function CostDashboardClient({
   initialByAgent,
   initialByModel,
 }: CostDashboardClientProps) {
-  const { session, loading: authLoading } = useAuth();
+  const { session, user, loading: authLoading } = useAuth();
   const token = session?.access_token ?? null;
 
   const [selectedPeriod, setSelectedPeriod] = useState(30);
   const [customDays, setCustomDays] = useState("");
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [trends, setTrends] = useState<CostTrend[]>(initialTrends);
-  const [byAgent, setByAgent] = useState<CostByAgent[]>(initialByAgent);
-  const [byModel, setByModel] = useState<CostByModel[]>(initialByModel);
+  const [trends, setTrends] = useState<CostTrend[]>(() =>
+    (initialTrends ?? []).map(normalizeCostTrend)
+  );
+  const [byAgent, setByAgent] = useState<CostByAgent[]>(() =>
+    (initialByAgent ?? []).map(normalizeCostByAgent)
+  );
+  const [byModel, setByModel] = useState<CostByModel[]>(() =>
+    (initialByModel ?? []).map(normalizeCostByModel)
+  );
   const [isLoading, setIsLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const hasFetchedRef = useRef(false);
   const [anomalies, setAnomalies] = useState<CostAnomaly[]>([]);
+  const [alertSettings, setAlertSettings] = useState<AlertSettings | null>(null);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<
     "overview" | "features" | "tokens" | "prompts" | "savings"
@@ -174,9 +213,9 @@ export default function CostDashboardClient({
           fetchCostByModel(startDate, endDate, token),
         ]);
 
-        setTrends(trendsData);
-        setByAgent(agentData);
-        setByModel(modelData);
+        setTrends((trendsData ?? []).map(normalizeCostTrend));
+        setByAgent((agentData ?? []).map(normalizeCostByAgent));
+        setByModel((modelData ?? []).map(normalizeCostByModel));
       } catch (error) {
         console.error("Failed to fetch cost data:", error);
       } finally {
@@ -192,9 +231,88 @@ export default function CostDashboardClient({
     if (!token) return;
     
     fetchCostAnomalies(24, token).then(data => {
-      if (data) setAnomalies(data.anomalies);
+      if (data) {
+        setAnomalies(data.anomalies);
+        setAlertSettings(data.settings);
+      }
     });
   }, [token]);
+
+  const dismissalsStorageKey = useMemo(() => {
+    if (!user?.id) return null;
+    return `orbis.alertDismissals.v1.${user.id}`;
+  }, [user?.id]);
+
+  const [dismissals, setDismissals] = useState<Record<string, number>>({});
+
+  const loadDismissals = useCallback(() => {
+    if (!dismissalsStorageKey) return;
+    try {
+      const raw = localStorage.getItem(dismissalsStorageKey);
+      const parsed = raw ? (JSON.parse(raw) as Record<string, number>) : {};
+      const now = Date.now();
+      const cleaned: Record<string, number> = {};
+      for (const [key, expiresAt] of Object.entries(parsed)) {
+        if (typeof expiresAt === "number" && expiresAt > now) cleaned[key] = expiresAt;
+      }
+      setDismissals(cleaned);
+      localStorage.setItem(dismissalsStorageKey, JSON.stringify(cleaned));
+    } catch {
+      setDismissals({});
+    }
+  }, [dismissalsStorageKey]);
+
+  useEffect(() => {
+    loadDismissals();
+  }, [loadDismissals]);
+
+  const makeDismissKey = useCallback((anomaly: CostAnomaly) => {
+    const trace = anomaly.trace_id ?? "";
+    const prompt = anomaly.prompt_name ?? "";
+    return `${anomaly.anomaly_type}|${trace}|${prompt}|${anomaly.title}`;
+  }, []);
+
+  const persistDismissals = useCallback(
+    (next: Record<string, number>) => {
+      setDismissals(next);
+      if (!dismissalsStorageKey) return;
+      try {
+        localStorage.setItem(dismissalsStorageKey, JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+    },
+    [dismissalsStorageKey]
+  );
+
+  const visibleAnomalies = useMemo(() => {
+    const now = Date.now();
+    return anomalies.filter((a) => {
+      const key = makeDismissKey(a);
+      const expiresAt = dismissals[key];
+      return !(typeof expiresAt === "number" && expiresAt > now);
+    });
+  }, [anomalies, dismissals, makeDismissKey]);
+
+  const handleDismissAnomaly = useCallback(
+    (anomaly: CostAnomaly) => {
+      const cooldownMinutes = alertSettings?.alert_cooldown_minutes ?? 60;
+      const expiresAt = Date.now() + cooldownMinutes * 60 * 1000;
+      const key = makeDismissKey(anomaly);
+      persistDismissals({ ...dismissals, [key]: expiresAt });
+    },
+    [alertSettings?.alert_cooldown_minutes, dismissals, makeDismissKey, persistDismissals]
+  );
+
+  const handleDismissAll = useCallback(() => {
+    const cooldownMinutes = alertSettings?.alert_cooldown_minutes ?? 60;
+    const expiresAt = Date.now() + cooldownMinutes * 60 * 1000;
+    const next = { ...dismissals };
+    for (const anomaly of visibleAnomalies) {
+      next[makeDismissKey(anomaly)] = expiresAt;
+    }
+    persistDismissals(next);
+  }, [alertSettings?.alert_cooldown_minutes, dismissals, makeDismissKey, persistDismissals, visibleAnomalies]);
 
   // Handle period selection
   const handlePeriodSelect = (value: number) => {
@@ -238,16 +356,6 @@ export default function CostDashboardClient({
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  };
-
-  const handleAcknowledgeAnomaly = async (anomalyId: string) => {
-    if (!token) return;
-    await acknowledgeAnomaly(anomalyId, token);
-  };
-
-  const handleAcknowledgeAll = async () => {
-    if (!token) return;
-    await acknowledgeAllAnomalies(token);
   };
 
   // Calculate summary metrics
@@ -732,15 +840,15 @@ export default function CostDashboardClient({
           <button
             onClick={() => setIsSettingsModalOpen(true)}
             className="ml-auto flex items-center gap-2 px-4 py-2 text-sm font-medium border-2 border-black bg-white hover:bg-gray-50 transition-all shadow-[2px_2px_0_rgba(0,0,0,0.1)] hover:shadow-[4px_4px_0_rgba(0,0,0,0.15)]"
-            title="Configure cost alert thresholds"
+            title="Configure alert thresholds"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </svg>
             <span>Alert Settings</span>
-            {anomalies.length > 0 && (
+            {visibleAnomalies.length > 0 && (
               <span className="flex items-center justify-center w-5 h-5 text-[10px] font-bold bg-error text-white rounded-full">
-                {anomalies.length}
+                {visibleAnomalies.length}
               </span>
             )}
           </button>
@@ -769,11 +877,11 @@ export default function CostDashboardClient({
           ))}
         </div>
 
-        {anomalies.length > 0 && (
+        {visibleAnomalies.length > 0 && (
           <CostAnomalyBanner
-            anomalies={anomalies}
-            onAcknowledge={handleAcknowledgeAnomaly}
-            onAcknowledgeAll={handleAcknowledgeAll}
+            anomalies={visibleAnomalies}
+            onDismiss={handleDismissAnomaly}
+            onDismissAll={handleDismissAll}
             onOpenSettings={() => setIsSettingsModalOpen(true)}
           />
         )}
@@ -786,7 +894,10 @@ export default function CostDashboardClient({
             // Refetch anomalies after settings change
             if (token) {
               fetchCostAnomalies(24, token).then(data => {
-                if (data) setAnomalies(data.anomalies);
+                if (data) {
+                  setAnomalies(data.anomalies);
+                  setAlertSettings(data.settings);
+                }
               });
             }
           }}

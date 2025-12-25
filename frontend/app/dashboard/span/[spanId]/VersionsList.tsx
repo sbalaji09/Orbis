@@ -115,11 +115,12 @@ export default function VersionsList({
         </div>
 
         <div className="divide-y divide-black/5">
-          {versions
-            .sort((a, b) => b.version_number - a.version_number)
-            .map((version) => {
-              const semanticVersion =
-                version.semantic_version || version.version_number.toString();
+          {[...versions]
+            .sort((a, b) =>
+              b.semantic_version.localeCompare(a.semantic_version, undefined, { numeric: true })
+            )
+            .map((version, versionIndex, sortedVersions) => {
+              const semanticVersion = version.semantic_version;
               const versionAnalytics = analytics.get(semanticVersion);
               const isBest =
                 bestVersion &&
@@ -132,17 +133,14 @@ export default function VersionsList({
                 currentPromptVersion === semanticVersion;
 
               // Get previous version for change indicator
-              const versionIndex = versions.findIndex(
-                (v) => v.semantic_version === semanticVersion
-              );
               const previousVersion =
-                versionIndex < versions.length - 1
-                  ? versions[versionIndex + 1]
+                versionIndex < sortedVersions.length - 1
+                  ? sortedVersions[versionIndex + 1]
                   : null;
 
               return (
                 <div
-                  key={semanticVersion}
+                  key={`${version.prompt_id}-${semanticVersion}`}
                   className={`p-4 transition-colors ${
                     isSelected ? "bg-babyblue/10" : "hover:bg-black/2"
                   } ${isBest ? "ring-2 ring-inset ring-success/30" : ""}`}

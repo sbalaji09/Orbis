@@ -41,8 +41,11 @@ class S3Uploader:
     def upload_prompt(self, user_id: str, trace_id: str, span_id: str, content: str, content_type: str = 'input') -> str:
         try:
             if len(content) < MIN_SIZE_FOR_S3_UPLOAD:
-                encoded = base64.b64encode(content.encode('utf-8')).decode('utf-8')
-                return f"inline://{encoded}"
+                # Store small blobs in Redis and return a short reference.
+                # This avoids embedding base64 directly into the URL (which can exceed DB VARCHAR limits).
+                hash_value = hashlib.sha256(content.encode()).hexdigest()
+                redis_client.set(f"inline_blob:{hash_value}", content)
+                return f"inline://sha256:{hash_value}"
             
             hash_value = hashlib.sha256(content.encode()).hexdigest()
             cache_key = f"s3:hash:{hash_value}"
@@ -135,12 +138,20 @@ def upload_output(user_id: str, trace_id: str, span_id: str, content: str) -> st
 def decode_blob_url(blob_url: str) -> str:
     """
     Decode a blob URL to get the content.
-    - For inline:// URLs, decode the base64 content directly
+    - For inline://sha256:<hash> URLs, fetch content from Redis
+    - For inline:// URLs, decode the base64 content directly (legacy)
     - For s3:// URLs, return as-is (caller should fetch from S3)
     - For other URLs, return as-is
 
     Returns the decoded content for inline URLs, or the original URL for others.
     """
+    if blob_url and blob_url.startswith('inline://sha256:'):
+        hash_value = blob_url[len('inline://sha256:'):]
+        if hash_value:
+            cached_content = redis_client.get(f"inline_blob:{hash_value}")
+            if cached_content is not None:
+                return cached_content
+        return ""
     if blob_url and blob_url.startswith('inline://'):
         encoded_content = blob_url[9:]  # Remove 'inline://' prefix
         return base64.b64decode(encoded_content).decode('utf-8')
@@ -177,6 +188,5 @@ if __name__ == "__main__":
         print("3. Proper IAM permissions")
     
     print("\n=== Test Complete ===\n")
-
 
 

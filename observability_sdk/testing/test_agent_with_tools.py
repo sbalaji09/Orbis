@@ -22,8 +22,8 @@ except ImportError as e:
 
 # Configure Orbis
 configure(
-    api_key="VGVzdCBBZ2VudCAz7SAX20F5LNf7Ap07jyd8HQ==",
-    project_id="7f3ceca9-366a-46ef-a2f4-097829b1a7a4",
+    api_key="VGVzdCBUcmFjZSAMlhbKlbc_MKUVQ-Kb1c95",
+    project_id="aca167c7-6c08-4fe2-a7af-21ec298e1d68",
     user_id="fbd31533-fe77-427f-9d2d-a1c4c69e9a6d",
     api_url="http://localhost:8080"
 )
@@ -38,7 +38,7 @@ client = openai.OpenAI(
     base_url="https://api.groq.com/openai/v1"
 )
 
-# ===================================================``=========================
+# ============================================================================
 # API TOOLS
 # ============================================================================
 
