@@ -8,7 +8,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
  * These are used in Server Components
  */
 
-interface TraceSearchFilters {
+export interface TraceSearchFilters {
   traceId?: string;
   status?: string;
   agentId?: string;
@@ -396,26 +396,53 @@ export async function explainTrace(traceId: string): Promise<{ explanation: stri
   }
 }
 
-export async function searchTraces(filter: TraceSearchFilters) {
+export async function searchTraces(filters: TraceSearchFilters): Promise<{
+  matches: number;
+  filters: Record<string, unknown>;
+  traces: Trace[];
+  limit: number;
+  offset: number;
+} | null> {
   try {
     const authHeaders = await getAuthHeaders();
 
-    const url = new URL(`${API_BASE_URL}/cost/trends`);
-    url.searchParams.set("filter", String(filter));
-    
+    if (!authHeaders.Authorization) {
+      console.warn("[api-server] No authentication token available for searchTraces");
+      return null;
+    }
+
+    const url = new URL(`${API_BASE_URL}/search/traces`);
+
+    // Add all filter parameters to the URL
+    if (filters.traceId) url.searchParams.set("trace_id", filters.traceId);
+    if (filters.agentId) url.searchParams.set("agent_id", filters.agentId);
+    if (filters.status) url.searchParams.set("status", filters.status);
+    if (filters.model) url.searchParams.set("model", filters.model);
+    if (filters.spanType) url.searchParams.set("span_type", filters.spanType);
+    if (filters.minCost !== undefined) url.searchParams.set("min_cost", String(filters.minCost));
+    if (filters.maxCost !== undefined) url.searchParams.set("max_cost", String(filters.maxCost));
+    if (filters.minDuration !== undefined) url.searchParams.set("min_duration", String(filters.minDuration));
+    if (filters.maxDuration !== undefined) url.searchParams.set("max_duration", String(filters.maxDuration));
+    if (filters.startDate) url.searchParams.set("start_date", filters.startDate);
+    if (filters.endDate) url.searchParams.set("end_date", filters.endDate);
+    if (filters.limit !== undefined) url.searchParams.set("limit", String(filters.limit));
+    if (filters.offset !== undefined) url.searchParams.set("offset", String(filters.offset));
+    if (filters.sortBy) url.searchParams.set("sort_by", filters.sortBy);
+    if (filters.sortOrder) url.searchParams.set("sort_order", filters.sortOrder);
+
     const response = await fetch(url.toString(), {
       headers: { ...authHeaders },
       cache: "no-store",
     });
 
     if (!response.ok) {
-      console.error(`Failed to explain trace: ${response.status} ${response.statusText}`);
+      console.error(`Failed to search traces: ${response.status} ${response.statusText}`);
       return null;
     }
 
     return await response.json();
   } catch (error) {
-    console.error("Error explaining trace:", error);
+    console.error("Error searching traces:", error);
     return null;
   }
 }
