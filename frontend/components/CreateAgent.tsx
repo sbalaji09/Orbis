@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
+import { Plus } from "lucide-react";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -16,6 +17,7 @@ export function CreateAgent({ onAgentCreated }: CreateAgentProps) {
   const [agentName, setAgentName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [step, setStep] = useState<"form" | "result">("form");
   const [copied, setCopied] = useState(false);
   const [result, setResult] = useState<{
     agent_id?: string;
@@ -55,8 +57,7 @@ export function CreateAgent({ onAgentCreated }: CreateAgentProps) {
         setResult({ error: data.detail || "Failed to create agent" });
       } else {
         setResult(data);
-        setAgentName(agentName);
-        setShowModal(true);
+        setStep("result");
         setCopied(false);
       }
     } catch (error) {
@@ -97,50 +98,24 @@ export function CreateAgent({ onAgentCreated }: CreateAgentProps) {
     setShowModal(false);
     setAgentName("");
     setResult(null);
+    setStep("form");
     // Refresh the page to show the new agent in the list
     router.refresh();
   };
 
   return (
     <>
-      <div className="border-2 border-black overflow-hidden shadow-[4px_4px_0_rgba(0,0,0,0.15)] bg-background">
-        <div className="px-5 py-4 bg-babyblue/10 border-b-2 border-black">
-          <h2 className="text-base font-semibold tracking-tight">
-            Create New Agent
-          </h2>
-          <p className="text-xs text-black/60 mt-1">
-            {`// Generate an API key for a new agent`}
-          </p>
-        </div>
-
-        <div className="px-5 py-4">
-          <form onSubmit={handleSubmit} className="flex gap-3">
-            <input
-              type="text"
-              value={agentName}
-              onChange={(e) => setAgentName(e.target.value)}
-              placeholder="Agent name"
-              className="flex-1 px-3 py-2 border-2 border-black text-sm focus:outline-none focus:ring-2 focus:ring-babyblue/50"
-            />
-            <button
-              type="submit"
-              disabled={isLoading || !agentName.trim()}
-              className="px-4 py-2 bg-black text-mustard border-2 border-black text-sm font-medium hover:bg-black/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {isLoading ? "Creating..." : "Create Agent"}
-            </button>
-          </form>
-
-          {result?.error && (
-            <div className="mt-4 p-3 bg-error/10 border-2 border-error text-sm text-error">
-              {result.error}
-            </div>
-          )}
-        </div>
-      </div>
+      {/* Compact + Button */}
+      <button
+        onClick={() => setShowModal(true)}
+        className="flex items-center justify-center w-9 h-9 bg-black text-mustard border-2 border-black hover:bg-black/90 transition-colors shadow-[2px_2px_0_rgba(0,0,0,0.15)]"
+        title="Create new agent"
+      >
+        <Plus className="w-5 h-5" />
+      </button>
 
       {/* Modal */}
-      {showModal && result && !result.error && (
+      {showModal && (
         <div
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
           onClick={closeModal}
@@ -149,83 +124,141 @@ export function CreateAgent({ onAgentCreated }: CreateAgentProps) {
             className="bg-background border-2 border-black shadow-[8px_8px_0_rgba(0,0,0,0.3)] max-w-md w-full mx-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-5 py-4 bg-mustard/10 border-b-2 border-black">
-              <h3 className="text-base font-semibold tracking-tight">
-                Agent Created Successfully
-              </h3>
-              <p className="text-xs text-black/60 mt-1">
-                {`// Save this API key - it cannot be retrieved again`}
-              </p>
-            </div>
+            {/* Step 1: Form */}
+            {step === "form" && (
+              <>
+                <div className="px-5 py-4 bg-babyblue/10 border-b-2 border-black">
+                  <h3 className="text-base font-semibold tracking-tight">
+                    Create New Agent
+                  </h3>
+                  <p className="text-xs text-black/60 mt-1">
+                    {`// Generate an API key for a new agent`}
+                  </p>
+                </div>
 
-            <div className="px-5 py-4 space-y-4">
-              <div>
-                <span className="text-xs text-black/60">Agent Name:</span>
-                <div className="font-mono text-sm mt-1">{agentName}</div>
-              </div>
+                <div className="px-5 py-4">
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                      <label className="text-xs text-black/60">Agent Name</label>
+                      <input
+                        type="text"
+                        value={agentName}
+                        onChange={(e) => setAgentName(e.target.value)}
+                        placeholder="Enter agent name"
+                        className="w-full mt-1 px-3 py-2 border-2 border-black text-sm focus:outline-none focus:ring-2 focus:ring-babyblue/50"
+                        autoFocus
+                      />
+                    </div>
 
-              <div>
-                <span className="text-xs text-black/60">Agent ID (project_id):</span>
-                <div className="mt-1 flex items-center gap-2">
-                  <code className="flex-1 p-2 bg-white border-2 border-black text-xs font-mono break-all">
-                    {result.agent_id}
-                  </code>
+                    {result?.error && (
+                      <div className="p-3 bg-error/10 border-2 border-error text-sm text-error">
+                        {result.error}
+                      </div>
+                    )}
+
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        onClick={closeModal}
+                        className="flex-1 px-4 py-2 bg-white text-black border-2 border-black text-sm font-medium hover:bg-gray-50 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isLoading || !agentName.trim()}
+                        className="flex-1 px-4 py-2 bg-black text-mustard border-2 border-black text-sm font-medium hover:bg-black/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        {isLoading ? "Creating..." : "Create Agent"}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </>
+            )}
+
+            {/* Step 2: Result */}
+            {step === "result" && result && (
+              <>
+                <div className="px-5 py-4 bg-mustard/10 border-b-2 border-black">
+                  <h3 className="text-base font-semibold tracking-tight">
+                    Agent Created Successfully
+                  </h3>
+                  <p className="text-xs text-black/60 mt-1">
+                    {`// Save this API key - it cannot be retrieved again`}
+                  </p>
+                </div>
+
+                <div className="px-5 py-4 space-y-4">
+                  <div>
+                    <span className="text-xs text-black/60">Agent Name:</span>
+                    <div className="font-mono text-sm mt-1">{agentName}</div>
+                  </div>
+
+                  <div>
+                    <span className="text-xs text-black/60">Agent ID (project_id):</span>
+                    <div className="mt-1 flex items-center gap-2">
+                      <code className="flex-1 p-2 bg-white border-2 border-black text-xs font-mono break-all">
+                        {result.agent_id}
+                      </code>
+                      <button
+                        onClick={() => handleCopy(result.agent_id || "")}
+                        className="px-3 py-2 bg-black text-mustard border-2 border-black text-xs font-medium hover:bg-black/90 transition-colors whitespace-nowrap"
+                      >
+                        {copied ? "✓" : "Copy"}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="text-xs text-black/60">API Key:</span>
+                    <div className="mt-1 flex items-center gap-2">
+                      <code className="flex-1 p-2 bg-white border-2 border-black text-xs font-mono break-all">
+                        {result.api_key}
+                      </code>
+                      <button
+                        onClick={() => handleCopy(result.api_key || "")}
+                        className="px-3 py-2 bg-black text-mustard border-2 border-black text-xs font-medium hover:bg-black/90 transition-colors whitespace-nowrap"
+                      >
+                        {copied ? "✓" : "Copy"}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="text-xs text-black/60">User ID:</span>
+                    <div className="mt-1 flex items-center gap-2">
+                      <code className="flex-1 p-2 bg-white border-2 border-black text-xs font-mono break-all">
+                        {session?.user?.id}
+                      </code>
+                      <button
+                        onClick={() => handleCopy(session?.user?.id || "")}
+                        className="px-3 py-2 bg-black text-mustard border-2 border-black text-xs font-medium hover:bg-black/90 transition-colors whitespace-nowrap"
+                      >
+                        {copied ? "✓" : "Copy"}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="border-t-2 border-black pt-4">
+                    <span className="text-xs text-black/60">SDK Configuration:</span>
+                    <button
+                      onClick={handleCopyConfig}
+                      className="w-full mt-2 px-4 py-2 bg-mustard text-black border-2 border-black text-sm font-medium hover:bg-mustard/90 transition-colors"
+                    >
+                      {copied ? "Copied Configuration!" : "Copy Full Configuration"}
+                    </button>
+                  </div>
+
                   <button
-                    onClick={() => handleCopy(result.agent_id || "")}
-                    className="px-3 py-2 bg-black text-mustard border-2 border-black text-xs font-medium hover:bg-black/90 transition-colors whitespace-nowrap"
+                    onClick={closeModal}
+                    className="w-full px-4 py-2 bg-babyblue text-white border-2 border-black text-sm font-medium hover:bg-babyblue/90 transition-colors"
                   >
-                    {copied ? "✓" : "Copy"}
+                    Close
                   </button>
                 </div>
-              </div>
-
-              <div>
-                <span className="text-xs text-black/60">API Key:</span>
-                <div className="mt-1 flex items-center gap-2">
-                  <code className="flex-1 p-2 bg-white border-2 border-black text-xs font-mono break-all">
-                    {result.api_key}
-                  </code>
-                  <button
-                    onClick={() => handleCopy(result.api_key || "")}
-                    className="px-3 py-2 bg-black text-mustard border-2 border-black text-xs font-medium hover:bg-black/90 transition-colors whitespace-nowrap"
-                  >
-                    {copied ? "✓" : "Copy"}
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <span className="text-xs text-black/60">User ID:</span>
-                <div className="mt-1 flex items-center gap-2">
-                  <code className="flex-1 p-2 bg-white border-2 border-black text-xs font-mono break-all">
-                    {session?.user?.id}
-                  </code>
-                  <button
-                    onClick={() => handleCopy(session?.user?.id || "")}
-                    className="px-3 py-2 bg-black text-mustard border-2 border-black text-xs font-medium hover:bg-black/90 transition-colors whitespace-nowrap"
-                  >
-                    {copied ? "✓" : "Copy"}
-                  </button>
-                </div>
-              </div>
-
-              <div className="border-t-2 border-black pt-4">
-                <span className="text-xs text-black/60">SDK Configuration:</span>
-                <button
-                  onClick={handleCopyConfig}
-                  className="w-full mt-2 px-4 py-2 bg-mustard text-black border-2 border-black text-sm font-medium hover:bg-mustard/90 transition-colors"
-                >
-                  {copied ? "Copied Configuration!" : "Copy Full Configuration"}
-                </button>
-              </div>
-
-              <button
-                onClick={closeModal}
-                className="w-full px-4 py-2 bg-babyblue text-white border-2 border-black text-sm font-medium hover:bg-babyblue/90 transition-colors"
-              >
-                Close
-              </button>
-            </div>
+              </>
+            )}
           </div>
         </div>
       )}

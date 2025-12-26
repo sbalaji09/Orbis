@@ -230,17 +230,15 @@ export default function DashboardClient({ initialAgents, initialTraces }: Dashbo
             </span>
           </div>
 
-          <h1 className="text-2xl font-semibold tracking-tight mb-1 mt-2">
-            <span className="text-black/40">{`> `}</span>Agent Traces
-          </h1>
+          <div className="flex items-center justify-between mt-2 mb-1">
+            <h1 className="text-2xl font-semibold tracking-tight">
+              <span className="text-black/40">{`> `}</span>Agent Traces
+            </h1>
+            <CreateAgent onAgentCreated={handleAgentCreated} />
+          </div>
           <p className="text-sm text-black/60">
             {`// View and analyze traces grouped by agent`}
           </p>
-        </div>
-
-        {/* Create Agent */}
-        <div className="mb-6">
-          <CreateAgent onAgentCreated={handleAgentCreated} />
         </div>
 
         {/* Search and Filter */}
