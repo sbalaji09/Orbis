@@ -8,6 +8,24 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
  * These are used in Server Components
  */
 
+interface TraceSearchFilters {
+  traceId?: string;
+  status?: string;
+  agentId?: string;
+  model?: string;
+  minCost?: number;
+  maxCost?: number;
+  minDuration?: number;
+  maxDuration?: number;
+  startDate?: string;
+  endDate?: string;
+  spanType?: string;
+  limit?: number;
+  offset?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}
+
 export async function getAgents(): Promise<Agent[]> {
   try {
     const authHeaders = await getAuthHeaders();
