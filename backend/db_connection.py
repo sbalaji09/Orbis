@@ -528,34 +528,76 @@ class SupabaseDB:
         finally:
             self.return_connection(conn)
 
-    def search_traces(self, user_id: str, filters: Dict) -> List[Dict]:
-        """Search traces with filters"""
+    def search_traces(
+        self,
+        user_id: str,
+        filters: Dict,
+        limit: int = 50,
+        offset: int = 0,
+        sort_by: str = "start_time",
+        sort_order: str = "desc"
+    ) -> List[Dict]:
+        """Search traces with filters, pagination, and sorting"""
         conn = self.get_connection()
         try:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 # Build WHERE clauses dynamically based on filters
-                where_clauses = ["user_id = %s"]
+                where_clauses = ["t.user_id = %s"]
                 params = [user_id]
 
+                # Partial trace_id match with ILIKE
+                if filters.get('trace_id'):
+                    where_clauses.append("t.trace_id ILIKE %s")
+                    params.append(f"%{filters['trace_id']}%")
+
+                # Filter by agent_id
+                if filters.get('agent_id'):
+                    where_clauses.append("t.agent_id = %s")
+                    params.append(filters['agent_id'])
+
                 if filters.get('status'):
-                    where_clauses.append("status = %s")
+                    where_clauses.append("t.status = %s")
                     params.append(filters['status'])
 
                 if filters.get('min_cost') is not None:
-                    where_clauses.append("total_cost >= %s")
+                    where_clauses.append("t.total_cost >= %s")
                     params.append(filters['min_cost'])
 
                 if filters.get('max_cost') is not None:
-                    where_clauses.append("total_cost <= %s")
+                    where_clauses.append("t.total_cost <= %s")
                     params.append(filters['max_cost'])
 
+                # Duration range filters
+                if filters.get('min_duration') is not None:
+                    where_clauses.append("t.duration >= %s")
+                    params.append(filters['min_duration'])
+
+                if filters.get('max_duration') is not None:
+                    where_clauses.append("t.duration <= %s")
+                    params.append(filters['max_duration'])
+
                 if filters.get('start_date'):
-                    where_clauses.append("start_time >= %s")
+                    where_clauses.append("t.start_time >= %s")
                     params.append(filters['start_date'])
 
                 if filters.get('end_date'):
-                    where_clauses.append("start_time <= %s")
+                    where_clauses.append("t.start_time <= %s")
                     params.append(filters['end_date'])
+
+                # Span type filtering - filter traces that have spans of the specified type
+                if filters.get('span_type'):
+                    where_clauses.append("""
+                        t.trace_id IN (
+                            SELECT DISTINCT trace_id FROM spans WHERE span_type = %s
+                        )
+                    """)
+                    params.append(filters['span_type'])
+
+                # Validate and set sort parameters
+                allowed_sort_fields = {'start_time', 'duration', 'total_cost'}
+                if sort_by not in allowed_sort_fields:
+                    sort_by = 'start_time'
+                sort_direction = 'DESC' if sort_order.lower() == 'desc' else 'ASC'
 
                 # Join with spans if filtering by model
                 if filters.get('model'):
@@ -564,16 +606,19 @@ class SupabaseDB:
                         JOIN spans s ON t.trace_id = s.trace_id
                         WHERE {' AND '.join(where_clauses)}
                         AND s.llm_model = %s
-                        ORDER BY t.start_time DESC
+                        ORDER BY t.{sort_by} {sort_direction}
+                        LIMIT %s OFFSET %s
                     """
                     params.append(filters['model'])
                 else:
                     sql = f"""
-                        SELECT * FROM traces
+                        SELECT t.* FROM traces t
                         WHERE {' AND '.join(where_clauses)}
-                        ORDER BY start_time DESC
+                        ORDER BY t.{sort_by} {sort_direction}
+                        LIMIT %s OFFSET %s
                     """
 
+                params.extend([limit, offset])
                 cur.execute(sql, params)
                 results = cur.fetchall()
                 return [dict(row) for row in results]

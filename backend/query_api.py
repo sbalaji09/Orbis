@@ -371,32 +371,38 @@ async def get_user_metrics(
         raise HTTPException(status_code=500, detail=str(e))
 
 # search and filter traces
-
-
 @app.get("/search/traces")
 async def search_traces(
-    trace_id: Optional[str],
-    agent_id: Optional[str],
-    min_duration: Optional[float],
-    max_duration: Optional[float],
-    span_type: Optional[str],
-    sort_by: Optional[str],
-    sort_order: Optional[str],
-    limit: int = 50,
-    offset: int = 0,
     user_id: str = Depends(get_user_id_from_token),
+    trace_id: Optional[str] = Query(None, description="Partial trace ID match"),
+    agent_id: Optional[str] = Query(None, description="Filter by agent ID"),
+    min_duration: Optional[float] = Query(None, description="Minimum duration in seconds"),
+    max_duration: Optional[float] = Query(None, description="Maximum duration in seconds"),
+    span_type: Optional[str] = Query(None, description="Filter by span type (llm, tool, agent, etc.)"),
+    sort_by: Optional[str] = Query("start_time", description="Sort field (start_time, duration, total_cost)"),
+    sort_order: Optional[str] = Query("desc", description="Sort order (asc, desc)"),
+    limit: int = Query(50, ge=1, le=100, description="Max traces to return"),
+    offset: int = Query(0, ge=0, description="Number to skip for pagination"),
     status: Optional[str] = Query(None, description="Filter by status"),
     model: Optional[str] = Query(None, description="Filter by LLM model"),
     min_cost: Optional[float] = Query(None, description="Minimum cost"),
     max_cost: Optional[float] = Query(None, description="Maximum cost"),
-    start_date: Optional[str] = Query(
-        None, description="Created after (ISO format)"),
-    end_date: Optional[str] = Query(
-        None, description="Created before (ISO format)"),
+    start_date: Optional[str] = Query(None, description="Created after (ISO format)"),
+    end_date: Optional[str] = Query(None, description="Created before (ISO format)"),
 ):
     try:
         # build the filters dictionary
         filters = {}
+        if trace_id:
+            filters['trace_id'] = trace_id
+        if agent_id:
+            filters['agent_id'] = agent_id
+        if min_duration is not None:
+            filters['min_duration'] = min_duration
+        if max_duration is not None:
+            filters['max_duration'] = max_duration
+        if span_type:
+            filters['span_type'] = span_type
         if status:
             filters['status'] = status
         if model:
@@ -410,13 +416,35 @@ async def search_traces(
         if end_date:
             filters['end_date'] = end_date
 
+        # Validate sort parameters
+        allowed_sort_fields = {'start_time', 'duration', 'total_cost'}
+        if sort_by and sort_by not in allowed_sort_fields:
+            sort_by = 'start_time'
+        if sort_order and sort_order.lower() not in {'asc', 'desc'}:
+            sort_order = 'desc'
+
         # search through the traces
-        traces = db.search_traces(user_id, filters)
+        traces = db.search_traces(
+            user_id,
+            filters,
+            limit=limit,
+            offset=offset,
+            sort_by=sort_by,
+            sort_order=sort_order
+        )
+
+        # Convert datetime objects to ISO strings
+        for trace in traces:
+            for key, value in list(trace.items()):
+                if isinstance(value, datetime):
+                    trace[key] = value.isoformat()
 
         return {
             "matches": len(traces),
             "filters": filters,
-            "traces": traces
+            "traces": traces,
+            "limit": limit,
+            "offset": offset
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
