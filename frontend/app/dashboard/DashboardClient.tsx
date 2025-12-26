@@ -1,19 +1,22 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useWebSocket } from "@/lib/useWebSocket";
 import type { WebSocketMessage } from "@/lib/websocket";
-import {useAuth} from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/useAuth";
 
 import { AgentGroup } from "@/components/AgentGroup";
 import { CreateAgent } from "@/components/CreateAgent";
+import { TraceSearchFilters as TraceSearchFiltersComponent } from "@/components/TraceSearchFilters";
+import { searchTraces, TraceSearchFilters } from "@/lib/api-server";
+import { Agent, Trace } from "@/lib/types";
 
 interface DashboardClientProps {
-  initialAgents: any[];
-  initialTraces: any[];
+  initialAgents: Agent[];
+  initialTraces: Trace[];
 }
 
-export default function DashboardClient({initialAgents, initialTraces}: DashboardClientProps) {
+export default function DashboardClient({ initialAgents, initialTraces }: DashboardClientProps) {
   const { session } = useAuth();
   const apiKey = session?.access_token ?? "";
 
@@ -23,20 +26,91 @@ export default function DashboardClient({initialAgents, initialTraces}: Dashboar
     disabled: !apiKey
   });
 
-  const [traces, setTraces] = useState(initialTraces);
-  const [agents, setAgents] = useState(initialAgents);
+  const [traces, setTraces] = useState<Trace[]>(initialTraces);
+  const [agents, setAgents] = useState<Agent[]>(initialAgents);
   const [hasNewTraces, setHasNewTraces] = useState(false);
+
+  // Filter state
+  const [filters, setFilters] = useState<TraceSearchFilters>({});
+  const [filteredTraces, setFilteredTraces] = useState<Trace[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+
+  // Check if any filters are active
+  const hasActiveFilters = Boolean(
+    filters.traceId ||
+    filters.status ||
+    filters.agentId ||
+    filters.spanType ||
+    filters.model ||
+    filters.minCost !== undefined ||
+    filters.maxCost !== undefined ||
+    filters.minDuration !== undefined ||
+    filters.maxDuration !== undefined ||
+    filters.startDate ||
+    filters.endDate
+  );
 
   // Callback when a new agent is created
   const handleAgentCreated = (newAgent: { agent_id: string; agent_name: string }) => {
     setAgents(prev => [
       {
         ...newAgent,
+        user_id: session?.user?.id ?? "",
         created_at: new Date().toISOString(),
-      },
+      } as Agent,
       ...prev,
     ]);
   };
+
+  // Handle filter changes (called on debounced input changes)
+  const handleFiltersChange = useCallback((newFilters: TraceSearchFilters) => {
+    setFilters(newFilters);
+  }, []);
+
+  // Handle search (called when user clicks search button)
+  const handleSearch = useCallback(async (searchFilters: TraceSearchFilters) => {
+    // If no active filters, clear filtered results
+    const isActive = Boolean(
+      searchFilters.traceId ||
+      searchFilters.status ||
+      searchFilters.agentId ||
+      searchFilters.spanType ||
+      searchFilters.model ||
+      searchFilters.minCost !== undefined ||
+      searchFilters.maxCost !== undefined ||
+      searchFilters.minDuration !== undefined ||
+      searchFilters.maxDuration !== undefined ||
+      searchFilters.startDate ||
+      searchFilters.endDate
+    );
+
+    if (!isActive) {
+      setFilteredTraces([]);
+      setSearchError(null);
+      return;
+    }
+
+    setIsSearching(true);
+    setSearchError(null);
+
+    try {
+      const result = await searchTraces(searchFilters);
+
+      if (result) {
+        setFilteredTraces(result.traces);
+      } else {
+        setSearchError("Failed to search traces. Please try again.");
+        setFilteredTraces([]);
+      }
+    } catch (error) {
+      console.error("Search error:", error);
+      setSearchError("An error occurred while searching. Please try again.");
+      setFilteredTraces([]);
+    } finally {
+      setIsSearching(false);
+    }
+  }, []);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const autoScroll = useRef(true);
@@ -147,8 +221,38 @@ export default function DashboardClient({initialAgents, initialTraces}: Dashboar
           <CreateAgent onAgentCreated={handleAgentCreated} />
         </div>
 
+        {/* Search and Filter */}
+        <div className="mb-6">
+          <TraceSearchFiltersComponent
+            agents={agents}
+            onFiltersChange={handleFiltersChange}
+            onSearch={handleSearch}
+            isLoading={isSearching}
+          />
+        </div>
+
+        {/* Search Error */}
+        {searchError && (
+          <div className="mb-4 p-3 bg-red-50 border-2 border-red-500 text-red-700 text-sm font-mono">
+            {searchError}
+          </div>
+        )}
+
+        {/* Search Results Info */}
+        {hasActiveFilters && filteredTraces.length > 0 && (
+          <div className="mb-4 p-3 bg-[#5B5FFF]/10 border-2 border-[#5B5FFF] text-sm font-mono">
+            <span className="text-[#5B5FFF] font-bold">{filteredTraces.length}</span> traces match your filters
+          </div>
+        )}
+
+        {hasActiveFilters && filteredTraces.length === 0 && !isSearching && (
+          <div className="mb-4 p-3 bg-yellow-50 border-2 border-yellow-500 text-yellow-700 text-sm font-mono">
+            No traces match your filters. Try adjusting your search criteria.
+          </div>
+        )}
+
         {/* NEW TRACES BANNER */}
-        {hasNewTraces && (
+        {hasNewTraces && !hasActiveFilters && (
           <div className="mb-3 p-2 bg-blue-100 text-blue-700 text-sm rounded cursor-pointer"
                onClick={() => {
                  scrollToBottom();
@@ -160,11 +264,14 @@ export default function DashboardClient({initialAgents, initialTraces}: Dashboar
 
         {/* Agent Groups */}
         <div className="space-y-5">
-          {tracesByAgent.map(({ agent, traces }) => (
+          {tracesByAgent.map(({ agent, traces: agentTraces }) => (
             <AgentGroup
               key={agent.agent_id}
               agent={agent}
-              traces={traces}
+              traces={hasActiveFilters
+                ? filteredTraces.filter(t => t.agent_id === agent.agent_id)
+                : agentTraces
+              }
               defaultOpen={false}
             />
           ))}
