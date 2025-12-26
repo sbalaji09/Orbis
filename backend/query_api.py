@@ -375,6 +375,15 @@ async def get_user_metrics(
 
 @app.get("/search/traces")
 async def search_traces(
+    trace_id: Optional[str],
+    agent_id: Optional[str],
+    min_duration: Optional[float],
+    max_duration: Optional[float],
+    span_type: Optional[str],
+    sort_by: Optional[str],
+    sort_order: Optional[str],
+    limit: int = 50,
+    offset: int = 0,
     user_id: str = Depends(get_user_id_from_token),
     status: Optional[str] = Query(None, description="Filter by status"),
     model: Optional[str] = Query(None, description="Filter by LLM model"),
@@ -383,7 +392,7 @@ async def search_traces(
     start_date: Optional[str] = Query(
         None, description="Created after (ISO format)"),
     end_date: Optional[str] = Query(
-        None, description="Created before (ISO format)")
+        None, description="Created before (ISO format)"),
 ):
     try:
         # build the filters dictionary
@@ -870,6 +879,7 @@ async def explain_trace(trace_id: str, user_id: str = Depends(get_user_id_from_t
         raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
 @app.exception_handler(ValidationError)
 async def validation_error_handler(request, exc: ValidationError):
     return JSONResponse(
