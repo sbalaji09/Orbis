@@ -395,3 +395,27 @@ export async function explainTrace(traceId: string): Promise<{ explanation: stri
     return null;
   }
 }
+
+export async function searchTraces(filter: TraceSearchFilters) {
+  try {
+    const authHeaders = await getAuthHeaders();
+
+    const url = new URL(`${API_BASE_URL}/cost/trends`);
+    url.searchParams.set("filter", String(filter));
+    
+    const response = await fetch(url.toString(), {
+      headers: { ...authHeaders },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      console.error(`Failed to explain trace: ${response.status} ${response.statusText}`);
+      return null;
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error explaining trace:", error);
+    return null;
+  }
+}
