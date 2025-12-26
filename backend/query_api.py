@@ -424,7 +424,7 @@ async def search_traces(
             sort_order = 'desc'
 
         # search through the traces
-        traces = db.search_traces(
+        result = db.search_traces(
             user_id,
             filters,
             limit=limit,
@@ -433,6 +433,9 @@ async def search_traces(
             sort_order=sort_order
         )
 
+        traces = result["traces"]
+        total = result["total"]
+
         # Convert datetime objects to ISO strings
         for trace in traces:
             for key, value in list(trace.items()):
@@ -440,11 +443,11 @@ async def search_traces(
                     trace[key] = value.isoformat()
 
         return {
-            "matches": len(traces),
-            "filters": filters,
             "traces": traces,
+            "total": total,
             "limit": limit,
-            "offset": offset
+            "offset": offset,
+            "filters": filters
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

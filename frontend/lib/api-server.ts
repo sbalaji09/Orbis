@@ -397,11 +397,11 @@ export async function explainTrace(traceId: string): Promise<{ explanation: stri
 }
 
 export async function searchTraces(filters: TraceSearchFilters): Promise<{
-  matches: number;
-  filters: Record<string, unknown>;
   traces: Trace[];
+  total: number;
   limit: number;
   offset: number;
+  filters: Record<string, unknown>;
 } | null> {
   try {
     const authHeaders = await getAuthHeaders();

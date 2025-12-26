@@ -536,8 +536,8 @@ class SupabaseDB:
         offset: int = 0,
         sort_by: str = "start_time",
         sort_order: str = "desc"
-    ) -> List[Dict]:
-        """Search traces with filters, pagination, and sorting"""
+    ) -> Dict:
+        """Search traces with filters, pagination, and sorting. Returns traces and total count."""
         conn = self.get_connection()
         try:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -599,12 +599,33 @@ class SupabaseDB:
                     sort_by = 'start_time'
                 sort_direction = 'DESC' if sort_order.lower() == 'desc' else 'ASC'
 
-                # Join with spans if filtering by model
+                where_clause_str = ' AND '.join(where_clauses)
+
+                # First, get the total count (without LIMIT/OFFSET)
+                if filters.get('model'):
+                    count_sql = f"""
+                        SELECT COUNT(DISTINCT t.trace_id) FROM traces t
+                        JOIN spans s ON t.trace_id = s.trace_id
+                        WHERE {where_clause_str}
+                        AND s.llm_model = %s
+                    """
+                    count_params = params + [filters['model']]
+                else:
+                    count_sql = f"""
+                        SELECT COUNT(*) FROM traces t
+                        WHERE {where_clause_str}
+                    """
+                    count_params = params.copy()
+
+                cur.execute(count_sql, count_params)
+                total = cur.fetchone()['count']
+
+                # Now get the paginated results
                 if filters.get('model'):
                     sql = f"""
                         SELECT DISTINCT t.* FROM traces t
                         JOIN spans s ON t.trace_id = s.trace_id
-                        WHERE {' AND '.join(where_clauses)}
+                        WHERE {where_clause_str}
                         AND s.llm_model = %s
                         ORDER BY t.{sort_by} {sort_direction}
                         LIMIT %s OFFSET %s
@@ -613,7 +634,7 @@ class SupabaseDB:
                 else:
                     sql = f"""
                         SELECT t.* FROM traces t
-                        WHERE {' AND '.join(where_clauses)}
+                        WHERE {where_clause_str}
                         ORDER BY t.{sort_by} {sort_direction}
                         LIMIT %s OFFSET %s
                     """
@@ -621,7 +642,11 @@ class SupabaseDB:
                 params.extend([limit, offset])
                 cur.execute(sql, params)
                 results = cur.fetchall()
-                return [dict(row) for row in results]
+
+                return {
+                    "traces": [dict(row) for row in results],
+                    "total": total
+                }
         finally:
             self.return_connection(conn)
 

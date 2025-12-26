@@ -36,6 +36,11 @@ export default function DashboardClient({ initialAgents, initialTraces }: Dashbo
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
 
+  // Pagination state
+  const [totalResults, setTotalResults] = useState<number>(0);
+  const [currentOffset, setCurrentOffset] = useState<number>(0);
+  const [currentLimit] = useState<number>(50);
+
   // Check if any filters are active
   const hasActiveFilters = Boolean(
     filters.traceId ||
@@ -69,7 +74,7 @@ export default function DashboardClient({ initialAgents, initialTraces }: Dashbo
   }, []);
 
   // Handle search (called when user clicks search button)
-  const handleSearch = useCallback(async (searchFilters: TraceSearchFilters) => {
+  const handleSearch = useCallback(async (searchFilters: TraceSearchFilters, offset: number = 0) => {
     // If no active filters, clear filtered results
     const isActive = Boolean(
       searchFilters.traceId ||
@@ -88,6 +93,8 @@ export default function DashboardClient({ initialAgents, initialTraces }: Dashbo
     if (!isActive) {
       setFilteredTraces([]);
       setSearchError(null);
+      setTotalResults(0);
+      setCurrentOffset(0);
       return;
     }
 
@@ -95,22 +102,35 @@ export default function DashboardClient({ initialAgents, initialTraces }: Dashbo
     setSearchError(null);
 
     try {
-      const result = await searchTraces(searchFilters);
+      const result = await searchTraces({
+        ...searchFilters,
+        limit: currentLimit,
+        offset: offset,
+      });
 
       if (result) {
         setFilteredTraces(result.traces);
+        setTotalResults(result.total);
+        setCurrentOffset(offset);
       } else {
         setSearchError("Failed to search traces. Please try again.");
         setFilteredTraces([]);
+        setTotalResults(0);
       }
     } catch (error) {
       console.error("Search error:", error);
       setSearchError("An error occurred while searching. Please try again.");
       setFilteredTraces([]);
+      setTotalResults(0);
     } finally {
       setIsSearching(false);
     }
-  }, []);
+  }, [currentLimit]);
+
+  // Handle page change
+  const handlePageChange = useCallback((newOffset: number) => {
+    handleSearch(filters, newOffset);
+  }, [filters, handleSearch]);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const autoScroll = useRef(true);
@@ -228,6 +248,10 @@ export default function DashboardClient({ initialAgents, initialTraces }: Dashbo
             onFiltersChange={handleFiltersChange}
             onSearch={handleSearch}
             isLoading={isSearching}
+            total={hasActiveFilters ? totalResults : undefined}
+            limit={currentLimit}
+            offset={currentOffset}
+            onPageChange={handlePageChange}
           />
         </div>
 
@@ -239,13 +263,16 @@ export default function DashboardClient({ initialAgents, initialTraces }: Dashbo
         )}
 
         {/* Search Results Info */}
-        {hasActiveFilters && filteredTraces.length > 0 && (
+        {hasActiveFilters && totalResults > 0 && (
           <div className="mb-4 p-3 bg-[#5B5FFF]/10 border-2 border-[#5B5FFF] text-sm font-mono">
-            <span className="text-[#5B5FFF] font-bold">{filteredTraces.length}</span> traces match your filters
+            <span className="text-[#5B5FFF] font-bold">{totalResults}</span> traces match your filters
+            {totalResults > currentLimit && (
+              <span className="text-black/60"> (showing {filteredTraces.length})</span>
+            )}
           </div>
         )}
 
-        {hasActiveFilters && filteredTraces.length === 0 && !isSearching && (
+        {hasActiveFilters && totalResults === 0 && !isSearching && (
           <div className="mb-4 p-3 bg-yellow-50 border-2 border-yellow-500 text-yellow-700 text-sm font-mono">
             No traces match your filters. Try adjusting your search criteria.
           </div>

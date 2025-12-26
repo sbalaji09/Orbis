@@ -10,8 +10,8 @@ import {
   ListboxOption,
   ListboxOptions,
 } from "@headlessui/react";
-import { Search, ChevronDown, ChevronUp, X } from "lucide-react";
-import { Agent, Trace } from "@/lib/types";
+import { Search, ChevronDown, ChevronUp, X, ChevronLeft, ChevronRight, AlertCircle, DollarSign, Calendar, Clock } from "lucide-react";
+import { Agent } from "@/lib/types";
 import { TraceSearchFilters as Filters } from "@/lib/api-server";
 
 // Debounce hook
@@ -31,11 +31,23 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue;
 }
 
+// Helper to get date strings
+function getDateString(daysAgo: number = 0): string {
+  const date = new Date();
+  date.setDate(date.getDate() - daysAgo);
+  return date.toISOString().split("T")[0];
+}
+
 interface TraceSearchFiltersProps {
   agents: Agent[];
   onFiltersChange: (filters: Filters) => void;
   onSearch: (filters: Filters) => void;
   isLoading?: boolean;
+  // Pagination props
+  total?: number;
+  limit?: number;
+  offset?: number;
+  onPageChange?: (newOffset: number) => void;
 }
 
 const STATUS_OPTIONS = [
@@ -79,6 +91,10 @@ export function TraceSearchFilters({
   onFiltersChange,
   onSearch,
   isLoading = false,
+  total,
+  limit = 50,
+  offset = 0,
+  onPageChange,
 }: TraceSearchFiltersProps) {
   // Search input state
   const [traceIdSearch, setTraceIdSearch] = useState("");
@@ -89,6 +105,9 @@ export function TraceSearchFilters({
   const [agentId, setAgentId] = useState("");
   const [spanType, setSpanType] = useState("");
   const [model, setModel] = useState("");
+
+  // Track active preset
+  const [activePreset, setActivePreset] = useState<string | null>(null);
 
   // Range filter states
   const [minCost, setMinCost] = useState("");
@@ -164,7 +183,38 @@ export function TraceSearchFilters({
     setEndDate("");
     setSortBy("start_time");
     setSortOrder("desc");
+    setActivePreset(null);
   };
+
+  // Filter presets
+  const applyPreset = (preset: string) => {
+    // Clear existing filters first
+    handleClearFilters();
+    setActivePreset(preset);
+
+    switch (preset) {
+      case "failed":
+        setStatus("failed");
+        break;
+      case "high-cost":
+        setMinCost("1.00");
+        break;
+      case "today":
+        setStartDate(getDateString(0));
+        setEndDate(getDateString(0));
+        break;
+      case "last-7-days":
+        setStartDate(getDateString(7));
+        setEndDate(getDateString(0));
+        break;
+    }
+  };
+
+  // Pagination calculations
+  const currentPage = Math.floor(offset / limit) + 1;
+  const totalPages = total ? Math.ceil(total / limit) : 0;
+  const hasPreviousPage = offset > 0;
+  const hasNextPage = total ? offset + limit < total : false;
 
   // Check if any filters are active
   const hasActiveFilters =
@@ -357,6 +407,55 @@ export function TraceSearchFilters({
             </button>
           </div>
         </div>
+
+        {/* Filter Presets */}
+        <div className="flex gap-2 mt-3 flex-wrap">
+          <span className="text-xs text-black/40 self-center mr-1">Quick:</span>
+          <button
+            onClick={() => applyPreset("failed")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 border-2 border-black text-xs font-mono transition-colors ${
+              activePreset === "failed"
+                ? "bg-red-500 text-white"
+                : "bg-white hover:bg-red-50"
+            }`}
+          >
+            <AlertCircle className="w-3 h-3" />
+            Failed Only
+          </button>
+          <button
+            onClick={() => applyPreset("high-cost")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 border-2 border-black text-xs font-mono transition-colors ${
+              activePreset === "high-cost"
+                ? "bg-amber-500 text-white"
+                : "bg-white hover:bg-amber-50"
+            }`}
+          >
+            <DollarSign className="w-3 h-3" />
+            High Cost
+          </button>
+          <button
+            onClick={() => applyPreset("today")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 border-2 border-black text-xs font-mono transition-colors ${
+              activePreset === "today"
+                ? "bg-[#5B5FFF] text-white"
+                : "bg-white hover:bg-[#5B5FFF]/10"
+            }`}
+          >
+            <Clock className="w-3 h-3" />
+            Today
+          </button>
+          <button
+            onClick={() => applyPreset("last-7-days")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 border-2 border-black text-xs font-mono transition-colors ${
+              activePreset === "last-7-days"
+                ? "bg-[#5B5FFF] text-white"
+                : "bg-white hover:bg-[#5B5FFF]/10"
+            }`}
+          >
+            <Calendar className="w-3 h-3" />
+            Last 7 Days
+          </button>
+        </div>
       </div>
 
       {/* Advanced Filters - Collapsible */}
@@ -532,6 +631,43 @@ export function TraceSearchFilters({
           </>
         )}
       </Disclosure>
+
+      {/* Pagination Controls - Only show when there are results */}
+      {total !== undefined && total > 0 && onPageChange && (
+        <div className="px-4 py-3 border-t-2 border-black flex items-center justify-between bg-white/50">
+          <div className="text-xs font-mono text-black/60">
+            Showing{" "}
+            <span className="font-bold text-black">
+              {offset + 1}-{Math.min(offset + limit, total)}
+            </span>{" "}
+            of <span className="font-bold text-black">{total}</span> traces
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => onPageChange(Math.max(0, offset - limit))}
+              disabled={!hasPreviousPage || isLoading}
+              className="flex items-center gap-1 px-3 py-1.5 bg-white border-2 border-black text-xs font-mono hover:bg-black/5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft className="w-3 h-3" />
+              Previous
+            </button>
+
+            <div className="px-3 py-1.5 bg-black text-white border-2 border-black text-xs font-mono font-bold">
+              {currentPage} / {totalPages}
+            </div>
+
+            <button
+              onClick={() => onPageChange(offset + limit)}
+              disabled={!hasNextPage || isLoading}
+              className="flex items-center gap-1 px-3 py-1.5 bg-white border-2 border-black text-xs font-mono hover:bg-black/5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Next
+              <ChevronRight className="w-3 h-3" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
