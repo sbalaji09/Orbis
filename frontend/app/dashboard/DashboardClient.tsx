@@ -8,7 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { AgentGroup } from "@/components/AgentGroup";
 import { CreateAgent } from "@/components/CreateAgent";
 import { TraceSearchFilters as TraceSearchFiltersComponent } from "@/components/TraceSearchFilters";
-import { searchTraces, TraceSearchFilters } from "@/lib/api-server";
+import { searchTraces, TraceSearchFilters } from "@/lib/api-client";
 import { Agent, Trace } from "@/lib/types";
 
 interface DashboardClientProps {
@@ -106,7 +106,9 @@ export default function DashboardClient({ initialAgents, initialTraces }: Dashbo
         ...searchFilters,
         limit: currentLimit,
         offset: offset,
-      });
+      },
+      session?.access_token
+    );
 
       if (result) {
         setFilteredTraces(result.traces);
