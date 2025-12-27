@@ -1,4 +1,4 @@
-import React, { Fragment, useState, useRef, useEffect } from "react";
+import { Fragment, useState, useRef, useEffect } from "react";
 import {
   Dialog,
   Transition,
@@ -7,7 +7,6 @@ import {
   DialogTitle,
 } from "@headlessui/react";
 import PromptBadge from "./PromptBadge";
-import VersionComparisonCard from "./VersionComparisonCard";
 import { PromptComparisonResult } from "@/lib/prompt-api-client";
 
 interface PromptComparisonViewProps {
@@ -478,10 +477,7 @@ export default function PromptComparisonView({
                         <div className="h-full overflow-auto">
                           {(() => {
                             // Handle both diff.raw and diff.diff.raw structures
-                            const diffRaw =
-                              comparisonData.diff?.raw ||
-                              (comparisonData.diff as any)?.diff?.raw ||
-                              "";
+                            const diffRaw = comparisonData.diff?.raw;
                             if (!diffRaw || diffRaw.trim() === "") {
                               return (
                                 <div className="flex items-center justify-center h-full">
@@ -515,7 +511,7 @@ export default function PromptComparisonView({
                                     ? "bg-success/10"
                                     : line.type === "removed"
                                     ? "bg-error/10"
-                                    : "hover:bg-black/[0.01]"
+                                    : "hover:bg-black/1"
                                 }`}
                               >
                                 {/* Line number */}
