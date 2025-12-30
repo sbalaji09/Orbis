@@ -14,6 +14,9 @@ export default function NotificationBell() {
     const [isLoading, setIsLoading] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
+    const unreadCount = anomalies.length;
+    const hasCritical = anomalies.some(a => a.severity === 'critical');
+
     useEffect(() => {
         if (!apiKey) {
             return;
