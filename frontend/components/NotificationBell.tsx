@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchCostAnomalies, acknowledgeAnomaly, acknowledgeAllAnomalies, CostAnomaly } from "@/lib/cost-api-client";
 import { Bell, Check, AlertTriangle, Info, X } from "lucide-react";
+import { useWebSocket } from "@/lib/useWebSocket";
 
 const ANOMALY_TYPE_LABELS: Record<string, string> = {
     daily_spike: "Daily Spike",
@@ -63,44 +64,71 @@ export default function NotificationBell() {
     const unreadCount = anomalies.length;
     const hasCritical = anomalies.some(a => a.severity === "critical");
 
-    // Load anomalies on mount and periodically
+    const { subscribe } = useWebSocket({
+        type: "dashboard",
+        apiKey: session?.access_token ?? "",
+        disabled: !session?.access_token
+    });
+
+    // ref to track if component is mounted
+    const isMountedRef = useRef(true);
+
+    // function to load anomalies
+    const loadAnomalies = async (showLoading = true) => {
+        if (!apiKey) return;
+
+        try {
+            if (showLoading) setIsLoading(true);
+            const response = await fetchCostAnomalies(24, apiKey);
+
+            if (!isMountedRef.current) return;
+
+            if (response && response.anomalies) {
+                setAnomalies(response.anomalies);
+            } else {
+                setAnomalies([]);
+            }
+        } catch (error) {
+            console.error("Failed to load anomalies:", error);
+        } finally {
+            if (isMountedRef.current) {
+                setIsLoading(false);
+            }
+        }
+    };
+
+    // load anomalies on mount and periodically
     useEffect(() => {
         if (!apiKey) {
             return;
         }
 
-        let isMounted = true;
-
-        const loadAnomalies = async () => {
-            try {
-                setIsLoading(true);
-                const response = await fetchCostAnomalies(24, apiKey);
-                if (!isMounted) {
-                    return;
-                }
-
-                if (response && response.anomalies) {
-                    setAnomalies(response.anomalies);
-                } else {
-                    setAnomalies([]);
-                }
-            } catch (error) {
-                console.error("Failed to load anomalies:", error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
+        isMountedRef.current = true;
         loadAnomalies();
 
-        // Refresh every 60 seconds
-        const intervalId = setInterval(loadAnomalies, 60000);
+        // refresh every 60 seconds
+        const intervalId = setInterval(() => loadAnomalies(false), 60000);
 
         return () => {
-            isMounted = false;
+            isMountedRef.current = false;
             clearInterval(intervalId);
         };
     }, [apiKey]);
+
+    // subscribe to WebSocket for real-time updates
+    useEffect(() => {
+        const unsubTraceCompleted = subscribe("trace_completed", () => {
+            setTimeout(() => {
+                if (isMountedRef.current) {
+                    loadAnomalies(false);
+                }
+            }, 1000);
+        });
+
+        return () => {
+            unsubTraceCompleted();
+        };
+    }, [subscribe, apiKey]);
 
     // Handle click outside to close dropdown
     useEffect(() => {
