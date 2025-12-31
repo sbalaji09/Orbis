@@ -322,7 +322,7 @@ export default function NotificationBell() {
                         <div className="px-4 py-2 border-t-2 border-black bg-[#f5f3f0]">
                             <button
                                 onClick={() => {
-                                    router.push("/dashboard/cost");
+                                    router.push("/dashboard/costs");
                                     setIsOpen(false);
                                 }}
                                 className="text-xs font-medium text-black/60 hover:text-black transition-colors w-full text-center"
