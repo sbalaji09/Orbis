@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { ReactElement } from "react";
 import { OrbisLogo } from "./OrbisLogo";
 import { useAuth } from "@/hooks/useAuth";
+import NotificationBell from "@/components/NotificationBell";
 
 interface NavItem {
   icon: ReactElement;
@@ -159,6 +160,7 @@ export default function NavMenu() {
 
         {/* User Info & Logout - Show skeleton while auth is loading */}
         <div className="flex items-center gap-3 pl-3 border-l-2 border-black/10">
+          <NotificationBell />
           {authLoading ? (
             <>
               <div className="h-4 w-32 bg-gray-200 animate-pulse rounded" />
