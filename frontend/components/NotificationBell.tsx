@@ -319,13 +319,13 @@ export default function NotificationBell() {
 
                     {/* Footer - Link to full alerts page */}
                     {anomalies.length > 0 && (
-                        <div className="px-4 py-2 border-t-2 border-black bg-[#f5f3f0]">
+                        <div className="px-4 py-3 border-t-2 border-black bg-[#f5f3f0]">
                             <button
                                 onClick={() => {
                                     router.push("/dashboard/costs");
                                     setIsOpen(false);
                                 }}
-                                className="text-xs font-medium text-black/60 hover:text-black transition-colors w-full text-center"
+                                className="text-sm text-babyblue hover:underline transition-colors w-full text-center"
                             >
                                 View all in Cost Dashboard
                             </button>
