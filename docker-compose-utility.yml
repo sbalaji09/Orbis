@@ -1,0 +1,7 @@
+version: "3.8"
+
+services:
+  utility:
+    image: busybox
+    container_name: orbis-utility
+    command: ["sleep", "3600"]

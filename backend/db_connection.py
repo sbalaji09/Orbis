@@ -17,6 +17,7 @@ load_dotenv()
 # this class is the connection to SupabaseDB
 
 
+# This is the DB connection class to SupabaseDB
 class SupabaseDB:
 
     # init the connection pool to Supabase
