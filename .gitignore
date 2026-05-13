@@ -110,6 +110,10 @@ logs/
 test-results/
 coverage/
 
+# Local testing fixtures (may contain keys)
+testing/
+observability_sdk/testing/
+
 # Documentation
 docs/_build/
 site/

@@ -199,7 +199,7 @@ class GzipRequestMiddleware(BaseHTTPMiddleware):
 app = FastAPI()
 
 # Add gzip decompression middleware (must be added before other middleware)
-app.add_middleware(GzipRequestMiddleware)
+# app.add_middleware(GzipRequestMiddleware)
 app.add_middleware(CORSMiddleware, **get_cors_config())
 
 # Include prompt versioning API
@@ -209,6 +209,8 @@ app.include_router(prompt_router)
 # instead of sending to the database automatically
 @app.post("/span", status_code=202)
 async def post_span(request: Request, span: SpanIn):
+
+    print(f"DEBUG: Received POST /span for span_id={span.span_id}, trace_id={span.trace_id}")
 
     check_api_key(request)
 

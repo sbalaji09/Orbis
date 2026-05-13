@@ -12,17 +12,18 @@ import openai
 
 # Configure observability
 configure(
-    api_key="VGVzdCBBZ2VudAyqF8dhGI1mMuqLtMFmouY=",
-    project_id="61d12c7c-e745-4a14-a039-60b7a5d1df62",
+    api_key="b3JiaXM8U7tvRyK3Yu_EuNZxN2Bg",
+    project_id="2362d81b-ae9c-4c79-ae80-411a4946bf22",
     user_id="fbd31533-fe77-427f-9d2d-a1c4c69e9a6d",
     api_url="http://localhost:8080",
+    compress_requests=False
 )
 
 instrument_all()
 
 # Configure OpenAI client to use Groq
 client = openai.OpenAI(
-    api_key="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",
+    api_key="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",
     base_url="https://api.groq.com/openai/v1"
 )
 
@@ -56,7 +57,7 @@ def test_streaming_v1():
     print("📡 Streaming response:")
     full_text = ""
     for chunk in response:
-        if chunk.choices[0].delta.content:
+        if chunk.choices and chunk.choices[0].delta.content:
             content = chunk.choices[0].delta.content
             print(content, end="", flush=True)
             full_text += content
@@ -90,7 +91,7 @@ def test_streaming_v2():
     print("📡 Streaming response:")
     full_text = ""
     for chunk in response:
-        if chunk.choices[0].delta.content:
+        if chunk.choices and chunk.choices[0].delta.content:
             content = chunk.choices[0].delta.content
             print(content, end="", flush=True)
             full_text += content

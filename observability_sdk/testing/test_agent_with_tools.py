@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from observability_sdk import configure, instrument_all, observe, observe_tool, instrument_http, run_tracked_command
 import openai
 
-GROQ_API_KEY = "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"
+GROQ_API_KEY = "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"
 
 # Check dependencies
 try:
@@ -22,8 +22,8 @@ except ImportError as e:
 
 # Configure Orbis
 configure(
-    api_key="VGVzdCBUcmFjZSAMlhbKlbc_MKUVQ-Kb1c95",
-    project_id="aca167c7-6c08-4fe2-a7af-21ec298e1d68",
+    api_key="b3JiaXM8U7tvRyK3Yu_EuNZxN2Bg",
+    project_id="2362d81b-ae9c-4c79-ae80-411a4946bf22",
     user_id="fbd31533-fe77-427f-9d2d-a1c4c69e9a6d",
     api_url="http://localhost:8080"
 )
@@ -153,7 +153,7 @@ def research_github_user(username: str):
     
     plan = ""
     for chunk in plan_response:
-        if chunk.choices[0].delta.content:
+        if chunk.choices and chunk.choices[0].delta.content:
             content = chunk.choices[0].delta.content
             plan += content
             print(content, end="", flush=True)
@@ -194,7 +194,7 @@ What stands out about this developer?
     
     profile_insight = ""
     for chunk in profile_analysis:
-        if chunk.choices[0].delta.content:
+        if chunk.choices and chunk.choices[0].delta.content:
             content = chunk.choices[0].delta.content
             profile_insight += content
             print(content, end="", flush=True)
@@ -234,7 +234,7 @@ In 2 sentences, what is this developer's primary focus or expertise?
     
     repo_focus = ""
     for chunk in repo_analysis:
-        if chunk.choices[0].delta.content:
+        if chunk.choices and chunk.choices[0].delta.content:
             content = chunk.choices[0].delta.content
             repo_focus += content
             print(content, end="", flush=True)
@@ -274,7 +274,7 @@ In 2 sentences, what does this score tell us about their impact in the GitHub co
     
     impact_analysis = ""
     for chunk in score_interpretation:
-        if chunk.choices[0].delta.content:
+        if chunk.choices and chunk.choices[0].delta.content:
             content = chunk.choices[0].delta.content
             impact_analysis += content
             print(content, end="", flush=True)
@@ -326,7 +326,7 @@ Make it engaging and highlight their contributions!
     
     summary = ""
     for chunk in final_summary:
-        if chunk.choices[0].delta.content:
+        if chunk.choices and chunk.choices[0].delta.content:
             content = chunk.choices[0].delta.content
             summary += content
             print(content, end="", flush=True)
